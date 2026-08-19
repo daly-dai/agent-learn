@@ -18,6 +18,11 @@
 //   - 真·流式（input.onDelta 提供）：stream:true，逐 token 读 SSE，
 //     文本 delta 立刻回调 onDelta，工具调用参数按 index 累积，
 //     finish 后统一 parse。
+//
+// 错误策略（两条路径共用）：
+//   网络错误 / HTTP 错误 / 用户中止都不抛异常，统一在
+//   postChatCompletion 里转成受控的 AssistantMessage（stopReason
+//   为 error / aborted），调用方（runAgentLoop）不需要 try-catch。
 // ============================================================
 
 import type {
@@ -31,7 +36,11 @@ import type { CompleteInput, TeachingModel } from "./model";
 import { messageText, text } from "./message";
 
 const DEFAULT_BASE_URL = "https://api.deepseek.com";
-const DEFAULT_MODEL = "deepseek-chat"; // 支持工具调用；deepseek-reasoner 是思考模式，历史上不支持 function calling
+const DEFAULT_MODEL = "deepseek-v4-flash"; // V4 系列（flash / pro），具体 model id 以官方文档为准，正式使用请用 DEEPSEEK_MODEL 显式指定
+
+// 错误 / 中止 / 流式消息没有真实 token 统计，统一用零值
+const EMPTY_USAGE: Usage = { input: 0, output: 0, totalTokens: 0 };
+const FALLBACK_TEXT = "（模型未返回内容）";
 
 export type DeepSeekModelOptions = {
   apiKey: string;
@@ -61,14 +70,17 @@ export class DeepSeekModel implements TeachingModel {
   }
 
   // ----------------------------------------------------------
-  // 非流式：一次请求拿完整响应
+  // 两条路径共用的请求入口
+  // 网络错误 / HTTP 错误 / 用户中止在这里统一转成受控消息，
+  // 流式与非流式不再各写一份错误处理。
   // ----------------------------------------------------------
-  private async completeNonStreaming(
+  private async postChatCompletion(
     url: string,
     input: CompleteInput,
     messages: OpenAiMessage[],
     tools: OpenAiTool[] | undefined,
-  ): Promise<AssistantMessage> {
+    stream: boolean,
+  ): Promise<ChatResult> {
     let response: Response;
     try {
       response = await fetch(url, {
@@ -78,24 +90,42 @@ export class DeepSeekModel implements TeachingModel {
           model: this.options.model ?? DEFAULT_MODEL,
           messages,
           ...(tools ? { tools } : {}),
-          stream: false,
+          stream,
         }),
         signal: input.signal,
       });
     } catch (error) {
       // 网络错误 / 用户中止：不抛异常，转成受控的 AssistantMessage
-      if (input.signal?.aborted) return abortedMessage();
-      return errorAssistant(
-        "network",
-        `网络请求失败：${error instanceof Error ? error.message : String(error)}`,
-      );
+      if (input.signal?.aborted) return { kind: "error", message: abortedMessage() };
+      return {
+        kind: "error",
+        message: errorAssistant(
+          "network",
+          `网络请求失败：${error instanceof Error ? error.message : String(error)}`,
+        ),
+      };
     }
 
     if (!response.ok) {
-      return errorAssistant("http", await httpErrorText(response));
+      return { kind: "error", message: errorAssistant("http", await httpErrorText(response)) };
     }
 
-    const data = (await response.json()) as OpenAiResponse;
+    return { kind: "ok", response };
+  }
+
+  // ----------------------------------------------------------
+  // 非流式：一次请求拿完整响应
+  // ----------------------------------------------------------
+  private async completeNonStreaming(
+    url: string,
+    input: CompleteInput,
+    messages: OpenAiMessage[],
+    tools: OpenAiTool[] | undefined,
+  ): Promise<AssistantMessage> {
+    const result = await this.postChatCompletion(url, input, messages, tools, false);
+    if (result.kind === "error") return result.message;
+
+    const data = (await result.response.json()) as OpenAiResponse;
     return toTeachingAssistantMessage(data);
   }
 
@@ -108,31 +138,10 @@ export class DeepSeekModel implements TeachingModel {
     messages: OpenAiMessage[],
     tools: OpenAiTool[] | undefined,
   ): Promise<AssistantMessage> {
-    let response: Response;
+    const result = await this.postChatCompletion(url, input, messages, tools, true);
+    if (result.kind === "error") return result.message;
 
-    try {
-      response = await fetch(url, {
-        method: "POST",
-        headers: this.headers(),
-        body: JSON.stringify({
-          model: this.options.model ?? DEFAULT_MODEL,
-          messages,
-          ...(tools ? { tools } : {}),
-          stream: true,
-        }),
-        signal: input.signal,
-      });
-    } catch (error) {
-      if (input.signal?.aborted) return abortedMessage();
-      return errorAssistant(
-        "network",
-        `网络请求失败：${error instanceof Error ? error.message : String(error)}`,
-      );
-    }
-
-    if (!response.ok) {
-      return errorAssistant("http", await httpErrorText(response));
-    }
+    const response = result.response;
     if (!response.body) {
       return errorAssistant("http", "响应体为空，无法流式读取。");
     }
@@ -145,7 +154,7 @@ export class DeepSeekModel implements TeachingModel {
     let buffer = "";
     let textBuffer = "";
     let finishReason: string | undefined;
-    
+
     const toolCallsAcc = new Map<number, { id?: string; name?: string; args: string }>();
 
     // 处理一个 SSE data chunk
@@ -185,16 +194,8 @@ export class DeepSeekModel implements TeachingModel {
           buffer = buffer.slice(newline + 1);
           if (!line.startsWith("data:")) continue;
 
-          const payload = line.slice(5).trim();
-          if (payload === "[DONE]") continue; // 结束标记
-
-          let chunk: OpenAiChunk;
-          try {
-            chunk = JSON.parse(payload);
-          } catch {
-            continue; // 忽略无法解析的行
-          }
-          consume(chunk);
+          const chunk = parseSseData(line.slice(5).trim());
+          if (chunk) consume(chunk);
         }
       }
     } catch (error) {
@@ -204,7 +205,7 @@ export class DeepSeekModel implements TeachingModel {
           role: "assistant",
           content: textBuffer.length > 0 ? [text(textBuffer)] : [text("（请求已中止）")],
           stopReason: "aborted",
-          usage: { input: 0, output: 0, totalTokens: 0 },
+          usage: EMPTY_USAGE,
           timestamp: Date.now(),
         };
       }
@@ -248,16 +249,12 @@ function buildStreamMessage(
     }));
   content.push(...toolCalls);
 
-  if (content.length === 0) {
-    content.push(text("（模型未返回内容）"));
-  }
-
   return {
     role: "assistant",
-    content,
-    stopReason: finishReason === "tool_calls" || toolCalls.length > 0 ? "toolUse" : "stop",
+    content: withFallbackText(content),
+    stopReason: stopReasonFor(finishReason, toolCalls.length),
     // 流式下精确 token 用量需 stream_options.include_usage（后续可补）
-    usage: { input: 0, output: 0, totalTokens: 0 },
+    usage: EMPTY_USAGE,
     timestamp: Date.now(),
   };
 }
@@ -354,10 +351,6 @@ function toTeachingAssistantMessage(data: OpenAiResponse): AssistantMessage {
   }
   content.push(...toolCalls);
 
-  if (content.length === 0) {
-    content.push(text("（模型未返回内容）"));
-  }
-
   const usage: Usage = {
     input: data.usage?.prompt_tokens ?? 0,
     output: data.usage?.completion_tokens ?? 0,
@@ -366,11 +359,28 @@ function toTeachingAssistantMessage(data: OpenAiResponse): AssistantMessage {
 
   return {
     role: "assistant",
-    content,
-    stopReason: finishReason === "tool_calls" || toolCalls.length > 0 ? "toolUse" : "stop",
+    content: withFallbackText(content),
+    stopReason: stopReasonFor(finishReason, toolCalls.length),
     usage,
     timestamp: Date.now(),
   };
+}
+
+// ------------------------------------------------------------
+// 两条路径共用的零碎逻辑
+// ------------------------------------------------------------
+
+/** 模型是否要进入工具循环：finish_reason 或内容里有 tool call 就算 */
+function stopReasonFor(
+  finishReason: string | undefined,
+  toolCallCount: number,
+): AssistantMessage["stopReason"] {
+  return finishReason === "tool_calls" || toolCallCount > 0 ? "toolUse" : "stop";
+}
+
+/** 内容为空时补占位文本，避免发出空消息 */
+function withFallbackText(content: AssistantMessage["content"]): AssistantMessage["content"] {
+  return content.length > 0 ? content : [text(FALLBACK_TEXT)];
 }
 
 // ------------------------------------------------------------
@@ -381,7 +391,7 @@ function errorAssistant(code: string, message: string): AssistantMessage {
     role: "assistant",
     content: [text(`[模型错误] ${message}`)],
     stopReason: "error",
-    usage: { input: 0, output: 0, totalTokens: 0 },
+    usage: EMPTY_USAGE,
     timestamp: Date.now(),
     errorMessage: `${code}: ${message}`,
   };
@@ -392,7 +402,7 @@ function abortedMessage(): AssistantMessage {
     role: "assistant",
     content: [text("（请求已中止）")],
     stopReason: "aborted",
-    usage: { input: 0, output: 0, totalTokens: 0 },
+    usage: EMPTY_USAGE,
     timestamp: Date.now(),
   };
 }
@@ -402,6 +412,20 @@ async function httpErrorText(response: Response): Promise<string> {
   return `DeepSeek API ${response.status} ${response.statusText}${
     bodyText ? `：${truncate(bodyText, 300)}` : ""
   }`;
+}
+
+/**
+ * 解析一个 SSE data 载荷。
+ * 返回 null 表示跳过：`[DONE]` 结束标记，或这一行是坏 JSON
+ * （断流/网络抖动时常见，忽略即可，别让整个流崩掉）。
+ */
+function parseSseData(payload: string): OpenAiChunk | null {
+  if (payload === "[DONE]") return null;
+  try {
+    return JSON.parse(payload) as OpenAiChunk;
+  } catch {
+    return null;
+  }
 }
 
 function safeJsonParse(raw: string): Record<string, unknown> {
@@ -447,6 +471,12 @@ function debugLog(
 // ------------------------------------------------------------
 // provider 侧类型（只在本文件可见，不污染 lib/types.ts）
 // ------------------------------------------------------------
+
+/** postChatCompletion 的结果：成功拿到 Response，或已转成受控错误消息 */
+type ChatResult =
+  | { kind: "ok"; response: Response }
+  | { kind: "error"; message: AssistantMessage };
+
 type OpenAiMessage =
   | { role: "system" | "user"; content: string }
   | { role: "tool"; content: string; tool_call_id: string }
