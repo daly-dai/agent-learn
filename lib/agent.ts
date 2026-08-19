@@ -1,44 +1,3 @@
-// ============================================================
-// Agent 核心 —— runAgentLoop（ReAct 循环）
-// ============================================================
-//
-// 这个文件是「引擎」。它不关心谁在调用自己，只负责产出两样东西：
-//   1. 结果数据 newMessages —— 本轮新增的完整消息列表（最终对话记录）
-//   2. 过程事件 events      —— 每一步发生了什么的「过程日志」
-//
-// 「使用端 / 消费者」就是调用 runAgentLoop 并消费这两样产物的一方。
-// 事件有两条通道，消费者可以任选其一：
-//   - onEvent 回调      → 边跑边推（推送式 push，用于流式输出 / 日志 / 中途中止）
-//   - 返回值 events 数组 → 跑完一次性拿（拉取式 pull，用于测试 / 批处理 / 落盘）
-//   两条通道是互补的，不是重复：引擎内置了「存数组」，又同时「往外回调」，
-//   目的是让引擎不依赖任何一种具体的消费者。
-//
-// ReAct 循环 = Reasoning（推理）+ Acting（行动）：
-//
-//   context = [...messages]                  // 复制一份，避免改到调用方原数组
-//   for turn in 1..maxTurns:
-//     assistant = model.complete(...)        // ① 让模型"想"一次
-//     context.push(assistant)                // ② 模型的回复进入上下文
-//     emit message 生命周期事件
-//
-//     if stopReason 是 error/aborted → return  // 模型出错 / 被中止 → 受控收尾
-//
-//     toolCalls = assistant.content 里 type=="toolCall" 的块
-//     if 没有 toolCalls → return               // 模型直接给出最终答案 → 正常结束
-//
-//     for each toolCall:                       // ③ 模型想"动手"
-//       beforeToolCall 审批（allow / block / rewrite）
-//       block   → 造一个 isError 的 toolResult（不真正执行）
-//       rewrite → 用新参数执行
-//       allow   → 用原参数执行
-//       context.push(toolResult)               // ④ 工具结果喂回上下文，成为"短期记忆"
-//       emit 工具执行事件
-//
-//   超出 maxTurns → guardrail 消息（防止无限循环）
-//
-// 参考实现见：lib/agentDemo.ts
-// ============================================================
-
 import type {
   AgentEvent,
   AgentMessage,
@@ -49,7 +8,7 @@ import type {
 } from "./types";
 import type { TeachingModel } from "./model";
 import type { ToolRegistry } from "./tools";
-import { text } from "./message";
+import { createAssistantMessage, text } from "./message";
 
 // ------------------------------------------------------------
 // 审批决策：模型想调用工具时，由使用端决定「放行 / 拦截 / 改写参数」。
@@ -83,17 +42,7 @@ type RunAgentLoopOptions = {
   onEvent?: (event: AgentEvent) => void;
 };
 
-// ------------------------------------------------------------
-// 发射一条消息的「生命周期事件」：start → (update…) → end
-//
-// message_start  消息出现（气泡先占位）
-// message_update 消息内容追加（对应真实模型的「逐 token 流式输出」）
-// message_end    消息完成
-//
-// 注意：本教学版用的 MockModel 是一次性返回完整消息，所以这三件事会背靠背
-// 瞬间发完，看起来多余。但「协议形状」是照着真实流式模型设计的——将来把
-// MockModel 换成真正逐 token 输出的模型，使用端（前端）一行都不用改。
-// ------------------------------------------------------------
+
 function emitMessageLifecycle(
   message: AgentMessage,
   emit: (event: AgentEvent) => void,
@@ -228,18 +177,30 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<{
     emit({ type: "turn_start", turn });
 
     // 2a. 让模型"想"一次：给定系统提示词 + 当前上下文 + 工具列表
+    //
+    // 流式三连（真正逐 token）：
+    //   message_start  先发一个空占位消息（前端据此建气泡）
+    //   message_update 模型每吐一段文本就发一条 delta（前端累加）
+    //   message_end    用完整最终消息收尾（含工具调用块）
+    // 非流式模型（MockModel）不调 onDelta，最终消息仍由 message_end 送达，
+    // 所以这条路径对两者都成立。
+    const streamingMessage = createAssistantMessage([text("")]);
+    emit({ type: "message_start", message: streamingMessage });
+
     const assistant = await options.model.complete({
       systemPrompt: options.systemPrompt,
       messages: context,
       tools: options.tools,
+      onDelta: (delta) => {
+        emit({ type: "message_update", message: streamingMessage, delta });
+      },
     });
 
     // 2b. 模型的回复同时进入「上下文」和「本轮新增记录」
     context.push(assistant);
     newMessages.push(assistant);
 
-    // 发射这条 assistant 消息的生命周期事件
-    emitMessageLifecycle(assistant, emit);
+    emit({ type: "message_end", message: assistant });
 
     // 2c. 模型层异常 / 被中止 → 受控收尾
     //    这里 return 不是"报错"，而是"安全停下并交出到目前为止的完整档案"：

@@ -10,11 +10,6 @@
 //   data: {json}\n\n
 // 浏览器用 fetch + ReadableStream 逐块读取，事件一到就立刻渲染。
 //
-// Phase 0 新增两件事：
-//   1. 模型选择：MOCK_MODE=true 用 MockModel（离线教学），否则用 DeepSeekModel。
-//   2. 轨迹（Trace）：每次请求 = 一次 run，用 TraceRecorder 把事件落盘成
-//      JSONL 黑匣子（边跑边写，事后可回放），同时照旧推给 SSE。
-//
 // 本路由会依次推送以下帧（frame）：
 //   { type: "run", runId, model }   本次 run 的元信息（前端据此展示）
 //   { type: "event", event }        每个 Agent 事件（含用户消息 + Agent 内部事件）
@@ -37,27 +32,48 @@ import { TraceRecorder } from "@/lib/trace";
 // 后面 Phase 4 还要用 node:child_process 跑终端。
 export const runtime = "nodejs";
 
+// 工作区根目录
 const workspaceRoot = resolve(process.cwd(), "workspace");
+// 轨迹（Trace）目录
 const traceDir = resolve(process.cwd(), ".traces");
+// 工具注册表
 const toolRegistry = createToolRegistry(workspaceRoot);
 
 const systemPrompt = [
-  "你是 Teaching Agent，一个用于解释 Agent 核心机制的教学版 Agent。",
-  "你可以使用工具观察安全工作区，也可以直接回答概念问题。",
-  "当工具返回结果后，必须基于工具结果继续回答用户。",
+  "你是 Teaching Agent，一个帮助初学者理解 AI Agent 核心机制的教学助手。",
+  "你运行在一个安全工作区（workspace/）内，只能通过工具与文件交互，不能直接改动文件系统。",
+  "",
+  "## 工具使用原则",
+  "你可以调用这些工具：list_files（列文件）、read_file（读文件）、write_note（写 Markdown 笔记）。",
+  "- 只有用户明确要「列出 / 读取 / 写入」文件时才调用工具；概念原理类问题直接回答，不要硬套工具。",
+  "- 一次只调用当前步骤真正需要的工具；拿到工具结果后必须基于真实结果回答，绝不编造文件内容。",
+  "- 工具失败或读不到内容时，如实说明，不要假装成功。",
+  "",
+  "## 输出要求",
+  "- 始终用中文回答。",
+  "- 用 Markdown 排版：善用标题、列表、表格；代码示例用带语言标注的代码块。",
+  "- 解释概念时：先一句话结论 → 再展开讲机制 → 最后给一个最小示例或类比。",
 ].join("\n");
 
 // SSE 帧的联合类型（前端 page.tsx 用同名类型来消费）
 type StreamFrame =
   | { type: "run"; runId: string; model: string }
   | { type: "event"; event: AgentEvent }
-  | { type: "done"; messages: AgentMessage[]; tools: ToolDefinition[]; runId: string }
+  | {
+      type: "done";
+      messages: AgentMessage[];
+      tools: ToolDefinition[];
+      runId: string;
+    }
   | { type: "error"; message: string };
 
+// --- POST /api/chat ---
 export async function POST(req: NextRequest) {
   let text: unknown;
+
   try {
     const body = await req.json();
+
     text = body?.text;
   } catch {
     return NextResponse.json({ error: "请求体不是合法 JSON" }, { status: 400 });
@@ -73,6 +89,7 @@ export async function POST(req: NextRequest) {
   let modelLabel: string;
   try {
     const selected = selectModel();
+
     model = selected.model;
     modelLabel = selected.label;
   } catch (error) {
@@ -86,6 +103,7 @@ export async function POST(req: NextRequest) {
 
   // 本次 run 的黑匣子：每次请求一个独立 runId，落到 .traces/<runId>.jsonl
   const recorder = TraceRecorder.create(traceDir, modelLabel);
+
   await recorder.init();
 
   const encoder = new TextEncoder();
@@ -93,7 +111,10 @@ export async function POST(req: NextRequest) {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       const send = (frame: StreamFrame) => {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(frame)}\n\n`));
+        // 每个 frame 前加 data: 开头，后加两个换行符，模拟 SSE 流
+        controller.enqueue(
+          encoder.encode(`data: ${JSON.stringify(frame)}\n\n`),
+        );
       };
 
       try {
@@ -101,8 +122,16 @@ export async function POST(req: NextRequest) {
         send({ type: "run", runId: recorder.runId, model: modelLabel });
 
         // 1) 用户消息生命周期事件：既进 SSE（前端画气泡），也进轨迹（黑匣子）
-        const userStart: AgentEvent = { type: "message_start", message: userMessage };
-        const userEnd: AgentEvent = { type: "message_end", message: userMessage };
+        const userStart: AgentEvent = {
+          type: "message_start",
+          message: userMessage,
+        };
+
+        const userEnd: AgentEvent = {
+          type: "message_end",
+          message: userMessage,
+        };
+
         recorder.record(userStart);
         send({ type: "event", event: userStart });
         recorder.record(userEnd);
@@ -162,6 +191,7 @@ function selectModel(): { model: TeachingModel; label: string } {
   }
 
   const apiKey = process.env.DEEPSEEK_API_KEY;
+
   if (!apiKey || apiKey === "sk-your-key-here") {
     throw new Error(
       "未配置 DEEPSEEK_API_KEY。请在 .env.local 填入真实 key 并把 MOCK_MODE 改为 false，或保持 MOCK_MODE=true 使用离线教学模式。",
@@ -173,6 +203,7 @@ function selectModel(): { model: TeachingModel; label: string } {
     baseUrl: process.env.DEEPSEEK_BASE_URL || undefined,
     model: process.env.DEEPSEEK_MODEL || undefined,
   });
+
   return { model, label: process.env.DEEPSEEK_MODEL || "deepseek-chat" };
 }
 
@@ -189,7 +220,10 @@ function beforeToolCall(call: {
   // 策略：不允许写入含 secret/秘密 的文件名
   if (call.name === "write_note") {
     const fileName =
-      typeof call.arguments.fileName === "string" ? call.arguments.fileName : "";
+      typeof call.arguments.fileName === "string"
+        ? call.arguments.fileName
+        : "";
+
     if (/secret|秘密/i.test(fileName)) {
       return {
         action: "block",

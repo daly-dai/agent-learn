@@ -10,6 +10,8 @@ export type CompleteInput = {
   messages: AgentMessage[];
   tools: ToolDefinition[];
   signal?: AbortSignal;
+  /** 逐段文本增量回调：流式模型每吐一段文本就调一次；非流式模型可忽略 */
+  onDelta?: (delta: string) => void;
 };
 
 export interface TeachingModel {
