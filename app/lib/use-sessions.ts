@@ -54,15 +54,19 @@ export function useSessions() {
   );
 
   // 挂载：拉列表，默认选中第一个（最近活跃的）
-  // AbortController：卸载时 abort() 取消请求，替代手写 cancelled 标志
+  // AbortController：卸载时 abort() 取消请求，替代手写 cancelled 标志。
+  // useEffect 不能直接传 async 函数（会返回 Promise 触发 React 警告），
+  // 所以包一层 async load() 再调用——比 .then 链读起来更统一
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
-    refresh(controller.signal).then((list) => {
+    async function load() {
+      const list = await refresh(controller.signal);
       if (controller.signal.aborted) return; // 已卸载，不再 setState
       setLoading(false);
       setCurrentId((prev) => prev || list[0]?.id || "");
-    });
+    }
+    load();
     return () => controller.abort();
   }, [refresh]);
 

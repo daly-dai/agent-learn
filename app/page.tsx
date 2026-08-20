@@ -135,7 +135,8 @@ export default function Home() {
 
   return (
     <div className="app">
-      {/* 页头：runId / 模型名 / 状态灯 / 清空按钮。canReset 在非加载且有内容时可点 */}
+      {/* 页头：runId / 模型名 / 状态灯 / 清空按钮。canReset 在非加载且有内容时可点。
+          停止按钮不在这：它在输入框旁（run 进行中发送按钮变身），见 console 区 */}
       <Nameplate
         runId={runId}
         model={model}
@@ -143,10 +144,6 @@ export default function Home() {
         turn={turn}
         onReset={reset}
         canReset={!loading && (messages.length > 0 || observed.length > 0)}
-        canStop={loading && Boolean(runId)}
-        onStop={() => {
-          stop(runId);
-        }}
       />
 
       <div className="deck">
@@ -221,13 +218,27 @@ export default function Home() {
                 disabled={loading}
                 autoFocus
               />
-              <button
-                className="console-send"
-                type="submit"
-                disabled={loading || !input.trim()}
-              >
-                发送
-              </button>
+              {/* 发送按钮在 run 进行中「变身」为停止按钮：
+                  位置永远不变（操作跟随视线），角色随 loading 切换。
+                  stop 需要 runId（来自 SSE run 帧），未到时短暂不可点 */}
+              {loading ? (
+                <button
+                  className="console-stop"
+                  type="button"
+                  onClick={() => stop(runId)}
+                  disabled={!runId}
+                >
+                  停止
+                </button>
+              ) : (
+                <button
+                  className="console-send"
+                  type="submit"
+                  disabled={!input.trim()}
+                >
+                  发送
+                </button>
+              )}
             </div>
             <p className="console-hint">
               Enter 发送 · Shift + Enter 换行 · 每次发送开始新的一次 run

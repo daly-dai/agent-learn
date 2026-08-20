@@ -3,6 +3,10 @@
 // ============================================================
 // 铭牌 —— 页头：标志 / 标题 / run 信息 / 状态灯 / 清空按钮
 // ============================================================
+// 停止按钮不在页头：它是高频操作，放在输入框旁（发送按钮在 run
+// 进行中变成「停止」），见 page.tsx console 区——操作位置跟随
+// 用户视线，这是 Phase 4 遗留体验问题的修正。
+// ============================================================
 
 import { shortId } from "../lib/format";
 
@@ -23,9 +27,6 @@ type NameplateProps = {
   turn: number;
   canReset: boolean;
   onReset: () => void;
-  /** Phase 4：停止当前 run（中止模型请求 + 杀死 bash 命令） */
-  canStop?: boolean;
-  onStop?: () => void;
 };
 
 export function Nameplate({
@@ -35,8 +36,6 @@ export function Nameplate({
   turn,
   canReset,
   onReset,
-  canStop,
-  onStop,
 }: NameplateProps) {
   return (
     <header className="nameplate">
@@ -54,11 +53,6 @@ export function Nameplate({
           </span>
         )}
         <StatusBeacon phase={phase} turn={turn} />
-        {canStop && (
-          <button className="btn btn-stop" onClick={onStop}>
-            停止
-          </button>
-        )}
         <button className="btn" onClick={onReset} disabled={!canReset}>
           清空记录
         </button>

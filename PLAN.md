@@ -432,6 +432,42 @@ type TraceEntry = {
   - **实现前补记（已确认，2026-08-20，两轮调整后定案）**：**两个正交的抽象，两层目录**（用户第二轮意见：plugins 只放通用能力，接口定义进专门的 api 文件夹）：
     - `plugins/` = **通用能力插件**（与业务无关、可复用）：`plugins/http/` 放 `api<T>()` + `ApiError`（全项目唯一 fetch 样板；方法类型限定实际用到的 GET/POST/PATCH/DELETE，**不做 PUT**；`body` 有值才加 Content-Type + stringify；`signal` 透传 AbortController）。以后其他插件（终端、工作区…）并列放在 `plugins/` 下。
     - `api/` = **业务接口清单**（本项目专属，与服务端 route 一一对应）：按 REST 资源分模块 `sessions/`、`chat/`，每个模块 `index.ts` 定义语义化接口函数（method 在此消化，调用方见不到）、`types.ts` 放参数/返回类型。`api/` 依赖 `plugins/http`，hooks 只依赖 `api/`——依赖单向。**命名沿革（2026-08-20 定案）**：最初放根目录 `api/`，会与 Next.js 强约定的 `app/api/`（服务端路由位置，route.ts 只能放那里）撞名混淆；用户定案改名 **`app/services/`**（与 `app/lib/`、`app/components/` 平级）。`app/` 下只有 page.tsx/route.ts 等特定文件名参与路由，普通 .ts 文件不产生路由，放 `app/` 下安全。
-    - **`sendMessage`（SSE）不收进 `api<T>`**（它要原始 `res.body` 交 `readStream`），但定义仍收口在 `api/chat/index.ts`，注释写明原因。
+    - **`sendMessage`（SSE）不收进 `api<T>`**（它要原始 `res.body` 交 `readStream`），但定义仍收口在 `app/services/chat/index.ts`，注释写明原因。
     - 类型搬家：`SessionSummary` 从 `use-sessions.ts` re-export（`session-list.tsx` 的 import 不变）；**`ToolApprovalRequest` 不搬家**——它是弹框 UI 状态类型（含 toolName/args 用于展示），不是接口参数类型（接口只要 `{toolCallId, allow}`），借此区分「接口类型 vs UI 状态类型」。
     - 顺手修两处：① `approve` 的 fetch 移出 setState updater（React 反模式，updater 理论上可能被调用两次）；② 两处手写 `cancelled` 竞态标志换 AbortController（挂载/切会话 effect 里 `controller.abort()` 即取消请求，catch 里按 `AbortError` 名显式忽略）。
+
+---
+
+## 十二、远期功能地图（开源 Agent 盘点提炼）
+
+> 来源：`workspace/开源Agent功能盘点.md`（市面五类 agent 全景 + pi / DSH / smolagents 一手探索）。
+> 定位：**很后期**——主线（Phase 5/6）走稳后再回头。每一项都已确认"长在哪个接缝"，**不需要为此改架构**——这是"接缝由需求逼出来"的运用：先登记在路线图（文档级预留），需求真来了再实现。
+
+### Top 5（按"学到的东西 ÷ 改动量"排序）
+
+| # | 功能 | 参考 | 长在哪 | 前置 |
+|---|---|---|---|---|
+| 1 | **仓库地图（repo map）** | [Aider](https://aider.chat/docs/repomap.html) | `lib/tools/` 新工具 `repo_map`：解析 import 引用边 + 按任务关键词 BFS 选相关文件压进上下文 | 无 |
+| 2 | **Skills（.md 即技能）** | Claude Code / pi `.pi/skills/` / DSH `packages/skill` | `app/api/chat/route.ts` 的 systemPrompt 组装处 + 根目录 `skills/` 目录（加载函数按描述注入） | 无 |
+| 3 | **分级权限（auto/plan/ask）** | Cline / Roo Code / Codex | `app/api/chat/route.ts` 的 `TOOLS_NEEDING_CONFIRM` 判定处：弹框加"本次会话记住"→ 会话级偏好 → 命中即放行；plan 档 = 模型只出计划 | 无 |
+| 4 | **hooks 化**（`beforeToolCall` → 钩子注册表） | Claude Code / DSH `packages/hooks` | `lib/agent.ts`（引擎只触发、不实现，同 `onToolOutput` 透传模式）；`lib/hooks.ts` 注册表 `onBeforeTool`/`onAfterTool` | 无 |
+| 5 | **代码执行器（Python 沙箱）** | smolagents `local_python_executor` | `lib/tools/` 新工具 `python`：复用 BashRunner 的进程管理 + stdout 捕获，"代码即动作" | 无 |
+
+### 远期其他项
+
+| 功能 | 参考 | 长在哪 | 前置 |
+|---|---|---|---|
+| MCP 生态 | Cline / smolagents `mcp_client.py` | ToolRegistry 注册外部工具源 | 工具系统稳定后 |
+| 沙箱容器 | OpenHands / DSH `packages/sandbox` | BashRunner 同级的新 Runner（真隔离） | 安全课题单独立项 |
+| 多智能体（handoffs 交接） | OpenAI Agents SDK | `runAgentLoop` 嵌套调用（子智能体=再跑一个 loop） | Phase 5 子智能体委派 |
+| 定时任务 | DSH `packages/schedule` | 产品层新 Runner | 无 |
+| 分析面板 | OpenHands / DSH `packages/feedback` | trace L3 Viewer（Phase 6）的延伸 | Phase 6 |
+| 个人行为偏好 | 各家配置体系 | 设置页 + 系统提示词注入 | 设置页之后 |
+
+### 五个共同规律（判断"要不要学"的尺子）
+
+1. **配置即文件**：`.pi/skills/*.md`、"设置页"的本质是读写配置文件，不是独立系统。
+2. **hooks 是标准扩展点**：Claude Code、DSH 都有 hooks 包；我们的 `beforeToolCall` 已是雏形。
+3. **记忆分层是标配**：上下文（短期）→ 摘要（长期）→ 外部记忆；我们只有第一层 + 拼贴式摘要。
+4. **权限分级是共识**：auto / plan / ask 三档；我们已在"ask 全量"这一档。
+5. **成熟产品必有沙箱**：OpenHands 容器、Codex 双层、DSH sandbox；我们是"路径沙箱 + 人工确认"的轻量版。

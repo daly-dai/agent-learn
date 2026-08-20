@@ -54,10 +54,10 @@ export function useAgentRun(sessionId: string) {
   // bash 命令的实时输出：toolCallId → 已累积的文本（tool_output 帧逐块追加）
   const [toolOutputs, setToolOutputs] = useState<Record<string, string>>({});
 
-  // 会话历史：挂载时 / sessionId 变化时触发。
-  // 先清空本地（避免上一会话的消息残留），再拉新会话的历史（刷新不丢）。
-  // AbortController：切会话/卸载时 abort() 取消请求，替代手写 cancelled 标志
-  useEffect(() => {
+  // 清空本地状态（不含服务端）：切会话 / 清空记录共用同一份。
+  // 从历史恢复 effect 和 reset() 里抽出来的公共逻辑——
+  // 原来两处各写一遍，且 reset 漏了清 toolOutputs，统一后行为一致
+  const resetLocal = useCallback(() => {
     setMessages([]);
     setObserved([]);
     setError("");
@@ -66,64 +66,93 @@ export function useAgentRun(sessionId: string) {
     setStats(ZERO_STATS);
     setPendingApproval(null);
     setToolOutputs({});
+  }, []);
+
+  // 会话历史：挂载时 / sessionId 变化时触发。
+  // 先清空本地（避免上一会话的消息残留），再拉新会话的历史（刷新不丢）。
+  // AbortController：切会话/卸载时 abort() 取消请求，替代手写 cancelled 标志
+  useEffect(() => {
+    resetLocal();
     if (!sessionId) return;
 
     const controller = new AbortController();
-    fetchHistory(sessionId, { signal: controller.signal })
-      .then((data) => {
+    async function load() {
+      try {
+        const data = await fetchHistory(sessionId, {
+          signal: controller.signal,
+        });
         if (Array.isArray(data.messages)) {
           setMessages(data.messages);
         }
         setStats(data.stats ?? ZERO_STATS);
-      })
-      .catch((e) => {
+      } catch (e) {
         if ((e as Error).name === "AbortError") return; // 切会话/卸载导致的取消
         // 其他失败：历史拉不到，页面从空开始（留痕便于排查，不打扰 UI）
         console.warn("拉取会话历史失败", e);
-      });
-    return () => controller.abort();
-  }, [sessionId]);
-
-  // 消费一帧 SSE：run 帧记元信息；event 帧进时间线并按事件类型更新转录稿；
-  // done 帧用全量历史整体替换；error 帧记错误。
-  const applyFrame = useCallback((frame: StreamFrame) => {
-    if (frame.type === "run") {
-      setRunId(frame.runId);
-      setModel(frame.model);
-    } else if (frame.type === "event") {
-      const ev = frame.event;
-      setObserved((prev) => [
-        ...prev,
-        { seq: prev.length + 1, at: Date.now(), event: ev },
-      ]);
-      if (ev.type === "message_start") {
-        setMessages((prev) => [...prev, ev.message]);
-      } else if (ev.type === "message_update") {
-        setMessages((prev) => appendDelta(prev, ev.delta));
-      } else if (ev.type === "message_end") {
-        setMessages((prev) => replaceLast(prev, ev.message));
       }
-    } else if (frame.type === "done") {
-      setMessages(frame.messages);
-      setRunId(frame.runId);
-      setStats(frame.stats);
-      // run 结束了：服务端不再有挂起的确认（超时会自动拒绝），清掉弹框
-      setPendingApproval(null);
-    } else if (frame.type === "error") {
-      setError(frame.message);
-    } else if (frame.type === "tool_permission_request") {
-      // 写/改/删工具需要人工确认：交给页面弹框
-      setPendingApproval({
-        toolCallId: frame.toolCallId,
-        toolName: frame.toolName,
-        args: frame.args,
-      });
-    } else if (frame.type === "tool_output") {
-      // bash 命令的流式输出：按 toolCallId 累积（同一次调用多次到达）
-      setToolOutputs((prev) => ({
-        ...prev,
-        [frame.toolCallId]: (prev[frame.toolCallId] ?? "") + frame.text,
-      }));
+    }
+    load();
+    return () => controller.abort();
+  }, [sessionId, resetLocal]);
+
+  // 消费一帧 SSE：按帧类型分派（switch + 可辨识联合，漏了新帧类型
+  // TypeScript 会在 default 处报穷尽性提示，比 if-else 链更安全）
+  const applyFrame = useCallback((frame: StreamFrame) => {
+    switch (frame.type) {
+      case "run":
+        setRunId(frame.runId);
+        setModel(frame.model);
+        break;
+      case "event": {
+        const ev = frame.event;
+        setObserved((prev) => [
+          ...prev,
+          { seq: prev.length + 1, at: Date.now(), event: ev },
+        ]);
+        // 事件内部再按消息事件分派；其他事件类型只进时间线，不碰转录稿
+        switch (ev.type) {
+          case "message_start":
+            setMessages((prev) => [...prev, ev.message]);
+            break;
+          case "message_update":
+            setMessages((prev) => appendDelta(prev, ev.delta));
+            break;
+          case "message_end":
+            setMessages((prev) => replaceLast(prev, ev.message));
+            break;
+          default:
+            break;
+        }
+        break;
+      }
+      case "done":
+        setMessages(frame.messages);
+        setRunId(frame.runId);
+        setStats(frame.stats);
+        // run 结束了：服务端不再有挂起的确认（超时会自动拒绝），清掉弹框
+        setPendingApproval(null);
+        break;
+      case "error":
+        setError(frame.message);
+        break;
+      case "tool_permission_request":
+        // 写/改/删工具需要人工确认：交给页面弹框
+        setPendingApproval({
+          toolCallId: frame.toolCallId,
+          toolName: frame.toolName,
+          args: frame.args,
+        });
+        break;
+      case "tool_output":
+        // bash 命令的流式输出：按 toolCallId 累积（同一次调用多次到达）
+        setToolOutputs((prev) => ({
+          ...prev,
+          [frame.toolCallId]: (prev[frame.toolCallId] ?? "") + frame.text,
+        }));
+        break;
+      default:
+        // StreamFrame 新增类型时，TS 会在这里提示漏了分支
+        break;
     }
   }, []);
 
@@ -132,13 +161,9 @@ export function useAgentRun(sessionId: string) {
   // 副作用不该放里面——React 反模式，Phase 3 遗留下来的）
   const approve = useCallback(
     async (allow: boolean) => {
-
       if (!pendingApproval) return;
-      
       const { toolCallId } = pendingApproval;
-      
       setPendingApproval(null); // 立即关掉弹框；服务端那边 resolve 后引擎继续
-      
       try {
         await approveTool({ toolCallId, allow });
       } catch {
@@ -161,7 +186,6 @@ export function useAgentRun(sessionId: string) {
   const send = useCallback(
     async (text: string) => {
       if (!sessionId || !text.trim() || loading) return;
-      
       setLoading(true);
       setError("");
       // 不清空 messages：历史来自会话历史 + 本次事件流的追加，多轮对话得以保留
@@ -200,14 +224,8 @@ export function useAgentRun(sessionId: string) {
         // 网络失败也继续清本地，不阻塞用户
       }
     }
-    setMessages([]);
-    setObserved([]);
-    setError("");
-    setRunId("");
-    setModel("");
-    setStats(ZERO_STATS);
-    setPendingApproval(null);
-  }, [sessionId]);
+    resetLocal();
+  }, [sessionId, resetLocal]);
 
   return {
     messages,
