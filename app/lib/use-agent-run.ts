@@ -13,12 +13,21 @@
 //     send 接收外部传入的文本；页面负责清空输入框。
 //   - Phase 2 多会话：hook 接收 sessionId（来自 useSessions 的 currentId）。
 //     sessionId 变化 = 切换会话：清空本地状态 → 拉新会话历史。
+//   - 请求全部走 app/services 接口层，本文件不再直接 fetch：
+//     fetchHistory / clearHistory / approveTool / stopRun / sendMessage
 // ============================================================
 
 import { useCallback, useEffect, useState } from "react";
 import type { AgentMessage, SessionStats } from "@/lib/types";
 import { appendDelta, replaceLast } from "./messages";
 import { readStream, type ObservedEvent, type StreamFrame } from "./sse";
+import {
+  fetchHistory,
+  clearHistory,
+  approveTool,
+  stopRun,
+  sendMessage,
+} from "@/app/services/chat";
 
 // 空会话的统计（读接口失败/清空后的兜底）
 const ZERO_STATS: SessionStats = { turns: 0, tools: 0, tokens: 0 };
@@ -47,6 +56,7 @@ export function useAgentRun(sessionId: string) {
 
   // 会话历史：挂载时 / sessionId 变化时触发。
   // 先清空本地（避免上一会话的消息残留），再拉新会话的历史（刷新不丢）。
+  // AbortController：切会话/卸载时 abort() 取消请求，替代手写 cancelled 标志
   useEffect(() => {
     setMessages([]);
     setObserved([]);
@@ -58,20 +68,20 @@ export function useAgentRun(sessionId: string) {
     setToolOutputs({});
     if (!sessionId) return;
 
-    let cancelled = false;
-    fetch(`/api/chat?sessionId=${encodeURIComponent(sessionId)}`)
-      .then((res) => (res.ok ? res.json() : null))
+    const controller = new AbortController();
+    fetchHistory(sessionId, { signal: controller.signal })
       .then((data) => {
-        if (cancelled || !data) return;
         if (Array.isArray(data.messages)) {
           setMessages(data.messages);
         }
         setStats(data.stats ?? ZERO_STATS);
       })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
+      .catch((e) => {
+        if ((e as Error).name === "AbortError") return; // 切会话/卸载导致的取消
+        // 其他失败：历史拉不到，页面从空开始（留痕便于排查，不打扰 UI）
+        console.warn("拉取会话历史失败", e);
+      });
+    return () => controller.abort();
   }, [sessionId]);
 
   // 消费一帧 SSE：run 帧记元信息；event 帧进时间线并按事件类型更新转录稿；
@@ -118,26 +128,30 @@ export function useAgentRun(sessionId: string) {
   }, []);
 
   // 回传用户对挂起确认的决定（允许/拒绝）。接口 404 = 已超时/已处理。
-  const approve = useCallback(async (allow: boolean) => {
-    setPendingApproval((current) => {
-      if (!current) return current;
-      fetch("/api/chat/approve", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ toolCallId: current.toolCallId, allow }),
-      }).catch(() => {});
-      return null; // 立即关掉弹框；服务端那边 resolve 后引擎继续
-    });
-  }, []);
+  // 注意：fetch 移出 setState updater（updater 理论上可能被调用两次，
+  // 副作用不该放里面——React 反模式，Phase 3 遗留下来的）
+  const approve = useCallback(
+    async (allow: boolean) => {
+
+      if (!pendingApproval) return;
+      
+      const { toolCallId } = pendingApproval;
+      
+      setPendingApproval(null); // 立即关掉弹框；服务端那边 resolve 后引擎继续
+      
+      try {
+        await approveTool({ toolCallId, allow });
+      } catch {
+        // 404 = 已超时/已处理，无需处理
+      }
+    },
+    [pendingApproval],
+  );
 
   // 停止当前 run：中止模型请求 + 杀死正在执行的命令（Phase 4 停止按钮）
   const stop = useCallback(async (targetRunId: string) => {
     try {
-      await fetch("/api/chat/stop", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ runId: targetRunId }),
-      });
+      await stopRun({ runId: targetRunId });
     } catch {
       // 停止失败不阻塞（run 可能刚好结束了）
     }
@@ -147,6 +161,7 @@ export function useAgentRun(sessionId: string) {
   const send = useCallback(
     async (text: string) => {
       if (!sessionId || !text.trim() || loading) return;
+      
       setLoading(true);
       setError("");
       // 不清空 messages：历史来自会话历史 + 本次事件流的追加，多轮对话得以保留
@@ -156,11 +171,9 @@ export function useAgentRun(sessionId: string) {
       setToolOutputs({}); // 新 run 开始，清掉上一条命令的输出
 
       try {
-        const res = await fetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: text.trim(), sessionId }),
-        });
+        // sendMessage 是 SSE 流式接口（返回 Response，不走 api<T>）：
+        // 必须拿到 res.body 交给 readStream 逐块消费
+        const res = await sendMessage({ text: text.trim(), sessionId });
 
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
@@ -182,9 +195,7 @@ export function useAgentRun(sessionId: string) {
   const reset = useCallback(async () => {
     if (sessionId) {
       try {
-        await fetch(`/api/chat?sessionId=${encodeURIComponent(sessionId)}`, {
-          method: "DELETE",
-        });
+        await clearHistory(sessionId);
       } catch {
         // 网络失败也继续清本地，不阻塞用户
       }

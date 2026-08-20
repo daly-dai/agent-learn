@@ -13,18 +13,23 @@
 //   create()   新建空会话并切过去（POST /api/sessions）
 //   rename()   重命名（PATCH /api/sessions）
 //   remove()   删除会话；删的是当前会话时自动切到列表第一个（DELETE）
+//
+// 请求全部走 app/services 接口层，本文件不再直接 fetch：
+//   listSessions / createSession / renameSession / removeSession
 // ============================================================
 
 import { useCallback, useEffect, useState } from "react";
+import {
+  listSessions,
+  createSession,
+  renameSession,
+  removeSession,
+} from "@/app/services/sessions";
 
-export type SessionSummary = {
-  id: string;
-  title?: string;
-  messageCount: number;
-  /** 文件最后修改时间（毫秒） */
-  updatedAt: number;
-  preview?: string;
-};
+// 类型定义搬到 app/services/sessions/types.ts；
+// 这里 re-export 保持组件 import（session-list.tsx）不变
+export type { SessionSummary } from "@/app/services/sessions/types";
+import type { SessionSummary } from "@/app/services/sessions/types";
 
 export function useSessions() {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
@@ -32,33 +37,33 @@ export function useSessions() {
   const [loading, setLoading] = useState(false);
 
   /** 拉列表；返回最新列表，供 create/remove 决定切到哪 */
-  const refresh = useCallback(async (): Promise<SessionSummary[]> => {
-    try {
-      const res = await fetch("/api/sessions");
-      if (!res.ok) return [];
-      const data = (await res.json()) as { sessions?: SessionSummary[] };
-      const list = data.sessions ?? [];
-      setSessions(list);
-      return list;
-    } catch {
-      // 列表拉取失败不阻塞页面，下次操作会再刷新
-      return [];
-    }
-  }, []);
+  const refresh = useCallback(
+    async (signal?: AbortSignal): Promise<SessionSummary[]> => {
+      try {
+        const data = await listSessions({ signal });
+        const list = data.sessions ?? [];
+        setSessions(list);
+        return list;
+      } catch (e) {
+        if ((e as Error).name === "AbortError") return []; // 组件卸载导致的取消
+        // 其他失败：列表拉取失败不阻塞页面，下次操作会再刷新（显式降级）
+        return [];
+      }
+    },
+    [],
+  );
 
   // 挂载：拉列表，默认选中第一个（最近活跃的）
+  // AbortController：卸载时 abort() 取消请求，替代手写 cancelled 标志
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
     setLoading(true);
-    refresh().then((list) => {
-      if (!cancelled) {
-        setLoading(false);
-        setCurrentId((prev) => prev || list[0]?.id || "");
-      }
+    refresh(controller.signal).then((list) => {
+      if (controller.signal.aborted) return; // 已卸载，不再 setState
+      setLoading(false);
+      setCurrentId((prev) => prev || list[0]?.id || "");
     });
-    return () => {
-      cancelled = true;
-    };
+    return () => controller.abort();
   }, [refresh]);
 
   const select = useCallback((id: string) => {
@@ -68,13 +73,7 @@ export function useSessions() {
   const create = useCallback(
     async (title?: string) => {
       try {
-        const res = await fetch("/api/sessions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(title ? { title } : {}),
-        });
-        if (!res.ok) return "";
-        const data = (await res.json()) as { id: string };
+        const data = await createSession(title ? { title } : {});
         setCurrentId(data.id); // 新建即切换
         await refresh();
         return data.id;
@@ -88,12 +87,7 @@ export function useSessions() {
   const rename = useCallback(
     async (id: string, title: string) => {
       try {
-        const res = await fetch("/api/sessions", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id, title }),
-        });
-        if (!res.ok) return false;
+        await renameSession({ id, title });
         await refresh();
         return true;
       } catch {
@@ -106,13 +100,9 @@ export function useSessions() {
   const remove = useCallback(
     async (id: string) => {
       try {
-        const res = await fetch(`/api/sessions?id=${encodeURIComponent(id)}`, {
-          method: "DELETE",
-        });
-        if (!res.ok) return false;
+        await removeSession(id);
         const list = await refresh();
-        // 删的是当前会话 → 切到列表第一个（决策：不自动新建）。
-        // 用 if 不用嵌套三元（prev === id ? (list[0]?.id ?? "") : prev 难读）
+        // 删的是当前会话 → 切到列表第一个（决策：不自动新建）
         setCurrentId((prev) => {
           if (prev !== id) return prev;
           return list[0]?.id ?? "";
