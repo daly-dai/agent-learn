@@ -18,9 +18,15 @@ import { formatClock } from "../lib/format";
 /** 工具结果超过这个行数才默认折叠 */
 const CLAMP_LINES = 12;
 
-type MessageRowProps = { message: AgentMessage; attached: boolean; live: boolean };
+type MessageRowProps = {
+  message: AgentMessage;
+  attached: boolean;
+  live: boolean;
+  /** bash 命令的实时输出（toolCallId → 已累积文本），Phase 4 */
+  toolOutputs?: Record<string, string>;
+};
 
-export function MessageRow({ message, attached, live }: MessageRowProps) {
+export function MessageRow({ message, attached, live, toolOutputs }: MessageRowProps) {
   if (message.role === "user") {
     return (
       <Row tone="user" role="你" timestamp={message.timestamp}>
@@ -39,7 +45,11 @@ export function MessageRow({ message, attached, live }: MessageRowProps) {
         <div className={`reply${live ? " is-live" : ""}`}>
           {message.content.map((block, i) =>
             block.type === "toolCall" ? (
-              <ToolCallLine key={i} block={block} />
+              <ToolCallLine
+                key={i}
+                block={block}
+                output={toolOutputs?.[block.id]}
+              />
             ) : (
               <Markdown key={i}>{block.text}</Markdown>
             ),
@@ -89,12 +99,22 @@ function Row({ tone, role, timestamp, attached, children }: RowProps) {
   );
 }
 
-function ToolCallLine({ block }: { block: ToolCallContent }) {
+function ToolCallLine({
+  block,
+  output,
+}: {
+  block: ToolCallContent;
+  output?: string;
+}) {
   return (
     <div className="call">
       <span className="call-tag">CALL</span>
       <span className="call-name">{block.name}</span>
       <code className="call-args">{JSON.stringify(block.arguments)}</code>
+      {/* bash 命令的实时输出：逐块追加，像真终端；结束后结果卡片再显示最终版 */}
+      {output !== undefined && output.length > 0 && (
+        <pre className="tool-output-live">{output}</pre>
+      )}
     </div>
   );
 }

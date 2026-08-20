@@ -36,6 +36,7 @@ import { TraceRecorder } from "@/lib/trace";
 import { JsonlSessionStore } from "@/lib/sessionStore";
 import { isValidSessionId } from "@/lib/sessionManager";
 import { toolApprovals } from "@/lib/toolApproval";
+import { runControllers } from "@/lib/runControl";
 
 // 显式声明 Node runtime：本路由（以及它的工具）会用 node:fs / node:path，
 // 后面 Phase 4 还要用 node:child_process 跑终端。
@@ -63,7 +64,8 @@ const systemPrompt = [
   "- delete_file（删除文件；写/改/删都会弹框请你确认）",
   "- grep（按正则搜内容）、find（按文件名找文件）",
   "- write_note（写工作区笔记）",
-  "- 只有用户明确要求「列出 / 读取 / 写入 / 修改 / 删除 / 搜索」文件时才调用工具；概念原理类问题直接回答，不要硬套工具。",
+  "- bash（执行 shell 命令；命令在 Windows 环境运行，避免 ls 等 Unix 专属命令；执行前会弹框确认）",
+  "- 只有用户明确要求「列出 / 读取 / 写入 / 修改 / 删除 / 搜索 / 执行命令」时才调用工具；概念原理类问题直接回答，不要硬套工具。",
   "- 一次只调用当前步骤真正需要的工具；拿到工具结果后必须基于真实结果回答，绝不编造文件内容。",
   "- 工具失败或读不到内容时，如实说明，不要假装成功。",
   "- 写/改/删文件时，引擎会弹框请用户确认；被拒绝（或用户 60 秒未回应）时工具结果会报错，如实向用户说明，不要反复重试同一操作。",
@@ -71,6 +73,8 @@ const systemPrompt = [
   "## 输出要求",
   "- 始终用中文回答。",
   "- 用 Markdown 排版：善用标题、列表、表格；代码示例用带语言标注的代码块。",
+  "- **任务优先于教学**：用户让你执行/验证/操作时，先直接给出结果（成功/失败/数据），不要借题发挥展开教学。",
+  "- 工具失败时：如实复述错误和退出码，一句话说明失败原因即可；只有用户明确追问机制时才展开讲解。",
   "- 解释概念时：先一句话结论 → 再展开讲机制 → 最后给一个最小示例或类比。",
 ].join("\n");
 
@@ -93,7 +97,9 @@ type StreamFrame =
       toolCallId: string;
       toolName: string;
       args: Record<string, unknown>;
-    };
+    }
+  // bash 命令的流式输出（旁路帧，不是 AgentEvent）：工具 → 这里 → SSE → 前端
+  | { type: "tool_output"; toolCallId: string; text: string };
 
 // --- POST /api/chat ---
 export async function POST(req: NextRequest) {
@@ -165,6 +171,10 @@ export async function POST(req: NextRequest) {
       };
 
       try {
+        // 0) run 级取消：注册 AbortController（停止按钮通过 /api/chat/stop 触发）
+        const abortController = new AbortController();
+        runControllers.set(recorder.runId, abortController);
+
         // 0) 先推 run 元信息（runId + 模型名），前端据此展示"本次是哪个 run"
         send({ type: "run", runId: recorder.runId, model: modelLabel });
 
@@ -203,6 +213,12 @@ export async function POST(req: NextRequest) {
           toolRegistry,
           // 审批需要 send（推确认帧给前端）和 recorder.runId，所以用闭包包一层
           beforeToolCall: (call) => handleToolApproval(call, send),
+          // run 级取消：中止模型请求 + 传给 bash 杀命令
+          signal: abortController.signal,
+          // bash 流式输出：旁路直达前端（不进事件流/trace）
+          onToolOutput: (toolCallId, text) => {
+            send({ type: "tool_output", toolCallId, text });
+          },
           onEvent: (event) => {
             recorder.record(event);
             send({ type: "event", event });
@@ -230,6 +246,8 @@ export async function POST(req: NextRequest) {
       } catch (e) {
         send({ type: "error", message: (e as Error).message });
       } finally {
+        // run 结束（无论正常/出错/被停止）：注销取消句柄，防止 Map 泄漏
+        runControllers.delete(recorder.runId);
         await recorder.end({ messages: recorder.entries.length });
         controller.close();
       }
@@ -318,12 +336,13 @@ function selectModel(): { model: TeachingModel; label: string } {
 // 只读工具（list/read/grep/find）默认放行。
 // 超时兜底：用户 60 秒不回应自动拒绝（block），避免挂起。
 
-/** 需要人工确认的工具：全部写/改/删操作（已确认：含 write_note） */
+/** 需要人工确认的工具：全部写/改/删操作 + bash（已确认：全量弹框） */
 const TOOLS_NEEDING_CONFIRM = [
   "write_note",
   "write_file",
   "edit_file",
   "delete_file",
+  "bash",
 ] as const;
 
 const APPROVAL_TIMEOUT_MS = 60_000;
@@ -334,12 +353,14 @@ async function handleToolApproval(
 ): Promise<ToolDecision> {
   // --- 硬性策略：secret/秘密 永不弹框，直接拦 ---
   if (call.name === "write_note" || call.name === "write_file") {
-    const target =
-      typeof call.arguments.fileName === "string"
-        ? call.arguments.fileName
-        : typeof call.arguments.path === "string"
-          ? call.arguments.path
-          : "";
+    // 取要检查的路径：write_note 用 fileName，write_file 用 path。
+    // 不用嵌套三元——两层 ? : 叠在一起难读，if/else 直白。
+    let target = "";
+    if (typeof call.arguments.fileName === "string") {
+      target = call.arguments.fileName;
+    } else if (typeof call.arguments.path === "string") {
+      target = call.arguments.path;
+    }
 
     if (/secret|秘密/i.test(target)) {
       return {

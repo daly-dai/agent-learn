@@ -1194,6 +1194,34 @@ pre,
   color: var(--ink-mid);
 }
 
+/* ============ bash 命令实时输出（Phase 4） ============ */
+.tool-output-live {
+  margin-top: 6px;
+  padding: 8px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--ink);
+  background: var(--recorder);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r);
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+/* 停止按钮：危险操作，用错误色系 */
+.btn-stop {
+  color: var(--plate);
+  background: var(--pen-error);
+  border: 1px solid var(--pen-error);
+}
+
+.btn-stop:hover {
+  filter: brightness(1.1);
+}
+
 /* ============ 审批弹框（Phase 3 人工确认） ============ */
 .approval-mask {
   position: fixed;

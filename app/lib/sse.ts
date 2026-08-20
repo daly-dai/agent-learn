@@ -33,7 +33,9 @@ export type StreamFrame =
       toolCallId: string;
       toolName: string;
       args: Record<string, unknown>;
-    };
+    }
+  // bash 命令的流式输出（旁路帧）：按 toolCallId 累积显示，像真终端
+  | { type: "tool_output"; toolCallId: string; text: string };
 
 /** 事件 + 前端观测到它的时刻（协议不动，时间戳加在这一层） */
 export type ObservedEvent = { seq: number; at: number; event: AgentEvent };
@@ -49,14 +51,20 @@ export async function readStream(
 
   while (true) {
     const { done, value } = await reader.read();
+
     if (done) break;
+    
     buffer += decoder.decode(value, { stream: true });
 
     let sep: number;
+
     while ((sep = buffer.indexOf("\n\n")) !== -1) {
       const raw = buffer.slice(0, sep).trim();
+
       buffer = buffer.slice(sep + 2);
+      
       if (!raw.startsWith("data:")) continue;
+      
       onFrame(JSON.parse(raw.slice(5).trim()) as StreamFrame);
     }
   }

@@ -111,8 +111,12 @@ export function useSessions() {
         });
         if (!res.ok) return false;
         const list = await refresh();
-        // 删的是当前会话 → 切到列表第一个（决策：不自动新建）
-        setCurrentId((prev) => (prev === id ? (list[0]?.id ?? "") : prev));
+        // 删的是当前会话 → 切到列表第一个（决策：不自动新建）。
+        // 用 if 不用嵌套三元（prev === id ? (list[0]?.id ?? "") : prev 难读）
+        setCurrentId((prev) => {
+          if (prev !== id) return prev;
+          return list[0]?.id ?? "";
+        });
         return true;
       } catch {
         return false;

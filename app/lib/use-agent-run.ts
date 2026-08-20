@@ -42,6 +42,8 @@ export function useAgentRun(sessionId: string) {
   // 挂起的工具确认：非 null 时前端要弹框，用户决定后回传 /api/chat/approve
   const [pendingApproval, setPendingApproval] =
     useState<ToolApprovalRequest | null>(null);
+  // bash 命令的实时输出：toolCallId → 已累积的文本（tool_output 帧逐块追加）
+  const [toolOutputs, setToolOutputs] = useState<Record<string, string>>({});
 
   // 会话历史：挂载时 / sessionId 变化时触发。
   // 先清空本地（避免上一会话的消息残留），再拉新会话的历史（刷新不丢）。
@@ -53,6 +55,7 @@ export function useAgentRun(sessionId: string) {
     setModel("");
     setStats(ZERO_STATS);
     setPendingApproval(null);
+    setToolOutputs({});
     if (!sessionId) return;
 
     let cancelled = false;
@@ -105,6 +108,12 @@ export function useAgentRun(sessionId: string) {
         toolName: frame.toolName,
         args: frame.args,
       });
+    } else if (frame.type === "tool_output") {
+      // bash 命令的流式输出：按 toolCallId 累积（同一次调用多次到达）
+      setToolOutputs((prev) => ({
+        ...prev,
+        [frame.toolCallId]: (prev[frame.toolCallId] ?? "") + frame.text,
+      }));
     }
   }, []);
 
@@ -121,6 +130,19 @@ export function useAgentRun(sessionId: string) {
     });
   }, []);
 
+  // 停止当前 run：中止模型请求 + 杀死正在执行的命令（Phase 4 停止按钮）
+  const stop = useCallback(async (targetRunId: string) => {
+    try {
+      await fetch("/api/chat/stop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runId: targetRunId }),
+      });
+    } catch {
+      // 停止失败不阻塞（run 可能刚好结束了）
+    }
+  }, []);
+
   // 发送：校验 + 请求 + 逐帧消费。text 由页面传入，页面负责清空输入框。
   const send = useCallback(
     async (text: string) => {
@@ -131,6 +153,7 @@ export function useAgentRun(sessionId: string) {
       setObserved([]);
       setRunId("");
       setModel("");
+      setToolOutputs({}); // 新 run 开始，清掉上一条命令的输出
 
       try {
         const res = await fetch("/api/chat", {
@@ -187,5 +210,7 @@ export function useAgentRun(sessionId: string) {
     stats,
     pendingApproval,
     approve,
+    toolOutputs,
+    stop,
   };
 }

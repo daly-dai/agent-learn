@@ -23,9 +23,21 @@ type NameplateProps = {
   turn: number;
   canReset: boolean;
   onReset: () => void;
+  /** Phase 4：停止当前 run（中止模型请求 + 杀死 bash 命令） */
+  canStop?: boolean;
+  onStop?: () => void;
 };
 
-export function Nameplate({ runId, model, phase, turn, canReset, onReset }: NameplateProps) {
+export function Nameplate({
+  runId,
+  model,
+  phase,
+  turn,
+  canReset,
+  onReset,
+  canStop,
+  onStop,
+}: NameplateProps) {
   return (
     <header className="nameplate">
       <PenMark />
@@ -42,6 +54,11 @@ export function Nameplate({ runId, model, phase, turn, canReset, onReset }: Name
           </span>
         )}
         <StatusBeacon phase={phase} turn={turn} />
+        {canStop && (
+          <button className="btn btn-stop" onClick={onStop}>
+            停止
+          </button>
+        )}
         <button className="btn" onClick={onReset} disabled={!canReset}>
           清空记录
         </button>

@@ -40,6 +40,11 @@ type RunAgentLoopOptions = {
   beforeToolCall?: BeforeToolCall;
   // 事件回调：每产生一个事件就立刻调用一次（推送式通道）
   onEvent?: (event: AgentEvent) => void;
+  // run 级取消：中止模型请求 + 传给工具（bash 用它杀命令）
+  signal?: AbortSignal;
+  // 工具执行中逐块输出（bash 的 stdout/stderr 流）。引擎不理解它，
+  // 只原样透传给工具的 execute options.onChunk——这是"旁路"，不进事件流。
+  onToolOutput?: (toolCallId: string, text: string) => void;
 };
 
 function emitMessageLifecycle(
@@ -88,11 +93,13 @@ function createBlockedToolResult(
 async function executeToolCall(
   toolCall: ToolCallContent,
   toolRegistry: ToolRegistry,
+  toolOptions?: { signal?: AbortSignal; onChunk?: (text: string) => void },
 ): Promise<ToolResultMessage> {
   try {
     const result = await toolRegistry.execute(
       toolCall.name,
       toolCall.arguments,
+      toolOptions, // 原样透传：signal（取消）+ onChunk（bash 流式输出）
     );
     return {
       role: "toolResult",
@@ -194,6 +201,7 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<{
       systemPrompt: options.systemPrompt,
       messages: context,
       tools: options.tools,
+      signal: options.signal, // run 级取消：中止正在进行的模型请求
       onDelta: (delta) => {
         emit({ type: "message_update", message: streamingMessage, delta });
       },
@@ -285,10 +293,15 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<{
         args: executableToolCall.arguments,
       });
 
-      // 真正执行工具
+      // 真正执行工具。toolOptions：signal（取消）+ onChunk（bash 流式
+      // 输出 → 引擎不懂它，只是把它转给使用端的 onToolOutput）
       const toolResult = await executeToolCall(
         executableToolCall,
         options.toolRegistry,
+        {
+          signal: options.signal,
+          onChunk: (text) => options.onToolOutput?.(toolCall.id, text),
+        },
       );
 
       // 关键：工具结果必须 push 进 context，模型下一轮才能"看到"它，

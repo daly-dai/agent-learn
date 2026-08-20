@@ -276,7 +276,19 @@ type TraceEntry = {
 - 能力：执行命令 → 流式吐 stdout/stderr → 超时/终止（Ctrl-C）→ 退出码。
 - 安全：命令白名单或确认机制、限制工作目录、禁止交互式 TTY（前期）。
 - 对应 pi：`packages/coding-agent/src/core/bash-executor.ts` 和 `exec.ts`。
-- 注意：`route.ts` 需 `export const runtime = "nodejs"`。
+- 注意：`route.ts` 需 `export const runtime = "nodejs"`（已有）。
+
+**实现前补记（AGENTS.md：先想清楚再动手）**
+
+- **BashRunner**（`lib/tools/bash-runner.ts`）：`spawn(command, { cwd, shell: true, stdio: ["ignore","pipe","pipe"] })`。stdout/stderr 的 `data` 事件逐块清理（去 ANSI 色码/`\r`/二进制垃圾）→ `onChunk` 流式回调 + 滚动缓冲（超 64KB 丢最旧）；`close` 事件拿退出码。**两级终止**：超时（已确认默认 30 秒）或 AbortSignal → `SIGTERM` → 5 秒后 `SIGKILL`。
+- **工具签名扩展**：`ToolExecutor` 加可选 `options?: { signal?, onChunk? }`（`lib/tools/types.ts`）——其他 8 个工具零改动。
+- **引擎只透传**：`RunAgentLoopOptions` 加 `onToolOutput?`，`executeToolCall` 原样递 signal + onChunk。引擎不理解 onChunk，只搬运。
+- **`tool_output` 是旁路帧，不是 AgentEvent**：工具 → route.ts → SSE → 前端实时显示；不进引擎事件流、不进 trace（避免一条 `npm install` 几千块把黑匣子淹掉）。最终输出仍在 `tool_execution_end` 的 result 里带一份（截断后）。
+- **run 级取消**：`lib/runControl.ts`（挂 globalThis 的 `Map<runId, AbortController>`，同 `toolApprovals` 模式）；POST /api/chat 创建 controller 注册（同时传给 `complete` 和工具 execute），finally 清理；新接口 `POST /api/chat/stop { runId }` → `abort()`。
+- **审批**（已确认）：bash 加入 `TOOLS_NEEDING_CONFIRM` 全量弹框；`cwd` 锁 workspace；`stdin: "ignore"` 天然禁交互式 TTY。
+- **诚实边界**：bash 执行任意字符串，`cd ..` 一行就出围栏——**bash 的安全不靠沙箱靠确认**，与文件工具本质不同（规划时已向用户说明）。
+- **Windows**：`shell: true` 走 cmd.exe；提示词引导用 Windows 兼容命令，避免 `ls` 等 Unix 专属命令。
+- 暂缓：交互式 TTY/pty、命令白名单免确认、Windows 进程树击杀（`taskkill /T`，先单层）、远程执行（SSH/容器）、输出写临时文件全量保留（pi 的 fullOutputPath）。
 
 ### Phase 5：task 面板
 - 引入"任务/计划"概念：模型产出 todo list，前端渲染成可勾选面板；或你手动拆任务，agent 逐条执行。
@@ -416,3 +428,4 @@ type TraceEntry = {
   - **前端**：工作区切换器（侧栏上方），切换 = 会话列表刷新 + 转录稿清空（复用 `useSessions` 的"换 id 即换数据"模式）。
   - **轻量版备选**：只想换一个目录时，只做 `WORKSPACE_ROOT` 环境变量（一处改动，沙箱跟随），不用等完整版。
 - **UI 视觉打磨（暂缓）**：核心功能跑稳后再回头调视觉。已记录的问题：Phase 3 人工确认弹框的样式（用户反馈不喜欢当前形态）、会话侧栏等。原则不变：交互正确优先于美观，视觉升级参考第十节的走纸记录仪语言。
+- **fetch 调用封装（暂缓）**：前端 8 处手写 fetch（`use-sessions.ts` 4 处 + `use-agent-run.ts` 4 处），存在链式 `.then`、重复 headers/错误处理、`.catch(() => {})` 静默吞错等痛点。封装方向：`app/lib/http.ts` 提供 `api<T>(url, { method, body, signal })`——自动 `Content-Type: application/json`、`!ok` 时抛带服务端 error 消息的 `ApiError`、调用方用 async/await。覆盖 7 处普通 JSON 请求（会话列表/历史/新建/重命名/删除/清空/approve）；**SSE 流式 `POST /api/chat` 除外**（它要 `res.body` 交给 `readStream`，保持原样）。顺带可消除 `cancelled` 手写竞态标志（换 AbortController）。

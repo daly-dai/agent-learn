@@ -71,6 +71,7 @@ export default function Home() {
   //   stats       会话级累计统计（轮次/工具/token）：服务端从会话文件算出，
   //               切换会话/run 结束时更新，读数盘直接展示
   //   pendingApproval  挂起的工具确认（写/改/删弹框用）；approve(allow) 回传决定
+  //   toolOutputs  bash 命令的实时输出（toolCallId → 文本）；stop(runId) 停止当前 run
   const {
     messages,
     observed,
@@ -83,6 +84,8 @@ export default function Home() {
     stats,
     pendingApproval,
     approve,
+    toolOutputs,
+    stop,
   } = useAgentRun(currentId);
 
   const [input, setInput] = useState("列出工作区文件"); // 输入框内容（表单状态留在页面，不进 hook）
@@ -140,6 +143,10 @@ export default function Home() {
         turn={turn}
         onReset={reset}
         canReset={!loading && (messages.length > 0 || observed.length > 0)}
+        canStop={loading && Boolean(runId)}
+        onStop={() => {
+          stop(runId);
+        }}
       />
 
       <div className="deck">
@@ -174,6 +181,7 @@ export default function Home() {
                     message={msg}
                     attached={i > 0 && msg.role === "toolResult"}
                     live={loading && i === messages.length - 1}
+                    toolOutputs={toolOutputs}
                   />
                 ))
               )}
