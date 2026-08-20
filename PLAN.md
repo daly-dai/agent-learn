@@ -225,6 +225,20 @@ type TraceEntry = {
 - 改 `route.ts`：不再每次新建 `[userMessage]`，而是 `appendMessage(user) → buildContext() → runAgentLoop → appendMessage(assistant/toolResult)`。
 - 把"事件轨迹"与"会话消息轨迹"统一，实现离线回放（L2 完整）。
 
+**实现前补记（AGENTS.md：先想清楚再动手）**
+
+- 会话文件：`.sessions/<sessionId>.jsonl`，与 `.traces/` 平级、进 gitignore。为什么放 `.sessions/` 而不是 workspace/sessions：workspace 是 agent 的工作区（工具可读写），会话数据是运行时状态，不该被 agent 工具碰到。
+- sessionId：Phase 1 固定 `"default"`；POST body 预留可选 `sessionId` 字段（不传则用 default）——为 Phase 2 多会话留接口，前端零改动。
+- store 生命周期：每次 POST 新建 store 实例（loadOrCreate 从磁盘读全量）。多进程安全、内存态与磁盘一致；会话文件小，读全量可接受。
+- 引用安全：`buildContext()` 返回新数组 + `runAgentLoop` 内部再复制，不污染 store 内存态；run 结束把 `result.newMessages`（assistant + toolResults）逐条 `appendMessage` 落盘。
+- `compactIfNeeded` 触发：每次 run 结束后调用；初值 `maxApproxTokens=4000`、`keepRecentMessages=8`（教学版测试里的 20/2 是逻辑验证值，不是生产值）。
+- 历史展示（经用户授权，本会话接管 UI 线这部分）：done frame 改为带**全量会话历史**（`store.buildContext()`）；新增 `GET /api/chat?sessionId=` 返回历史（前端挂载时恢复、刷新不丢）、`DELETE /api/chat?sessionId=` 清空会话（配合前端「清空记录」）；前端发送时不再清空消息。
+- 测试：本阶段不引入测试框架（原计划 Phase 6 再补），教学版 `sessionStore.test.ts` 留作参考。
+
+**Phase 1 后续优化（暂缓，等主线跑稳再回来）——「真摘要」压缩**
+
+当前 `compactIfNeeded` 的摘要只是原文拼贴（`role: 文本` 连起来），token 几乎不省，是教学简化。真实产品（pi）会**调用 LLM 生成结构化摘要**（`pi/packages/agent/src/harness/compaction/compaction.ts` 的 `generateSummary`）：专用系统提示词 + 一次性 complete 请求，产出 `## Goal / ## Progress / ## Key Decisions / ## Next Steps / ## Critical Context` 结构，把几千 token 压成几百。升级方案：复用 `TeachingModel` 接口（摘要 = 调模型 complete 一次），照抄 pi 的结构化提示词；注意 `MOCK_MODE` 下无 key 的降级策略（可回退到现在的拼贴式）。对照细节见 `workspace/实现走读-pi对照.md`。
+
 ### Phase 2：多个会话
 - 一个 session = 一个 JSONL 文件（或一张表）。`SessionManager` 负责 list/create/switch/rename/delete。
 - 前端加左侧会话列表；切换会话 = 换 `leafId` 对应的文件。
@@ -365,3 +379,10 @@ type TraceEntry = {
 ### 10.4 仍然遵守"暂缓事项"
 
 第九节写着"漂亮动画 / 复杂 UI"暂缓。这次只做了排版与信息结构，动效只保留三处、且都表示状态而非装饰：状态灯脉冲、流式笔尖、工具运行中的条。`prefers-reduced-motion` 下全部关闭。
+
+---
+
+## 十一、未来规划（暂缓，等主线跑稳再回来）
+
+- **思考过程渲染**：模型处于"思考模式"时会在 `reasoning_content` 字段返回推理链（V4 系列支持）。届时四步落地：① `types.ts` 加 `reasoning` 内容块；② 适配器捕获 `reasoning_content`（流式 `delta.reasoning_content` + 非流式 `message.reasoning_content`）；③ 回传 assistant 消息时把 `reasoning_content` 原样带回去，否则工具调用会报错；④ UI 渲染成默认折叠的「思考过程」块。
+- **模型版本**：model id 会持续演进（当前 V4 flash / pro）。`DEFAULT_MODEL` 只是兜底，正式使用一律在 `.env.local` 用 `DEEPSEEK_MODEL` 显式指定。

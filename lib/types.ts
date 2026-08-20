@@ -109,6 +109,36 @@ export type AgentEvent =
     }
   | { type: "compaction"; summary: string; tokensBefore: number; firstKeptEntryId: string };
 
+// --- 会话存储条目（JSONL 会话文件的一行） ---
+// 会话树：id 唯一，parentId 指向前一条（叶子 leafId = 当前最新）。
+// 为什么有 parentId：Phase 2 要做分支切换（一条对话可以岔出多条线），
+// 没有它就只能线性追加，无法回溯到任意历史节点重新分支。
+// compaction 条目记录「旧消息摘要」：上下文超窗口时用它替代被压缩的旧消息。
+export type SessionEntry =
+  | {
+      type: "session";
+      version: 1;
+      id: string;
+      timestamp: string;
+      cwd: string;
+    }
+  | {
+      type: "message";
+      id: string;
+      parentId: string | null;
+      timestamp: string;
+      message: AgentMessage;
+    }
+  | {
+      type: "compaction";
+      id: string;
+      parentId: string | null;
+      timestamp: string;
+      summary: string;
+      firstKeptEntryId: string;
+      tokensBefore: number;
+    };
+
 // --- API 响应 ---
 
 export type SessionResponse = {

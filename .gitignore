@@ -39,6 +39,9 @@ yarn-error.log*
 # agent traces (黑匣子轨迹，不提交)
 .traces/
 
+# agent sessions (会话记忆 JSONL，不提交)
+.sessions/
+
 # vercel
 .vercel
 

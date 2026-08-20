@@ -18,7 +18,7 @@
 // ============================================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import type { AgentEvent, AgentMessage, ToolDefinition } from "@/lib/types";
 import { createUserMessage } from "@/lib/message";
 import { MockModel } from "@/lib/mockModel";
@@ -27,6 +27,7 @@ import type { TeachingModel } from "@/lib/model";
 import { createToolRegistry } from "@/lib/tools";
 import { runAgentLoop } from "@/lib/agent";
 import { TraceRecorder } from "@/lib/trace";
+import { JsonlSessionStore } from "@/lib/sessionStore";
 
 // 显式声明 Node runtime：本路由（以及它的工具）会用 node:fs / node:path，
 // 后面 Phase 4 还要用 node:child_process 跑终端。
@@ -36,6 +37,10 @@ export const runtime = "nodejs";
 const workspaceRoot = resolve(process.cwd(), "workspace");
 // 轨迹（Trace）目录
 const traceDir = resolve(process.cwd(), ".traces");
+// 会话（Session）目录：多轮对话的 JSONL 落盘位置，与 .traces/ 平级。
+// 为什么不在 workspace/sessions：workspace 是 agent 的工作区（工具可读写），
+// 会话数据是运行时状态，不该被 agent 工具碰到。
+const sessionDir = resolve(process.cwd(), ".sessions");
 // 工具注册表
 const toolRegistry = createToolRegistry(workspaceRoot);
 
@@ -70,11 +75,17 @@ type StreamFrame =
 // --- POST /api/chat ---
 export async function POST(req: NextRequest) {
   let text: unknown;
+  // Phase 1 单会话：body 可选传 sessionId，不传用 default（Phase 2 多会话的前置接口）
+  let sessionId = "default";
 
   try {
     const body = await req.json();
 
     text = body?.text;
+    
+    if (typeof body?.sessionId === "string" && body.sessionId.trim()) {
+      sessionId = body.sessionId.trim();
+    }
   } catch {
     return NextResponse.json({ error: "请求体不是合法 JSON" }, { status: 400 });
   }
@@ -100,6 +111,15 @@ export async function POST(req: NextRequest) {
   }
 
   const userMessage = createUserMessage(text.trim());
+
+  // 会话存储：每次请求新建实例并从磁盘读全量。
+  // 为什么不在模块级复用单例：多进程（dev server 多 worker / 未来部署）下
+  // 内存态可能落后于磁盘，新建实例能保证「内存 = 磁盘」；会话文件小，读全量可接受。
+  const store = new JsonlSessionStore(
+    join(sessionDir, `${sessionId}.jsonl`),
+    workspaceRoot,
+    sessionId,
+  );
 
   // 本次 run 的黑匣子：每次请求一个独立 runId，落到 .traces/<runId>.jsonl
   const recorder = TraceRecorder.create(traceDir, modelLabel);
@@ -127,22 +147,30 @@ export async function POST(req: NextRequest) {
           message: userMessage,
         };
 
+        // 
         const userEnd: AgentEvent = {
           type: "message_end",
           message: userMessage,
         };
 
         recorder.record(userStart);
+
         send({ type: "event", event: userStart });
+        
         recorder.record(userEnd);
         send({ type: "event", event: userEnd });
+
+        // 1b) 多轮记忆的核心：先把用户消息落盘，再从叶子回溯出完整上下文。
+        //     上一轮的 assistant/toolResult 都在上下文里，模型这一轮才能"记得"。
+        await store.appendMessage(userMessage);
+        const context = store.buildContext();
 
         // 2) 运行 Agent Loop。onEvent 同时做两件事：
         //    - recorder.record(event)  → 落盘成轨迹（黑匣子）
         //    - send({type:"event"})    → 推给浏览器（实时仪表盘）
         const result = await runAgentLoop({
           systemPrompt,
-          messages: [userMessage],
+          messages: context,
           tools: toolRegistry.definitions(),
           model,
           toolRegistry,
@@ -153,10 +181,19 @@ export async function POST(req: NextRequest) {
           },
         });
 
-        // 3) 全部结束后，推送最终权威结果（完整消息列表 + 工具定义 + runId）。
+        // 2b) 本轮新增的 assistant/toolResult 逐条落盘，成为下一轮的"记忆"
+        for (const message of result.newMessages) {
+          await store.appendMessage(message);
+        }
+        // 2c) 上下文超窗口时压缩旧消息为摘要，防止上下文无限膨胀
+        await store.compactIfNeeded(4000, 8);
+
+        // 3) 全部结束后，推送最终权威结果。
+        //    messages 带「全量会话历史」（buildContext 从叶子回溯），
+        //    前端直接整体替换渲染——多轮对话因此能完整显示。
         send({
           type: "done",
-          messages: [userMessage, ...result.newMessages],
+          messages: store.buildContext(),
           tools: toolRegistry.definitions(),
           runId: recorder.runId,
         });
@@ -179,6 +216,35 @@ export async function POST(req: NextRequest) {
       "X-Accel-Buffering": "no",
     },
   });
+}
+
+// --- GET /api/chat?sessionId=xxx ---
+// 返回会话历史（叶子路径上的全部消息），供前端挂载时恢复多轮对话（刷新不丢）。
+export async function GET(req: NextRequest) {
+  const sessionId = req.nextUrl.searchParams.get("sessionId") || "default";
+  const store = new JsonlSessionStore(
+    join(sessionDir, `${sessionId}.jsonl`),
+    workspaceRoot,
+    sessionId,
+  );
+  return NextResponse.json({
+    sessionId,
+    leafId: store.getLeafId(),
+    messages: store.buildContext(),
+  });
+}
+
+// --- DELETE /api/chat?sessionId=xxx ---
+// 清空会话（与前端「清空记录」按钮配套：只清本地状态的话，刷新后历史会复活）。
+export async function DELETE(req: NextRequest) {
+  const sessionId = req.nextUrl.searchParams.get("sessionId") || "default";
+  const store = new JsonlSessionStore(
+    join(sessionDir, `${sessionId}.jsonl`),
+    workspaceRoot,
+    sessionId,
+  );
+  await store.reset();
+  return NextResponse.json({ ok: true, sessionId });
 }
 
 // --- 模型选择（环境变量 → 具体实现）---
@@ -204,7 +270,7 @@ function selectModel(): { model: TeachingModel; label: string } {
     model: process.env.DEEPSEEK_MODEL || undefined,
   });
 
-  return { model, label: process.env.DEEPSEEK_MODEL || "deepseek-chat" };
+  return { model, label: process.env.DEEPSEEK_MODEL || "deepseek-v4-flash" };
 }
 
 // --- beforeToolCall 审批策略 ---
