@@ -1,74 +1,62 @@
 "use client";
 
 // ============================================================
-// 前端 —— SSE 流式消费者 + Agent 观测台
+// 页面 —— 观测台的「组装层」
 // ============================================================
+// 它本身不含业务逻辑，只做三件事：
+//   1. 调 useAgentRun() 拿状态和行为（消息、事件、loading、发送、清空）
+//   2. 派生展示数据（phase / turn / rows 三个纯函数）
+//   3. 组合四个组件（Nameplate / Overture / MessageRow / TraceRail）
 //
-// 左边是「转录稿」：谁说了什么、调了什么工具、拿到什么结果。
-// 右边是「走纸记录条」：同一次 run 被画成一条时间轴。
-//
-// 轨迹区不是日志列表，它做了三件聚合（都在 foldEvents 里）：
-//   1. turn_start                  → 开一条轮次带 T1 / T2
-//   2. 连续的 message_update        → 收成一笔墨迹（长度随字数增长）
-//   3. tool_execution_start/end    → 配成一段跨度（条长 = 真实耗时）
-//
-// 为什么要给事件补 seq/at：AgentEvent 协议里没有时间戳（PLAN.md 第四节
-// 说 Phase 0 才补）。前端作为「观测者」自己盖到达时间戳，不改协议就能
-// 画出耗时与用时 —— 这是产品层的观测，不是引擎的职责。
+// ── 调用地图：页面调用的每个东西是什么、在哪、干什么 ──
+//   useAgentRun()   app/lib/use-agent-run.ts
+//                   run 的全部状态 + 行为。内部封装了 fetch POST /api/chat、
+//                   readStream 逐帧消费、挂载时 GET 恢复历史、DELETE 清空。
+//                   返回 { messages, observed, loading, error, runId, model,
+//                          send(text), reset() }。
+//   foldEvents()    app/lib/trace-fold.ts（纯函数）
+//                   把原始 AgentEvent 流折叠成记录条行：连续 message_update
+//                   收成一笔墨迹、工具 start/end 配成一段跨度（105 条事件
+//                   实测塌成 2 行），结果喂给 <TraceRail> 渲染。
+//   derivePhase()   本文件底部（纯函数）—— 根据最近一条事件推断状态灯相位
+//   currentTurn()   本文件底部（纯函数）—— 从 turn_start 事件数出当前轮次
+//   <Nameplate>     app/components/nameplate.tsx —— 页头：标志/标题/run 信息/
+//                   状态灯/清空按钮
+//   <Overture>      app/components/overture.tsx —— 空态引导 + 例句按钮
+//   <MessageRow>    app/components/message-row.tsx —— 转录稿单条消息
+//                   （用户/Agent 文本/工具调用行/工具结果卡片）
+//   <TraceRail>     app/components/trace-rail.tsx —— 右侧走纸记录条
+//                   （时间轴 + 底部轮次/工具/token 统计）
 // ============================================================
 
-import { useState, useRef, useEffect } from "react";
-import type {
-  AgentMessage,
-  AgentEvent,
-  TextContent,
-  ToolCallContent,
-  ToolResultMessage,
-  ToolDefinition,
-} from "@/lib/types";
-import { Markdown } from "./markdown";
-
-type StreamFrame =
-  | { type: "run"; runId: string; model: string }
-  | { type: "event"; event: AgentEvent }
-  | { type: "done"; messages: AgentMessage[]; tools: ToolDefinition[]; runId: string }
-  | { type: "error"; message: string };
-
-/** 事件 + 前端观测到它的时刻（协议不动，时间戳加在这一层） */
-type ObservedEvent = { seq: number; at: number; event: AgentEvent };
-
-const PHASES = {
-  idle: "待命",
-  thinking: "思考中",
-  tool: "执行工具",
-  streaming: "输出中",
-} as const;
-
-type Phase = keyof typeof PHASES;
-
-/** 空态里的起手式：每条都标注它会练到哪个工具（最后一条故意不需要工具） */
-const SEEDS = [
-  { text: "列出工作区文件", tool: "list_files" },
-  { text: "读取 agent-notes.md", tool: "read_file" },
-  { text: "把 Agent Loop 的要点写成笔记", tool: "write_note" },
-  { text: "什么是 Agent Loop？", tool: "不调用工具，直接回答" },
-];
-
-/** 工具结果超过这个行数才默认折叠 */
-const CLAMP_LINES = 12;
+import { useEffect, useRef, useState } from "react";
+import { Nameplate, type Phase } from "./components/nameplate";
+import { Overture } from "./components/overture";
+import { MessageRow } from "./components/message-row";
+import { TraceRail } from "./components/trace-rail";
+import { useAgentRun } from "./lib/use-agent-run";
+import { foldEvents } from "./lib/trace-fold";
+import type { ObservedEvent } from "./lib/sse";
 
 export default function Home() {
-  const [messages, setMessages] = useState<AgentMessage[]>([]);
-  const [observed, setObserved] = useState<ObservedEvent[]>([]);
-  const [input, setInput] = useState("列出工作区文件");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [runId, setRunId] = useState("");
-  const [model, setModel] = useState("");
-  const transcriptRef = useRef<HTMLDivElement>(null);
-  const traceRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  // hook：一次 run 的观测状态和行为。页面从这里拿数据，不再自己发 fetch。
+  //   messages  转录稿消息（挂载恢复的多轮历史 + 本次 run 新增）
+  //   observed  带到达时间戳的事件流（右侧时间线的原始素材）
+  //   loading   请求进行中（按钮禁用、状态灯判断都用它）
+  //   error     请求/流式错误信息（显示在输入框上方横幅）
+  //   runId     本次 run 的唯一 id（铭牌展示，来自 run 帧）
+  //   model     本次用的模型名（铭牌展示）
+  //   send(text)  发送一次 run：fetch → readStream 逐帧消费 → applyFrame
+  //   reset()     清空会话：先 DELETE /api/chat（清服务端 JSONL），再清本地
+  const { messages, observed, loading, error, runId, model, send, reset } =
+    useAgentRun();
 
+  const [input, setInput] = useState("列出工作区文件"); // 输入框内容（表单状态留在页面，不进 hook）
+  const transcriptRef = useRef<HTMLDivElement>(null); // 转录稿容器，新消息到达时滚到底
+  const traceRef = useRef<HTMLDivElement>(null); // 轨迹容器，新事件到达时滚到底
+  const inputRef = useRef<HTMLTextAreaElement>(null); // 输入框，聚焦/自适应高度用
+
+  // 两个滚动效果：messages / observed 更新时把对应面板滚到底部
   useEffect(() => {
     scrollToEnd(transcriptRef.current);
   }, [messages]);
@@ -85,86 +73,37 @@ export default function Home() {
     box.style.height = `${box.scrollHeight}px`;
   }, [input]);
 
-  async function send() {
+  // 发送入口（表单提交 / 回车都走这里）：
+  // 页面负责「校验非空 + 清空输入框」，真正的请求交给 hook 的 send(text)
+  function submit() {
     if (!input.trim() || loading) return;
     const text = input.trim();
     setInput("");
-    setLoading(true);
-    setError("");
-    setMessages([]);
-    setObserved([]);
-    setRunId("");
-    setModel("");
-
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || `HTTP ${res.status}`);
-      }
-      if (!res.body) throw new Error("当前浏览器不支持流式响应");
-
-      await readStream(res.body, applyFrame);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setLoading(false);
-    }
+    send(text);
   }
 
-  function applyFrame(frame: StreamFrame) {
-    if (frame.type === "run") {
-      setRunId(frame.runId);
-      setModel(frame.model);
-    } else if (frame.type === "event") {
-      const ev = frame.event;
-      setObserved((prev) => [
-        ...prev,
-        { seq: prev.length + 1, at: Date.now(), event: ev },
-      ]);
-      if (ev.type === "message_start") {
-        setMessages((prev) => [...prev, ev.message]);
-      } else if (ev.type === "message_update") {
-        setMessages((prev) => appendDelta(prev, ev.delta));
-      } else if (ev.type === "message_end") {
-        setMessages((prev) => replaceLast(prev, ev.message));
-      }
-    } else if (frame.type === "done") {
-      setMessages(frame.messages);
-      setRunId(frame.runId);
-    } else if (frame.type === "error") {
-      setError(frame.message);
-    }
-  }
-
-  function reset() {
-    setMessages([]);
-    setObserved([]);
-    setError("");
-    setRunId("");
-    setModel("");
-  }
-
+  // 点空态例句：把文案填进输入框并聚焦（不直接发送，用户可再改）
   function pickSeed(text: string) {
     setInput(text);
     inputRef.current?.focus();
   }
 
+  // 派生展示数据（都是纯函数，不改状态）：
+  //   phase  状态灯相位（待命/思考中/执行工具/输出中）—— 看最近一条事件推断
+  //   turn   当前进行到第几轮 —— 从 turn_start 事件数出来
+  //   rows   事件流折叠后的记录条行 —— 给 <TraceRail> 画时间轴
   const phase = derivePhase(observed, loading);
+  const turn = currentTurn(observed);
   const rows = foldEvents(observed);
 
   return (
     <div className="app">
+      {/* 页头：runId / 模型名 / 状态灯 / 清空按钮。canReset 在非加载且有内容时可点 */}
       <Nameplate
         runId={runId}
         model={model}
         phase={phase}
-        turn={currentTurn(observed)}
+        turn={turn}
         onReset={reset}
         canReset={!loading && (messages.length > 0 || observed.length > 0)}
       />
@@ -173,6 +112,9 @@ export default function Home() {
         <main className="stage">
           <div className="transcript" ref={transcriptRef}>
             <div className="reel">
+              {/* 空态 → 起手式引导；有消息 → 逐条渲染。
+                  attached：工具结果行从属于上一条消息（视觉上缩进连接）
+                  live：最后一条且正在加载 → 流式增长动画 + 思考中占位 */}
               {messages.length === 0 ? (
                 <Overture onPick={pickSeed} />
               ) : (
@@ -188,11 +130,12 @@ export default function Home() {
             </div>
           </div>
 
+          {/* 输入控制台：提交走 submit()；错误横幅显示在输入框上方 */}
           <form
             className="console"
             onSubmit={(e) => {
               e.preventDefault();
-              send();
+              submit();
             }}
           >
             {error && (
@@ -210,10 +153,11 @@ export default function Home() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => {
+                  // 回车发送；Shift+Enter 换行；中文输入法选词时的回车不算发送
                   if (e.key !== "Enter" || e.shiftKey) return;
-                  if (e.nativeEvent.isComposing) return; // 中文输入法选词时的回车不算发送
+                  if (e.nativeEvent.isComposing) return;
                   e.preventDefault();
-                  send();
+                  submit();
                 }}
                 placeholder="给它一个目标，例如：读取 agent-notes.md 并总结要点"
                 disabled={loading}
@@ -233,409 +177,17 @@ export default function Home() {
           </form>
         </main>
 
+        {/* 轨迹区：rows 是折叠后的行（时间轴），observed 用于底部统计与耗时计算 */}
         <TraceRail rows={rows} observed={observed} reelRef={traceRef} />
       </div>
     </div>
   );
 }
 
-// ============ 铭牌 ============
+// ============ 状态推导（纯函数，跟着页面走） ============
 
-type NameplateProps = {
-  runId: string;
-  model: string;
-  phase: Phase;
-  turn: number;
-  canReset: boolean;
-  onReset: () => void;
-};
-
-function Nameplate({ runId, model, phase, turn, canReset, onReset }: NameplateProps) {
-  return (
-    <header className="nameplate">
-      <PenMark />
-      <span className="wordmark">Teaching Agent</span>
-      <span className="plate-rule" />
-      <span className="wordmark-cn">观测台</span>
-
-      <div className="plate-right">
-        {runId && (
-          <span className="readout-run" title={`run ${runId} · ${model}`}>
-            <span className="model">{model}</span>
-            <span className="plate-rule" />
-            <span className="run">run {shortId(runId)}</span>
-          </span>
-        )}
-        <StatusBeacon phase={phase} turn={turn} />
-        <button className="btn" onClick={onReset} disabled={!canReset}>
-          清空记录
-        </button>
-      </div>
-    </header>
-  );
-}
-
-/** 标志：一段笔迹。它和轨迹区画的是同一件事 */
-function PenMark() {
-  return (
-    <svg className="mark" width="21" height="21" viewBox="0 0 21 21" aria-hidden="true">
-      <path
-        d="M1.5 14.5H5L7.5 6l3 10.5L13 10l2 2h4.5"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function StatusBeacon({ phase, turn }: { phase: Phase; turn: number }) {
-  return (
-    <span className={`beacon beacon-${phase}`}>
-      <span className="beacon-lens" />
-      <span className="beacon-label">{PHASES[phase]}</span>
-      {turn > 0 && <span className="beacon-turn">T{turn}</span>}
-    </span>
-  );
-}
-
-// ============ 转录稿 ============
-
-function Overture({ onPick }: { onPick: (text: string) => void }) {
-  return (
-    <div className="overture">
-      <p className="overture-eyebrow">单轮运行 · 尚无会话记忆</p>
-      <h1 className="overture-title">
-        给它一个目标，看它怎么一步步做完。
-      </h1>
-      <p className="overture-note">
-        每次发送开始一次新的 run。右边的记录条会同步画出这次 run 的全过程：
-        分成几轮、调了哪些工具、每步花了多久。
-      </p>
-      <div className="seed-grid">
-        {SEEDS.map((seed) => (
-          <button
-            key={seed.text}
-            className="seed"
-            type="button"
-            onClick={() => onPick(seed.text)}
-          >
-            <span className="seed-text">{seed.text}</span>
-            <span className="seed-tool">{seed.tool}</span>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-type MessageRowProps = { message: AgentMessage; attached: boolean; live: boolean };
-
-function MessageRow({ message, attached, live }: MessageRowProps) {
-  if (message.role === "user") {
-    return (
-      <Row tone="user" role="你" timestamp={message.timestamp}>
-        <div className="said">
-          {message.content.map((block, i) => (
-            <Markdown key={i}>{block.text}</Markdown>
-          ))}
-        </div>
-      </Row>
-    );
-  }
-
-  if (message.role === "assistant") {
-    return (
-      <Row tone="agent" role="Agent" timestamp={message.timestamp}>
-        <div className={`reply${live ? " is-live" : ""}`}>
-          {message.content.map((block, i) =>
-            block.type === "toolCall" ? (
-              <ToolCallLine key={i} block={block} />
-            ) : (
-              <Markdown key={i}>{block.text}</Markdown>
-            ),
-          )}
-          {/* 首个 token 还没到：给一行明确的等待态，而不是留一块空白 */}
-          {live && message.content.length === 0 && (
-            <span className="pondering">思考中</span>
-          )}
-        </div>
-      </Row>
-    );
-  }
-
-  return (
-    <Row tone="tool" attached={attached}>
-      <ToolOutput message={message} />
-    </Row>
-  );
-}
-
-type RowProps = {
-  tone: string;
-  role?: string;
-  timestamp?: number;
-  attached?: boolean;
-  children: React.ReactNode;
-};
-
-function Row({ tone, role, timestamp, attached, children }: RowProps) {
-  return (
-    <article className={`row row-${tone}${attached ? " is-attached" : ""}`}>
-      <div className="row-gutter">
-        {role ? (
-          <>
-            <span className="row-role">{role}</span>
-            <span className="row-time">{formatClock(timestamp)}</span>
-          </>
-        ) : (
-          // 工具结果没有独立身份：它属于上一条消息，用连接符表示从属
-          <span className="row-link" aria-hidden="true">
-            ↳
-          </span>
-        )}
-      </div>
-      <div className="row-body">{children}</div>
-    </article>
-  );
-}
-
-function ToolCallLine({ block }: { block: ToolCallContent }) {
-  return (
-    <div className="call">
-      <span className="call-tag">CALL</span>
-      <span className="call-name">{block.name}</span>
-      <code className="call-args">{JSON.stringify(block.arguments)}</code>
-    </div>
-  );
-}
-
-/** 工具结果：默认只露出开头，长输出不该淹掉对话 */
-function ToolOutput({ message }: { message: ToolResultMessage }) {
-  const text = message.content.map((block) => block.text).join("\n");
-  const lines = text.split("\n").length;
-  const [expanded, setExpanded] = useState(lines <= CLAMP_LINES);
-  const clamped = !expanded && lines > CLAMP_LINES;
-
-  return (
-    <div
-      className={[
-        "apparatus",
-        message.isError ? "apparatus-error" : "",
-        clamped ? "apparatus-clamped" : "",
-      ]
-        .filter(Boolean)
-        .join(" ")}
-    >
-      <div className="apparatus-head">
-        <span className="apparatus-name">{message.toolName}</span>
-        <span className="apparatus-verdict">
-          {message.isError ? "✗ 失败" : "✓ 成功"}
-        </span>
-        <span className="apparatus-meta">{lines} 行</span>
-        {lines > CLAMP_LINES && (
-          <button
-            className="apparatus-toggle"
-            type="button"
-            onClick={() => setExpanded(!expanded)}
-          >
-            {expanded ? "收起" : `展开 ${lines} 行`}
-          </button>
-        )}
-      </div>
-      <div className="apparatus-body">
-        <pre className="tool-output">{text}</pre>
-      </div>
-    </div>
-  );
-}
-
-// ============ 轨迹区（走纸记录条） ============
-
-type TraceRailProps = {
-  rows: TraceRow[];
-  observed: ObservedEvent[];
-  reelRef: React.RefObject<HTMLDivElement | null>;
-};
-
-function TraceRail({ rows, observed, reelRef }: TraceRailProps) {
-  const stats = traceStats(observed);
-
-  return (
-    <aside className="trace">
-      <div className="trace-head">
-        <span className="trace-title">Trace</span>
-        <span className="trace-sub">运行记录</span>
-        <span className="trace-clock">{formatElapsed(observed)}</span>
-      </div>
-
-      <div className="trace-reel" ref={reelRef}>
-        {rows.length === 0 ? (
-          <TraceLegend />
-        ) : (
-          <div className="trace-strip">
-            {rows.map((row, i) => (
-              <TraceRowView key={i} row={row} />
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="trace-foot">
-        <Gauge value={stats.turns} label="轮次" />
-        <Gauge value={stats.tools} label="工具调用" />
-        <Gauge value={formatTokens(stats.tokens)} label="token" />
-      </div>
-    </aside>
-  );
-}
-
-/** 空态里放读法说明：与其写「暂无事件」，不如先教会怎么看这张纸 */
-function TraceLegend() {
-  const keys = [
-    { tone: "turn", text: "轮次分节 T1 / T2" },
-    { tone: "model", text: "模型输出，长度随字数" },
-    { tone: "tool", text: "工具执行，条长 = 耗时" },
-    { tone: "signal", text: "运行信号与审批干预" },
-  ];
-
-  return (
-    <div className="trace-empty">
-      <p>发送指令后，这里会从上到下画出这次 run。</p>
-      <div className="legend">
-        {keys.map((key) => (
-          <span key={key.tone} className={`legend-row legend-${key.tone}`}>
-            <span className="legend-key" />
-            {key.text}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function TraceRowView({ row }: { row: TraceRow }) {
-  const cls = `trace-row pen-${row.pen}`;
-
-  if (row.kind === "band") {
-    return (
-      <div className={`${cls} is-band`}>
-        <span className="band-label">{row.label}</span>
-        <span className="band-rule" />
-      </div>
-    );
-  }
-
-  if (row.kind === "stroke") {
-    return (
-      <div className={cls}>
-        <div className={`stroke${row.live ? " is-live" : ""}`}>
-          <span className="stroke-label">{row.label}</span>
-          <span className="stroke-ink" style={{ width: inkWidth(row.size) }} />
-          <span className="stroke-note">{row.note}</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (row.kind === "span") {
-    return (
-      <div className={cls}>
-        <div className={`span${row.live ? " is-running" : ""}`}>
-          <span className="span-name">{row.label}</span>
-          <span className="span-bar" style={{ width: barWidth(row.size) }} />
-          <span className="span-note">
-            {row.live ? "运行中" : formatMs(row.size)}
-          </span>
-          {!row.live && (
-            <span className={row.ok ? "span-ok" : "span-bad"}>
-              {row.ok ? "✓" : "✗"}
-            </span>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className={cls}>
-      <div className="signal">
-        <span className="signal-strong">{row.label}</span>
-        {row.note && <span>{row.note}</span>}
-      </div>
-    </div>
-  );
-}
-
-function Gauge({ value, label }: { value: number | string; label: string }) {
-  return (
-    <span className="gauge">
-      <span className="gauge-value">{value}</span>
-      <span className="gauge-label">{label}</span>
-    </span>
-  );
-}
-
-// ============ 流读取 ============
-
-/** 逐块读 SSE，按空行切帧 */
-async function readStream(
-  body: ReadableStream<Uint8Array>,
-  onFrame: (frame: StreamFrame) => void,
-): Promise<void> {
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-
-    let sep: number;
-    while ((sep = buffer.indexOf("\n\n")) !== -1) {
-      const raw = buffer.slice(0, sep).trim();
-      buffer = buffer.slice(sep + 2);
-      if (!raw.startsWith("data:")) continue;
-      onFrame(JSON.parse(raw.slice(5).trim()) as StreamFrame);
-    }
-  }
-}
-
-// ============ 消息辅助 ============
-
-function appendDelta(messages: AgentMessage[], delta: string): AgentMessage[] {
-  const next = [...messages];
-  const last = next[next.length - 1];
-  if (!last || last.role !== "assistant") return next;
-
-  const content = [...last.content];
-  const lastBlock = content[content.length - 1];
-  if (lastBlock && lastBlock.type === "text") {
-    content[content.length - 1] = { ...lastBlock, text: lastBlock.text + delta };
-  } else {
-    content.push({ type: "text", text: delta });
-  }
-
-  next[next.length - 1] = { ...last, content };
-  return next;
-}
-
-function replaceLast(messages: AgentMessage[], message: AgentMessage): AgentMessage[] {
-  if (messages.length === 0) return messages;
-  const next = [...messages];
-  next[next.length - 1] = message;
-  return next;
-}
-
-function scrollToEnd(box: HTMLDivElement | null) {
-  box?.scrollTo(0, box.scrollHeight);
-}
-
-// ============ 状态推导 ============
-
+// 状态灯相位：加载中才显示；看最近一条事件——
+//   工具执行 → "执行工具"；流式增量 → "输出中"；否则 → "思考中"
 function derivePhase(observed: ObservedEvent[], loading: boolean): Phase {
   if (!loading) return "idle";
   const last = observed[observed.length - 1]?.event;
@@ -646,6 +198,7 @@ function derivePhase(observed: ObservedEvent[], loading: boolean): Phase {
   return "thinking";
 }
 
+// 当前轮次：事件流里最后一个 turn_start 的 turn 值
 function currentTurn(observed: ObservedEvent[]): number {
   let turn = 0;
   for (const { event } of observed) {
@@ -654,201 +207,6 @@ function currentTurn(observed: ObservedEvent[]): number {
   return turn;
 }
 
-function traceStats(observed: ObservedEvent[]) {
-  let turns = 0;
-  let tools = 0;
-  let tokens = 0;
-
-  for (const { event } of observed) {
-    if (event.type === "turn_start") turns = event.turn;
-    if (event.type === "tool_execution_end") tools += 1;
-    if (event.type === "message_end" && event.message.role === "assistant") {
-      tokens += event.message.usage.totalTokens;
-    }
-  }
-
-  return { turns, tools, tokens };
-}
-
-// ============ 事件 → 记录行 ============
-
-type TraceRow = {
-  pen: "turn" | "user" | "model" | "tool" | "signal" | "error";
-  kind: "band" | "stroke" | "span" | "signal";
-  label: string;
-  note?: string;
-  size?: number; // stroke 用字数，span 用毫秒
-  live?: boolean;
-  ok?: boolean;
-  callId?: string;
-  startedAt?: number;
-};
-
-function foldEvents(observed: ObservedEvent[]): TraceRow[] {
-  const rows: TraceRow[] = [];
-  for (const item of observed) foldOne(rows, item);
-  return rows;
-}
-
-function foldOne(rows: TraceRow[], item: ObservedEvent): void {
-  const event = item.event;
-
-  switch (event.type) {
-    case "agent_start":
-      rows.push(signal("RUN 开始"));
-      break;
-    case "agent_end":
-      rows.push(signal("RUN 结束", `${event.messages.length} 条消息`));
-      break;
-    case "turn_start":
-      rows.push({ pen: "turn", kind: "band", label: `T${event.turn}` });
-      break;
-    case "message_start":
-      foldMessageStart(rows, item);
-      break;
-    case "message_update":
-      bumpStroke(rows, event.delta.length);
-      break;
-    case "message_end":
-      sealStroke(rows, item);
-      break;
-    case "tool_execution_start":
-      rows.push(openSpan(event.toolName, event.toolCallId, item.at));
-      break;
-    case "tool_execution_end":
-      closeSpan(rows, event.toolCallId, event.isError, item.at);
-      break;
-    case "tool_permission":
-      foldPermission(rows, event);
-      break;
-    case "compaction":
-      rows.push(signal("上下文压缩", `${event.tokensBefore} tokens`));
-      break;
-    case "turn_end":
-      break; // 轮次的收尾信息已由带内各行表达，不再单独记一行
-  }
-}
-
-function signal(label: string, note?: string): TraceRow {
-  return { pen: "signal", kind: "signal", label, note };
-}
-
-/** 用户消息进轨迹（模型消息交给墨迹行，工具结果交给跨度行） */
-function foldMessageStart(rows: TraceRow[], item: ObservedEvent): void {
-  if (item.event.type !== "message_start") return;
-  const message = item.event.message;
-  if (message.role !== "user") return;
-
-  const chars = message.content.reduce((sum, block) => sum + block.text.length, 0);
-  rows.push({ pen: "user", kind: "signal", label: "指令", note: `${chars} 字` });
-}
-
-/** 连续的流式增量只占一行，长度随字数增长 —— 一支笔画出的一条线 */
-function bumpStroke(rows: TraceRow[], chars: number): void {
-  const last = rows[rows.length - 1];
-  if (last?.kind === "stroke" && last.live) {
-    last.size = (last.size ?? 0) + chars;
-    last.note = `${last.size} 字`;
-    return;
-  }
-  rows.push({ pen: "model", kind: "stroke", label: "输出", size: chars, live: true, note: `${chars} 字` });
-}
-
-/** 模型消息收尾：给这一笔标上 token 用量；非流式模型在这里补出整笔 */
-function sealStroke(rows: TraceRow[], item: ObservedEvent): void {
-  if (item.event.type !== "message_end") return;
-  const message = item.event.message;
-  if (message.role !== "assistant") return;
-
-  const last = rows[rows.length - 1];
-  const tokens = `${message.usage.totalTokens} tok`;
-
-  if (last?.kind === "stroke" && last.live) {
-    last.live = false;
-    last.note = `${last.size ?? 0} 字 · ${tokens}`;
-    return;
-  }
-
-  const chars = textLength(message.content);
-  rows.push({ pen: "model", kind: "stroke", label: "输出", size: chars, note: `${chars} 字 · ${tokens}` });
-}
-
-function openSpan(toolName: string, callId: string, at: number): TraceRow {
-  return {
-    pen: "tool",
-    kind: "span",
-    label: toolName,
-    callId,
-    startedAt: at,
-    live: true,
-  };
-}
-
-/** 用 toolCallId 把 end 配回它的 start，两条事件合成一段有长度的跨度 */
-function closeSpan(rows: TraceRow[], callId: string, isError: boolean, at: number): void {
-  const span = [...rows].reverse().find((row) => row.callId === callId && row.live);
-  if (!span) return;
-
-  span.live = false;
-  span.ok = !isError;
-  span.size = at - (span.startedAt ?? at);
-}
-
-/** 只记「有干预」的审批：放行是默认路径，记下来只会淹掉真正的信号 */
-function foldPermission(
-  rows: TraceRow[],
-  event: Extract<AgentEvent, { type: "tool_permission" }>,
-): void {
-  if (event.action === "allow") return;
-
-  const label = event.action === "block" ? "审批拦截" : "参数改写";
-  const note = [event.toolName, event.reason].filter(Boolean).join(" · ");
-  rows.push({
-    pen: event.action === "block" ? "error" : "signal",
-    kind: "signal",
-    label,
-    note,
-  });
-}
-
-// ============ 格式化 ============
-
-function textLength(content: Array<TextContent | ToolCallContent>): number {
-  return content.reduce(
-    (sum, block) => sum + (block.type === "text" ? block.text.length : 0),
-    0,
-  );
-}
-
-function inkWidth(chars = 0): string {
-  return `${Math.min(96, 8 + chars / 6)}px`;
-}
-
-function barWidth(ms = 0): string {
-  return `${Math.min(92, 12 + ms / 20)}px`;
-}
-
-function formatMs(ms = 0): string {
-  return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
-}
-
-function formatTokens(tokens: number): string {
-  return tokens >= 1000 ? `${(tokens / 1000).toFixed(1)}k` : `${tokens}`;
-}
-
-function formatElapsed(observed: ObservedEvent[]): string {
-  if (observed.length < 2) return "—";
-  return formatMs(observed[observed.length - 1].at - observed[0].at);
-}
-
-function formatClock(timestamp?: number): string {
-  if (!timestamp) return "";
-  const time = new Date(timestamp);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(time.getHours())}:${pad(time.getMinutes())}:${pad(time.getSeconds())}`;
-}
-
-function shortId(id: string): string {
-  if (id.length <= 14) return id;
-  return `${id.slice(0, 8)}…${id.slice(-4)}`;
+function scrollToEnd(box: HTMLDivElement | null) {
+  box?.scrollTo(0, box.scrollHeight);
 }
