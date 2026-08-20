@@ -19,7 +19,12 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { join, resolve } from "node:path";
-import type { AgentEvent, AgentMessage, ToolDefinition } from "@/lib/types";
+import type {
+  AgentEvent,
+  AgentMessage,
+  SessionStats,
+  ToolDefinition,
+} from "@/lib/types";
 import { createUserMessage } from "@/lib/message";
 import { MockModel } from "@/lib/mockModel";
 import { DeepSeekModel } from "@/lib/deepseekModel";
@@ -28,6 +33,7 @@ import { createToolRegistry } from "@/lib/tools";
 import { runAgentLoop } from "@/lib/agent";
 import { TraceRecorder } from "@/lib/trace";
 import { JsonlSessionStore } from "@/lib/sessionStore";
+import { isValidSessionId } from "@/lib/sessionManager";
 
 // 显式声明 Node runtime：本路由（以及它的工具）会用 node:fs / node:path，
 // 后面 Phase 4 还要用 node:child_process 跑终端。
@@ -60,7 +66,7 @@ const systemPrompt = [
   "- 解释概念时：先一句话结论 → 再展开讲机制 → 最后给一个最小示例或类比。",
 ].join("\n");
 
-// SSE 帧的联合类型（前端 page.tsx 用同名类型来消费）
+// SSE 帧的联合类型（前端 sse.ts 用同名类型来消费）
 type StreamFrame =
   | { type: "run"; runId: string; model: string }
   | { type: "event"; event: AgentEvent }
@@ -69,13 +75,15 @@ type StreamFrame =
       messages: AgentMessage[];
       tools: ToolDefinition[];
       runId: string;
+      // 会话级累计统计（读数盘）：done 时点由 store 从会话文件算出
+      stats: SessionStats;
     }
   | { type: "error"; message: string };
 
 // --- POST /api/chat ---
 export async function POST(req: NextRequest) {
   let text: unknown;
-  // Phase 1 单会话：body 可选传 sessionId，不传用 default（Phase 2 多会话的前置接口）
+  // Phase 2 多会话：body 可选传 sessionId，不传用 default
   let sessionId = "default";
 
   try {
@@ -85,6 +93,10 @@ export async function POST(req: NextRequest) {
     
     if (typeof body?.sessionId === "string" && body.sessionId.trim()) {
       sessionId = body.sessionId.trim();
+      // 安全：sessionId 会拼进文件路径，必须过白名单校验（见 sessionManager）
+      if (!isValidSessionId(sessionId)) {
+        return NextResponse.json({ error: "非法 sessionId" }, { status: 400 });
+      }
     }
   } catch {
     return NextResponse.json({ error: "请求体不是合法 JSON" }, { status: 400 });
@@ -191,11 +203,13 @@ export async function POST(req: NextRequest) {
         // 3) 全部结束后，推送最终权威结果。
         //    messages 带「全量会话历史」（buildContext 从叶子回溯），
         //    前端直接整体替换渲染——多轮对话因此能完整显示。
+        //    stats 是会话级累计统计（含本轮新增），前端读数盘直接展示。
         send({
           type: "done",
           messages: store.buildContext(),
           tools: toolRegistry.definitions(),
           runId: recorder.runId,
+          stats: store.stats(),
         });
       } catch (e) {
         send({ type: "error", message: (e as Error).message });
@@ -219,9 +233,12 @@ export async function POST(req: NextRequest) {
 }
 
 // --- GET /api/chat?sessionId=xxx ---
-// 返回会话历史（叶子路径上的全部消息），供前端挂载时恢复多轮对话（刷新不丢）。
+// 返回会话历史（叶子路径上的全部消息），供前端挂载/切换会话时恢复多轮对话。
 export async function GET(req: NextRequest) {
   const sessionId = req.nextUrl.searchParams.get("sessionId") || "default";
+  if (!isValidSessionId(sessionId)) {
+    return NextResponse.json({ error: "非法 sessionId" }, { status: 400 });
+  }
   const store = new JsonlSessionStore(
     join(sessionDir, `${sessionId}.jsonl`),
     workspaceRoot,
@@ -231,6 +248,7 @@ export async function GET(req: NextRequest) {
     sessionId,
     leafId: store.getLeafId(),
     messages: store.buildContext(),
+    stats: store.stats(),
   });
 }
 
@@ -238,6 +256,9 @@ export async function GET(req: NextRequest) {
 // 清空会话（与前端「清空记录」按钮配套：只清本地状态的话，刷新后历史会复活）。
 export async function DELETE(req: NextRequest) {
   const sessionId = req.nextUrl.searchParams.get("sessionId") || "default";
+  if (!isValidSessionId(sessionId)) {
+    return NextResponse.json({ error: "非法 sessionId" }, { status: 400 });
+  }
   const store = new JsonlSessionStore(
     join(sessionDir, `${sessionId}.jsonl`),
     workspaceRoot,

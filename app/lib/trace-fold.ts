@@ -34,23 +34,6 @@ export function foldEvents(observed: ObservedEvent[]): TraceRow[] {
   return rows;
 }
 
-/** 底部统计：轮次数 / 工具调用数 / token 用量 */
-export function traceStats(observed: ObservedEvent[]) {
-  let turns = 0;
-  let tools = 0;
-  let tokens = 0;
-
-  for (const { event } of observed) {
-    if (event.type === "turn_start") turns = event.turn;
-    if (event.type === "tool_execution_end") tools += 1;
-    if (event.type === "message_end" && event.message.role === "assistant") {
-      tokens += event.message.usage.totalTokens;
-    }
-  }
-
-  return { turns, tools, tokens };
-}
-
 function foldOne(rows: TraceRow[], item: ObservedEvent): void {
   const event = item.event;
 

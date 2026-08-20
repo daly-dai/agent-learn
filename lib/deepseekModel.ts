@@ -91,6 +91,10 @@ export class DeepSeekModel implements TeachingModel {
           messages,
           ...(tools ? { tools } : {}),
           stream,
+          // 流式默认不返回 token 用量；include_usage 让流的最后一个 chunk
+          // 带上 usage（OpenAI 兼容约定）。不支持的供应商会忽略它，
+          // 前端那边会回退显示 0。
+          ...(stream ? { stream_options: { include_usage: true } } : {}),
         }),
         signal: input.signal,
       });
@@ -154,11 +158,16 @@ export class DeepSeekModel implements TeachingModel {
     let buffer = "";
     let textBuffer = "";
     let finishReason: string | undefined;
+    // include_usage 时，流的最后一个 chunk（choices 为空）会带 usage
+    let usage: Usage | undefined;
 
     const toolCallsAcc = new Map<number, { id?: string; name?: string; args: string }>();
 
     // 处理一个 SSE data chunk
     const consume = (chunk: OpenAiChunk) => {
+      // usage chunk 没有 choices/delta，必须在下面的 delta 早退之前捕获
+      if (chunk.usage) usage = toUsage(chunk.usage);
+
       const choice = chunk.choices?.[0];
       if (choice?.finish_reason) finishReason = choice.finish_reason;
 
@@ -215,7 +224,7 @@ export class DeepSeekModel implements TeachingModel {
       );
     }
 
-    return buildStreamMessage(textBuffer, toolCallsAcc, finishReason);
+    return buildStreamMessage(textBuffer, toolCallsAcc, finishReason, usage);
   }
 
   private headers(): Record<string, string> {
@@ -233,6 +242,7 @@ function buildStreamMessage(
   textBuffer: string,
   toolCallsAcc: Map<number, { id?: string; name?: string; args: string }>,
   finishReason: string | undefined,
+  usage: Usage | undefined,
 ): AssistantMessage {
   const content: AssistantMessage["content"] = [];
   if (textBuffer.length > 0) {
@@ -253,9 +263,22 @@ function buildStreamMessage(
     role: "assistant",
     content: withFallbackText(content),
     stopReason: stopReasonFor(finishReason, toolCalls.length),
-    // 流式下精确 token 用量需 stream_options.include_usage（后续可补）
-    usage: EMPTY_USAGE,
+    // include_usage 拿到真实用量；供应商不支持时拿不到，回退 0
+    usage: usage ?? EMPTY_USAGE,
     timestamp: Date.now(),
+  };
+}
+
+/** OpenAI 的 usage 字段 → 统一 Usage（流式最后一个 chunk 携带） */
+function toUsage(u: {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+}): Usage {
+  return {
+    input: u.prompt_tokens ?? 0,
+    output: u.completion_tokens ?? 0,
+    totalTokens: u.total_tokens ?? 0,
   };
 }
 
@@ -534,4 +557,10 @@ type OpenAiChunk = {
     };
     finish_reason?: string | null;
   }>;
+  // include_usage 时，流的最后一个 chunk 携带用量
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
 };

@@ -22,7 +22,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { appendFile, rm } from "node:fs/promises";
 import { dirname } from "node:path";
-import type { AgentMessage, SessionEntry } from "./types";
+import type { AgentMessage, SessionEntry, SessionStats } from "./types";
 import { isTextContent, text } from "./message";
 
 type MessageEntry = Extract<SessionEntry, { type: "message" }>;
@@ -41,6 +41,9 @@ export class JsonlSessionStore {
     private readonly filePath: string,
     private readonly cwd: string,
     private readonly sessionId: string,
+    // Phase 2 多会话：新建会话时给一个显示名（title）；读旧文件时头里的
+    // title 原样保留在 entries 里，不需要这里再传。
+    private readonly title?: string,
   ) {
     this.loadOrCreate();
   }
@@ -55,6 +58,27 @@ export class JsonlSessionStore {
 
   getLeafId(): string | null {
     return this.leafId;
+  }
+
+  /** 会话级累计统计（读数盘用）：扫描内存态全量 entries。
+   *  轮次 = assistant 消息数；工具调用 = toolResult 数；
+   *  token = 所有 assistant 消息 usage.totalTokens 之和。 */
+  stats(): SessionStats {
+    let turns = 0;
+    let tools = 0;
+    let tokens = 0;
+
+    for (const entry of this.entries) {
+      if (entry.type !== "message") continue;
+      if (entry.message.role === "assistant") {
+        turns += 1;
+        tokens += entry.message.usage.totalTokens;
+      } else if (entry.message.role === "toolResult") {
+        tools += 1;
+      }
+    }
+
+    return { turns, tools, tokens };
   }
 
   /** 切分支（Phase 2 多会话/回溯用）：把叶子指到任意历史条目 */
@@ -243,6 +267,7 @@ export class JsonlSessionStore {
       id: this.sessionId,
       timestamp: new Date().toISOString(),
       cwd: this.cwd,
+      ...(this.title ? { title: this.title } : {}),
     };
 
     this.entries.push(header);

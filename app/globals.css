@@ -131,7 +131,8 @@ pre,
 
 .deck {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 348px;
+  /* Phase 2：会话侧栏（240px） + 对话面 + 轨迹（348px） */
+  grid-template-columns: 240px minmax(0, 1fr) 348px;
   grid-template-rows: minmax(0, 1fr);
   min-height: 0;
 }
@@ -287,6 +288,162 @@ pre,
   50% {
     opacity: 0.35;
   }
+}
+
+/* ============ 会话侧栏（Phase 2 多会话） ============ */
+.sidebar {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 0;
+  background: var(--recorder);
+  border-right: 1px solid var(--line);
+}
+
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.sidebar-title {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+}
+
+.sidebar-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+.sidebar-new {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--pen-model);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.sidebar-new:hover {
+  border-color: var(--pen-model);
+}
+
+.session-list {
+  overflow-y: auto;
+  min-height: 0;
+  padding: 8px;
+}
+
+.session-empty {
+  padding: 12px 6px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+.session-item {
+  position: relative;
+  margin-bottom: 4px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  cursor: pointer;
+}
+
+.session-item:hover {
+  background: var(--paper);
+}
+
+.session-item.is-current {
+  background: var(--plate);
+  border-color: var(--line);
+}
+
+.session-title {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-preview {
+  margin-top: 2px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--ink-mid);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-meta {
+  display: flex;
+  gap: 8px;
+  margin-top: 3px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-faint);
+}
+
+/* 操作按钮只在悬停时出现：默认路径是「看」，干预才需要动手 */
+.session-actions {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  display: none;
+  gap: 2px;
+}
+
+.session-item:hover .session-actions {
+  display: flex;
+}
+
+.session-action {
+  padding: 2px 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+  color: var(--ink-mid);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  cursor: pointer;
+}
+
+.session-action:hover {
+  color: var(--ink);
+  border-color: var(--ink-faint);
+}
+
+.session-rename-input {
+  width: 100%;
+  padding: 3px 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+  background: var(--plate);
+  border: 1px solid var(--pen-model);
+  border-radius: var(--r);
+  outline: none;
+}
+
+.sidebar-foot {
+  padding: 8px 14px;
+  border-top: 1px solid var(--line-soft);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-faint);
 }
 
 /* ============ 对话面（转录稿） ============ */
@@ -1005,7 +1162,7 @@ pre,
   background: var(--pen-signal);
 }
 
-/* 读数盘：本次 run 的三个数字 */
+/* 读数盘：当前会话的累计数字（由服务端从会话文件算出，不是本次 run 的临时值） */
 .trace-foot {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

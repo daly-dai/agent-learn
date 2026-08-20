@@ -7,9 +7,14 @@
 // 不改协议就能画出耗时与用时 —— 这是产品层的观测，不是引擎的职责。
 // ============================================================
 
-import type { AgentEvent, AgentMessage, ToolDefinition } from "@/lib/types";
+import type {
+  AgentEvent,
+  AgentMessage,
+  SessionStats,
+  ToolDefinition,
+} from "@/lib/types";
 
-// SSE 帧的联合类型（服务端 route.ts 用同名类型来推送）
+// SSE 帧的联合类型（服务端 route.ts 推送同名帧）
 export type StreamFrame =
   | { type: "run"; runId: string; model: string }
   | { type: "event"; event: AgentEvent }
@@ -18,6 +23,8 @@ export type StreamFrame =
       messages: AgentMessage[];
       tools: ToolDefinition[];
       runId: string;
+      // 会话级累计统计（读数盘）：服务端从会话文件算出
+      stats: SessionStats;
     }
   | { type: "error"; message: string };
 

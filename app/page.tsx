@@ -9,17 +9,23 @@
 //   3. 组合四个组件（Nameplate / Overture / MessageRow / TraceRail）
 //
 // ── 调用地图：页面调用的每个东西是什么、在哪、干什么 ──
+//   useSessions()   app/lib/use-sessions.ts
+//                   Phase 2 多会话：会话列表 + 当前会话 id。返回
+//                   { sessions, currentId, select, create, rename, remove }。
+//                   页面把 currentId 传给 useAgentRun —— 切换会话 = 换 id。
 //   useAgentRun()   app/lib/use-agent-run.ts
 //                   run 的全部状态 + 行为。内部封装了 fetch POST /api/chat、
-//                   readStream 逐帧消费、挂载时 GET 恢复历史、DELETE 清空。
+//                   readStream 逐帧消费、会话历史 GET 恢复、DELETE 清空。
 //                   返回 { messages, observed, loading, error, runId, model,
-//                          send(text), reset() }。
+//                          send(text), reset(), stats }。
 //   foldEvents()    app/lib/trace-fold.ts（纯函数）
 //                   把原始 AgentEvent 流折叠成记录条行：连续 message_update
 //                   收成一笔墨迹、工具 start/end 配成一段跨度（105 条事件
 //                   实测塌成 2 行），结果喂给 <TraceRail> 渲染。
 //   derivePhase()   本文件底部（纯函数）—— 根据最近一条事件推断状态灯相位
 //   currentTurn()   本文件底部（纯函数）—— 从 turn_start 事件数出当前轮次
+//   <SessionList>   app/components/session-list.tsx —— 左侧会话栏
+//                   （列表 / 新建 / 行内重命名 / 删除）
 //   <Nameplate>     app/components/nameplate.tsx —— 页头：标志/标题/run 信息/
 //                   状态灯/清空按钮
 //   <Overture>      app/components/overture.tsx —— 空态引导 + 例句按钮
@@ -34,22 +40,30 @@ import { Nameplate, type Phase } from "./components/nameplate";
 import { Overture } from "./components/overture";
 import { MessageRow } from "./components/message-row";
 import { TraceRail } from "./components/trace-rail";
+import { SessionList } from "./components/session-list";
 import { useAgentRun } from "./lib/use-agent-run";
+import { useSessions } from "./lib/use-sessions";
 import { foldEvents } from "./lib/trace-fold";
 import type { ObservedEvent } from "./lib/sse";
 
 export default function Home() {
+  // 会话栏（Phase 2）：列表 + 当前会话 id。currentId 传给 useAgentRun，
+  // 切换会话 = 换 currentId，聊天区随之清空并加载对应历史。
+  const { sessions, currentId, select, create, rename, remove } = useSessions();
+
   // hook：一次 run 的观测状态和行为。页面从这里拿数据，不再自己发 fetch。
-  //   messages  转录稿消息（挂载恢复的多轮历史 + 本次 run 新增）
+  //   messages  转录稿消息（当前会话历史 + 本次 run 新增）
   //   observed  带到达时间戳的事件流（右侧时间线的原始素材）
   //   loading   请求进行中（按钮禁用、状态灯判断都用它）
   //   error     请求/流式错误信息（显示在输入框上方横幅）
   //   runId     本次 run 的唯一 id（铭牌展示，来自 run 帧）
   //   model     本次用的模型名（铭牌展示）
   //   send(text)  发送一次 run：fetch → readStream 逐帧消费 → applyFrame
-  //   reset()     清空会话：先 DELETE /api/chat（清服务端 JSONL），再清本地
-  const { messages, observed, loading, error, runId, model, send, reset } =
-    useAgentRun();
+  //   reset()     清空当前会话：先 DELETE /api/chat（清服务端 JSONL），再清本地
+  //   stats       会话级累计统计（轮次/工具/token）：服务端从会话文件算出，
+  //               切换会话/run 结束时更新，读数盘直接展示
+  const { messages, observed, loading, error, runId, model, send, reset, stats } =
+    useAgentRun(currentId);
 
   const [input, setInput] = useState("列出工作区文件"); // 输入框内容（表单状态留在页面，不进 hook）
   const transcriptRef = useRef<HTMLDivElement>(null); // 转录稿容器，新消息到达时滚到底
@@ -109,6 +123,22 @@ export default function Home() {
       />
 
       <div className="deck">
+        {/* 左侧会话栏（Phase 2）：点击切换 / ＋新建 / ✎重命名 / ×删除 */}
+        <SessionList
+          sessions={sessions}
+          currentId={currentId}
+          onSelect={select}
+          onCreate={() => {
+            create();
+          }}
+          onRename={(id, title) => {
+            rename(id, title);
+          }}
+          onDelete={(id) => {
+            remove(id);
+          }}
+        />
+
         <main className="stage">
           <div className="transcript" ref={transcriptRef}>
             <div className="reel">
@@ -177,8 +207,9 @@ export default function Home() {
           </form>
         </main>
 
-        {/* 轨迹区：rows 是折叠后的行（时间轴），observed 用于底部统计与耗时计算 */}
-        <TraceRail rows={rows} observed={observed} reelRef={traceRef} />
+        {/* 轨迹区：rows 是折叠后的行（时间轴），observed 用于耗时计算，
+            stats 是会话级累计统计（读数盘，服务端算出） */}
+        <TraceRail rows={rows} observed={observed} stats={stats} reelRef={traceRef} />
       </div>
     </div>
   );

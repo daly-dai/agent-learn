@@ -121,6 +121,9 @@ export type SessionEntry =
       id: string;
       timestamp: string;
       cwd: string;
+      // 显示名（Phase 2 多会话）：可选；没有就回退用 id 显示。
+      // 重命名只改这里，不改文件名——id 是身份，title 是给人看的名字。
+      title?: string;
     }
   | {
       type: "message";
@@ -138,6 +141,16 @@ export type SessionEntry =
       firstKeptEntryId: string;
       tokensBefore: number;
     };
+
+// --- 会话统计（读数盘：会话级累计，由服务端从会话文件算出） ---
+export type SessionStats = {
+  /** 轮次 = assistant 消息数（每次模型调用产出一条 assistant 消息） */
+  turns: number;
+  /** 工具调用 = toolResult 消息数（每次工具执行产出一条 toolResult） */
+  tools: number;
+  /** token = 所有 assistant 消息 usage.totalTokens 之和 */
+  tokens: number;
+};
 
 // --- API 响应 ---
 

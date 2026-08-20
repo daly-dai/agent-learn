@@ -6,8 +6,9 @@
 // ============================================================
 
 import type { RefObject } from "react";
+import type { SessionStats } from "@/lib/types";
 import type { ObservedEvent } from "../lib/sse";
-import { traceStats, type TraceRow } from "../lib/trace-fold";
+import type { TraceRow } from "../lib/trace-fold";
 import {
   barWidth,
   formatElapsed,
@@ -19,12 +20,12 @@ import {
 type TraceRailProps = {
   rows: TraceRow[];
   observed: ObservedEvent[];
+  // 会话级累计统计（读数盘）：由服务端从会话文件算出，页面从 useAgentRun 传入
+  stats: SessionStats;
   reelRef: RefObject<HTMLDivElement | null>;
 };
 
-export function TraceRail({ rows, observed, reelRef }: TraceRailProps) {
-  const stats = traceStats(observed);
-
+export function TraceRail({ rows, observed, stats, reelRef }: TraceRailProps) {
   return (
     <aside className="trace">
       <div className="trace-head">
