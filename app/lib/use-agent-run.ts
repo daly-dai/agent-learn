@@ -23,6 +23,13 @@ import { readStream, type ObservedEvent, type StreamFrame } from "./sse";
 // 空会话的统计（读接口失败/清空后的兜底）
 const ZERO_STATS: SessionStats = { turns: 0, tools: 0, tokens: 0 };
 
+/** 一次挂起的工具确认（前端弹框内容） */
+export type ToolApprovalRequest = {
+  toolCallId: string;
+  toolName: string;
+  args: Record<string, unknown>;
+};
+
 export function useAgentRun(sessionId: string) {
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [observed, setObserved] = useState<ObservedEvent[]>([]);
@@ -32,6 +39,9 @@ export function useAgentRun(sessionId: string) {
   const [model, setModel] = useState("");
   // 会话级累计统计（读数盘）：随历史接口和 done 帧一起更新，不自己算
   const [stats, setStats] = useState<SessionStats>(ZERO_STATS);
+  // 挂起的工具确认：非 null 时前端要弹框，用户决定后回传 /api/chat/approve
+  const [pendingApproval, setPendingApproval] =
+    useState<ToolApprovalRequest | null>(null);
 
   // 会话历史：挂载时 / sessionId 变化时触发。
   // 先清空本地（避免上一会话的消息残留），再拉新会话的历史（刷新不丢）。
@@ -42,6 +52,7 @@ export function useAgentRun(sessionId: string) {
     setRunId("");
     setModel("");
     setStats(ZERO_STATS);
+    setPendingApproval(null);
     if (!sessionId) return;
 
     let cancelled = false;
@@ -83,9 +94,31 @@ export function useAgentRun(sessionId: string) {
       setMessages(frame.messages);
       setRunId(frame.runId);
       setStats(frame.stats);
+      // run 结束了：服务端不再有挂起的确认（超时会自动拒绝），清掉弹框
+      setPendingApproval(null);
     } else if (frame.type === "error") {
       setError(frame.message);
+    } else if (frame.type === "tool_permission_request") {
+      // 写/改/删工具需要人工确认：交给页面弹框
+      setPendingApproval({
+        toolCallId: frame.toolCallId,
+        toolName: frame.toolName,
+        args: frame.args,
+      });
     }
+  }, []);
+
+  // 回传用户对挂起确认的决定（允许/拒绝）。接口 404 = 已超时/已处理。
+  const approve = useCallback(async (allow: boolean) => {
+    setPendingApproval((current) => {
+      if (!current) return current;
+      fetch("/api/chat/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ toolCallId: current.toolCallId, allow }),
+      }).catch(() => {});
+      return null; // 立即关掉弹框；服务端那边 resolve 后引擎继续
+    });
   }, []);
 
   // 发送：校验 + 请求 + 逐帧消费。text 由页面传入，页面负责清空输入框。
@@ -139,7 +172,20 @@ export function useAgentRun(sessionId: string) {
     setRunId("");
     setModel("");
     setStats(ZERO_STATS);
+    setPendingApproval(null);
   }, [sessionId]);
 
-  return { messages, observed, loading, error, runId, model, send, reset, stats };
+  return {
+    messages,
+    observed,
+    loading,
+    error,
+    runId,
+    model,
+    send,
+    reset,
+    stats,
+    pendingApproval,
+    approve,
+  };
 }

@@ -29,6 +29,13 @@
 //   <Nameplate>     app/components/nameplate.tsx —— 页头：标志/标题/run 信息/
 //                   状态灯/清空按钮
 //   <Overture>      app/components/overture.tsx —— 空态引导 + 例句按钮
+//   <SessionList>   app/components/session-list.tsx —— 左侧会话栏
+//                   （列表 / 新建 / 行内重命名 / 删除）
+//   <ApprovalDialog> app/components/approval-dialog.tsx —— 写/改/删工具的
+//                   人工确认弹框（允许/拒绝），配合 pendingApproval/approve
+//   <Nameplate>     app/components/nameplate.tsx —— 页头：标志/标题/run 信息/
+//                   状态灯/清空按钮
+//   <Overture>      app/components/overture.tsx —— 空态引导 + 例句按钮
 //   <MessageRow>    app/components/message-row.tsx —— 转录稿单条消息
 //                   （用户/Agent 文本/工具调用行/工具结果卡片）
 //   <TraceRail>     app/components/trace-rail.tsx —— 右侧走纸记录条
@@ -41,6 +48,7 @@ import { Overture } from "./components/overture";
 import { MessageRow } from "./components/message-row";
 import { TraceRail } from "./components/trace-rail";
 import { SessionList } from "./components/session-list";
+import { ApprovalDialog } from "./components/approval-dialog";
 import { useAgentRun } from "./lib/use-agent-run";
 import { useSessions } from "./lib/use-sessions";
 import { foldEvents } from "./lib/trace-fold";
@@ -62,8 +70,20 @@ export default function Home() {
   //   reset()     清空当前会话：先 DELETE /api/chat（清服务端 JSONL），再清本地
   //   stats       会话级累计统计（轮次/工具/token）：服务端从会话文件算出，
   //               切换会话/run 结束时更新，读数盘直接展示
-  const { messages, observed, loading, error, runId, model, send, reset, stats } =
-    useAgentRun(currentId);
+  //   pendingApproval  挂起的工具确认（写/改/删弹框用）；approve(allow) 回传决定
+  const {
+    messages,
+    observed,
+    loading,
+    error,
+    runId,
+    model,
+    send,
+    reset,
+    stats,
+    pendingApproval,
+    approve,
+  } = useAgentRun(currentId);
 
   const [input, setInput] = useState("列出工作区文件"); // 输入框内容（表单状态留在页面，不进 hook）
   const transcriptRef = useRef<HTMLDivElement>(null); // 转录稿容器，新消息到达时滚到底
@@ -211,6 +231,9 @@ export default function Home() {
             stats 是会话级累计统计（读数盘，服务端算出） */}
         <TraceRail rows={rows} observed={observed} stats={stats} reelRef={traceRef} />
       </div>
+
+      {/* 写/改/删工具的人工确认弹框（Phase 3）：pendingApproval 非空时弹出 */}
+      <ApprovalDialog request={pendingApproval} onApprove={approve} />
     </div>
   );
 }

@@ -1194,6 +1194,98 @@ pre,
   color: var(--ink-mid);
 }
 
+/* ============ 审批弹框（Phase 3 人工确认） ============ */
+.approval-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background: rgba(29, 33, 39, 0.35);
+}
+
+.approval-panel {
+  width: min(420px, calc(100vw - 48px));
+  padding: 16px 18px 14px;
+  background: var(--plate);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: 0 10px 30px rgba(29, 33, 39, 0.25);
+}
+
+.approval-title {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+}
+
+.approval-tool {
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--pen-tool);
+}
+
+.approval-args {
+  margin-top: 8px;
+  max-height: 180px;
+  overflow: auto;
+  padding: 8px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--ink-mid);
+  background: var(--paper);
+  border-radius: var(--r);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.approval-note {
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-faint);
+}
+
+.approval-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.approval-btn {
+  padding: 5px 16px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  border-radius: var(--r);
+  cursor: pointer;
+}
+
+.approval-allow {
+  color: var(--plate);
+  background: var(--pen-model);
+  border: 1px solid var(--pen-model);
+}
+
+.approval-allow:hover {
+  filter: brightness(1.08);
+}
+
+.approval-block {
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+
+.approval-block:hover {
+  border-color: var(--pen-error);
+  color: var(--pen-error);
+}
+
 /* ============ Markdown 阅读样式 ============ */
 .markdown-body {
   font-size: 14.5px;

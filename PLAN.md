@@ -27,7 +27,7 @@
 
 ### 已经做对的地方（值得保留）
 
-1. **抽象接缝留对了**：`TeachingModel` 接口（`lib/model.ts`）就是"换大脑"的正确位置；`ToolRegistry`（`lib/tools.ts`）就是"加手脚"的正确位置。接真实模型、加终端、加文件工具，都不需要重写引擎。
+1. **抽象接缝留对了**：`TeachingModel` 接口（`lib/model.ts`）就是"换大脑"的正确位置；`ToolRegistry`（`lib/tools/`）就是"加手脚"的正确位置。接真实模型、加终端、加文件工具，都不需要重写引擎。
 2. **引擎不依赖消费者**：`runAgentLoop` 同时产出 `events`（拉取）和 `onEvent`（推送），事件协议已经按"真实流式模型"的形状设计好了。
 3. **副作用边界清晰**：模型只能提 tool call，真正的文件读写发生在工具里，且有路径沙箱 + 审批钩子。
 
@@ -205,6 +205,7 @@ type TraceEntry = {
 | 终端运行 | 产品层 BashRunner | Phase 4 |
 | 执行 task 面板 | 产品层 TaskRunner + UI | Phase 5 |
 | 对话面板（完整） | 产品层 UI | Phase 6 |
+| 选择 / 切换多个工作区 | 产品层 SessionManager/API/UI + 内核层沙箱参数化 | 暂缓（见第十一节） |
 
 ---
 
@@ -255,9 +256,20 @@ type TraceEntry = {
 - 暂缓：会话树分支切换（`switchLeaf`，那是会话内的岔路）、标题自动生成（从首条消息摘）、归档/排序、并发写锁。
 
 ### Phase 3：文件增删改查
-- 扩展 `ToolRegistry`：`read_file`（已有）、`write_file`（任意路径）、`edit_file`（旧串→新串替换，或 diff 式）、`delete_file`、`grep`、`find`、`list_files`（已有）。
+- 扩展 `ToolRegistry`：`read_file`（已有）、`write_file`（任意路径）、`edit_file`（旧串→新串替换）、`delete_file`、`grep`、`find`、`list_files`（已有）。
 - 保留并强化路径沙箱（`resolveInsideWorkspace`）。
 - 对应 pi：`packages/agent/src/harness/tools/{read,write,edit,edit-diff,path-utils}.ts` + `packages/coding-agent/src/core/tools/{find,grep,ls}.ts`。
+
+**实现前补记（AGENTS.md：先想清楚再动手）**
+
+- 新工具清单（参数见 `lib/tools/` 各工具文件）：`write_file`（任意路径 + 自动建父目录）、`edit_file`（唯一 oldText→newText 替换：找不到/多处都报错回给模型）、`delete_file`、`grep`（正则搜内容，无效正则转 isError）、`find`（文件名 `*` 通配）。全部复用 `resolveInsideWorkspace`。
+- **write_note 保留并存**（已确认）：它是「只写 notes/」的低危特例，`write_file` 是通用入口——同一种能力两种危险等级，审批策略不同（教学点）。
+- **edit_file 形态**（已确认）：形态 A 最简版「唯一 oldText→newText 替换」。模糊匹配（智能引号/破折号归一化，pi 的做法）和 diff 式编辑都留作扩展。
+- **审批策略**（已确认）：读类（list/read/find/grep）默认放行；写类（write_note/write_file）放行但拦截「secret/秘密」文件名；**delete_file 默认 block**（演示审批机制），`ALLOW_FILE_DELETE=true` 环境变量可放行——「策略配置」的教学样例。
+- **grep 细节**（已确认）：JS 正则；默认最多 50 条匹配，超出提示「共 N 条，显示前 M」；每行截断 200 字符；读文件失败（二进制等）跳过不崩。
+- 暂缓：edit 模糊匹配、diff 式编辑、符号链接逃逸防护、二进制识别、并发写锁、前端删除确认弹窗（等 Phase 5/6 的交互通道）。
+- **人工确认（已确认：全部写操作弹框 + 60s 超时自动拒绝）**：`write_note`/`write_file`/`edit_file`/`delete_file` 每次调用都弹框让用户当场允许/拒绝，不再依赖硬编码策略。实现：`beforeToolCall` 是 async 钩子——识别写/改/删 → SSE 推新帧 `tool_permission_request`（toolCallId/工具名/参数）→ await 挂起的 Promise（`lib/toolApproval.ts` 的 pending 注册表，globalThis 挂载防 dev 多 worker 不共享）→ 前端弹框 → `POST /api/chat/approve` 回传决定 → resolve 放行/拦截。60 秒不点自动拒绝（block 结果回给模型解释）。硬性安全策略（secret/秘密 文件名）仍不弹框直接拦。**`ALLOW_FILE_DELETE` 开关被弹框机制取代，移除**。会话/全局「记住选择」留待以后。
+- 测试：Phase 6 补框架；`tools.ts` 是全项目最适合先补单测的模块（纯函数 + node:fs），届时从这里开始。
 
 ### Phase 4：终端运行
 - 新增 `bash` 工具 + `BashRunner`（`node:child_process`）。
@@ -396,3 +408,11 @@ type TraceEntry = {
 
 - **思考过程渲染**：模型处于"思考模式"时会在 `reasoning_content` 字段返回推理链（V4 系列支持）。届时四步落地：① `types.ts` 加 `reasoning` 内容块；② 适配器捕获 `reasoning_content`（流式 `delta.reasoning_content` + 非流式 `message.reasoning_content`）；③ 回传 assistant 消息时把 `reasoning_content` 原样带回去，否则工具调用会报错；④ UI 渲染成默认折叠的「思考过程」块。
 - **模型版本**：model id 会持续演进（当前 V4 flash / pro）。`DEFAULT_MODEL` 只是兜底，正式使用一律在 `.env.local` 用 `DEEPSEEK_MODEL` 显式指定。
+- **工作区选择（完整版，多工作区）**：让 agent 能在多个工作区之间选择，而不是硬编码 `workspace/`。暂缓原因：它是跨切面功能（数据模型 + API + 前端 + 安全），且会动摇「单一 workspace 围栏」这个安全教学基础，等 Phase 4（终端）跑稳后再评估。设计要点（想清楚再动手）：
+  - **核心原则：工作区选择器是「换围栏」，不是「拆围栏」**——每个工作区仍然是路径沙箱（`resolveInsideWorkspace` 的参数从固定 workspaceRoot 变成当前工作区路径），白名单外的路径一律拒绝，否则"选择任意路径"等于绕过沙箱。
+  - **工作区定义走白名单**：如 `.env.local` 的 `WORKSPACES=path1;path2`（和 `ALLOW_FILE_DELETE` 同一种「策略配置」思路）；备选：扫描 `./workspaces/*` 子目录。推荐白名单——最安全、最教学。
+  - **会话 ↔ 工作区绑定**：现状会话头 `cwd` 只存字符串，切换工作区后旧会话失真。推荐 `.sessions/<workspaceId>/<sessionId>.jsonl` 按工作区分目录——切换工作区 = 会话列表跟着换，互不污染。
+  - **基础设施变化**：`workspaceRoot` 从模块级常量变成每个请求解析当前工作区；`toolRegistry` 现在是模块级单例（绑定 workspaceRoot），需要按工作区建 registry 或改成接收 root 参数；系统提示词里"你运行在安全工作区（workspace/）"要改成当前工作区名。
+  - **前端**：工作区切换器（侧栏上方），切换 = 会话列表刷新 + 转录稿清空（复用 `useSessions` 的"换 id 即换数据"模式）。
+  - **轻量版备选**：只想换一个目录时，只做 `WORKSPACE_ROOT` 环境变量（一处改动，沙箱跟随），不用等完整版。
+- **UI 视觉打磨（暂缓）**：核心功能跑稳后再回头调视觉。已记录的问题：Phase 3 人工确认弹框的样式（用户反馈不喜欢当前形态）、会话侧栏等。原则不变：交互正确优先于美观，视觉升级参考第十节的走纸记录仪语言。

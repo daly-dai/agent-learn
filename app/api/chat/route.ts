@@ -23,6 +23,7 @@ import type {
   AgentEvent,
   AgentMessage,
   SessionStats,
+  ToolCallContent,
   ToolDefinition,
 } from "@/lib/types";
 import { createUserMessage } from "@/lib/message";
@@ -30,10 +31,11 @@ import { MockModel } from "@/lib/mockModel";
 import { DeepSeekModel } from "@/lib/deepseekModel";
 import type { TeachingModel } from "@/lib/model";
 import { createToolRegistry } from "@/lib/tools";
-import { runAgentLoop } from "@/lib/agent";
+import { runAgentLoop, type ToolDecision } from "@/lib/agent";
 import { TraceRecorder } from "@/lib/trace";
 import { JsonlSessionStore } from "@/lib/sessionStore";
 import { isValidSessionId } from "@/lib/sessionManager";
+import { toolApprovals } from "@/lib/toolApproval";
 
 // 显式声明 Node runtime：本路由（以及它的工具）会用 node:fs / node:path，
 // 后面 Phase 4 还要用 node:child_process 跑终端。
@@ -55,10 +57,16 @@ const systemPrompt = [
   "你运行在一个安全工作区（workspace/）内，只能通过工具与文件交互，不能直接改动文件系统。",
   "",
   "## 工具使用原则",
-  "你可以调用这些工具：list_files（列文件）、read_file（读文件）、write_note（写 Markdown 笔记）。",
-  "- 只有用户明确要「列出 / 读取 / 写入」文件时才调用工具；概念原理类问题直接回答，不要硬套工具。",
+  "你可以调用这些工具：",
+  "- list_files（列文件）、read_file（读文件）",
+  "- write_file（写任意文件）、edit_file（精确替换文件内容）",
+  "- delete_file（删除文件；写/改/删都会弹框请你确认）",
+  "- grep（按正则搜内容）、find（按文件名找文件）",
+  "- write_note（写工作区笔记）",
+  "- 只有用户明确要求「列出 / 读取 / 写入 / 修改 / 删除 / 搜索」文件时才调用工具；概念原理类问题直接回答，不要硬套工具。",
   "- 一次只调用当前步骤真正需要的工具；拿到工具结果后必须基于真实结果回答，绝不编造文件内容。",
   "- 工具失败或读不到内容时，如实说明，不要假装成功。",
+  "- 写/改/删文件时，引擎会弹框请用户确认；被拒绝（或用户 60 秒未回应）时工具结果会报错，如实向用户说明，不要反复重试同一操作。",
   "",
   "## 输出要求",
   "- 始终用中文回答。",
@@ -78,7 +86,14 @@ type StreamFrame =
       // 会话级累计统计（读数盘）：done 时点由 store 从会话文件算出
       stats: SessionStats;
     }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  // 写/改/删工具需要人工确认：推给前端弹框，用户决定后回传 /api/chat/approve
+  | {
+      type: "tool_permission_request";
+      toolCallId: string;
+      toolName: string;
+      args: Record<string, unknown>;
+    };
 
 // --- POST /api/chat ---
 export async function POST(req: NextRequest) {
@@ -186,7 +201,8 @@ export async function POST(req: NextRequest) {
           tools: toolRegistry.definitions(),
           model,
           toolRegistry,
-          beforeToolCall,
+          // 审批需要 send（推确认帧给前端）和 recorder.runId，所以用闭包包一层
+          beforeToolCall: (call) => handleToolApproval(call, send),
           onEvent: (event) => {
             recorder.record(event);
             send({ type: "event", event });
@@ -294,29 +310,51 @@ function selectModel(): { model: TeachingModel; label: string } {
   return { model, label: process.env.DEEPSEEK_MODEL || "deepseek-v4-flash" };
 }
 
-// --- beforeToolCall 审批策略 ---
-// 这是「审批」这个生命周期的另一个使用端：引擎每次想调工具都会先来这里问一句。
+// --- 工具审批：硬性策略 + 人工确认 ---
+// 引擎每次想调工具都会先来这里（beforeToolCall 钩子）。
+// 两层把关：
+//   1. 硬性安全策略：secret/秘密 文件名直接拦，不弹框（这类永远不该发生）
+//   2. 人工确认：写/改/删工具推确认帧给前端弹框，用户当场允许/拒绝
+// 只读工具（list/read/grep/find）默认放行。
+// 超时兜底：用户 60 秒不回应自动拒绝（block），避免挂起。
 
-function beforeToolCall(call: {
-  name: string;
-  arguments: Record<string, unknown>;
-}):
-  | { action: "allow"; reason?: string }
-  | { action: "block"; reason: string }
-  | { action: "rewrite"; args: Record<string, unknown>; reason?: string } {
-  // 策略：不允许写入含 secret/秘密 的文件名
-  if (call.name === "write_note") {
-    const fileName =
+/** 需要人工确认的工具：全部写/改/删操作（已确认：含 write_note） */
+const TOOLS_NEEDING_CONFIRM = [
+  "write_note",
+  "write_file",
+  "edit_file",
+  "delete_file",
+] as const;
+
+const APPROVAL_TIMEOUT_MS = 60_000;
+
+async function handleToolApproval(
+  call: ToolCallContent,
+  send: (frame: StreamFrame) => void,
+): Promise<ToolDecision> {
+  // --- 硬性策略：secret/秘密 永不弹框，直接拦 ---
+  if (call.name === "write_note" || call.name === "write_file") {
+    const target =
       typeof call.arguments.fileName === "string"
         ? call.arguments.fileName
-        : "";
+        : typeof call.arguments.path === "string"
+          ? call.arguments.path
+          : "";
 
-    if (/secret|秘密/i.test(fileName)) {
+    if (/secret|秘密/i.test(target)) {
       return {
         action: "block",
-        reason: "教学版权限策略：不允许写入包含 secret/秘密 的笔记文件。",
+        reason: "教学版权限策略：不允许写入包含 secret/秘密 的文件。",
       };
     }
+  }
+
+  // --- 人工确认：推帧给前端弹框，await 用户决定 ---
+  if ((TOOLS_NEEDING_CONFIRM as readonly string[]).includes(call.name)) {
+    const allow = await askUserApproval(call, send);
+    return allow
+      ? { action: "allow" }
+      : { action: "block", reason: "用户拒绝了本次工具调用。" };
   }
 
   // list_files 没有 path 参数时补齐默认值
@@ -329,4 +367,34 @@ function beforeToolCall(call: {
   }
 
   return { action: "allow" };
+}
+
+/** 挂起一次人工确认：推帧 → 注册 pending → 返回 Promise（approve 接口或超时来 resolve） */
+function askUserApproval(
+  call: ToolCallContent,
+  send: (frame: StreamFrame) => void,
+): Promise<boolean> {
+  return new Promise((resolve) => {
+    send({
+      type: "tool_permission_request",
+      toolCallId: call.id,
+      toolName: call.name,
+      args: call.arguments,
+    });
+
+    // 超时兜底：60 秒不回应自动拒绝（block），run 不会被挂死
+    const timer = setTimeout(() => {
+      toolApprovals.delete(call.id);
+      resolve(false);
+    }, APPROVAL_TIMEOUT_MS);
+
+    toolApprovals.set(call.id, {
+      resolve: (allow: boolean) => {
+        clearTimeout(timer);
+        toolApprovals.delete(call.id);
+        resolve(allow);
+      },
+      timer,
+    });
+  });
 }

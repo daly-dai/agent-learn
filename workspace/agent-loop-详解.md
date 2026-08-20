@@ -265,7 +265,7 @@ emit({ type: "agent_end", messages: newMessages });
 | `lib/message.ts` | 辅助 | 造消息、提取文本 |
 | `lib/model.ts` | 接口 | 定义「大脑」的契约 |
 | `lib/mockModel.ts` | 模型实现 | 关键词驱动的模拟模型（含演示延迟） |
-| `lib/tools.ts` | 工具 | 文件系统工具 + 安全边界 |
+| `lib/tools/` | 工具 | 文件系统工具 + 安全边界 |
 | `lib/agent.ts` | **引擎** | ReAct 循环，产出结果 + 广播事件 |
 | `app/api/chat/route.ts` | **使用端（服务端）** | 用 `onEvent` 把事件写进 SSE 流 |
 | `app/page.tsx` | **使用端（浏览器）** | 读取 SSE 流，实时渲染消息 + 时间线 |

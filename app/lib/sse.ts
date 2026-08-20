@@ -26,7 +26,14 @@ export type StreamFrame =
       // 会话级累计统计（读数盘）：服务端从会话文件算出
       stats: SessionStats;
     }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  // 写/改/删工具需要人工确认：前端弹框，用户决定后回传 /api/chat/approve
+  | {
+      type: "tool_permission_request";
+      toolCallId: string;
+      toolName: string;
+      args: Record<string, unknown>;
+    };
 
 /** 事件 + 前端观测到它的时刻（协议不动，时间戳加在这一层） */
 export type ObservedEvent = { seq: number; at: number; event: AgentEvent };
