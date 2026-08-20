@@ -1,0 +1,161 @@
+/* ============================================================
+   session-list.module.css —— 会话侧栏（Phase 2 多会话）
+   归属组件：app/components/session-list/index.tsx
+   唯一动态类：sessionItem 上的 is-current（:global 标注）
+   ============================================================ */
+
+.sidebar {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 0;
+  background: var(--recorder);
+  border-right: 1px solid var(--line);
+}
+
+.sidebarHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.sidebarTitle {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+}
+
+.sidebarCount {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+.sidebarNew {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--pen-model);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.sidebarNew:hover {
+  border-color: var(--pen-model);
+}
+
+.sessionList {
+  overflow-y: auto;
+  min-height: 0;
+  padding: 8px;
+}
+
+.sessionEmpty {
+  padding: 12px 6px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+.sessionItem {
+  position: relative;
+  margin-bottom: 4px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  cursor: pointer;
+}
+
+.sessionItem:hover {
+  background: var(--paper);
+}
+
+/* 当前会话：状态类故意全局（JSX 拼 is-current） */
+.sessionItem:global(.is-current) {
+  background: var(--plate);
+  border-color: var(--line);
+}
+
+.sessionTitle {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sessionPreview {
+  margin-top: 2px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--ink-mid);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sessionMeta {
+  display: flex;
+  gap: 8px;
+  margin-top: 3px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-faint);
+}
+
+/* 操作按钮只在悬停时出现：默认路径是「看」，干预才需要动手 */
+.sessionActions {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  display: none;
+  gap: 2px;
+}
+
+.sessionItem:hover .sessionActions {
+  display: flex;
+}
+
+.sessionAction {
+  padding: 2px 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1;
+  color: var(--ink-mid);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  cursor: pointer;
+}
+
+.sessionAction:hover {
+  color: var(--ink);
+  border-color: var(--ink-faint);
+}
+
+.sessionRenameInput {
+  width: 100%;
+  padding: 3px 6px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+  background: var(--plate);
+  border: 1px solid var(--pen-model);
+  border-radius: var(--r);
+  outline: none;
+}
+
+.sidebarFoot {
+  padding: 8px 14px;
+  border-top: 1px solid var(--line-soft);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-faint);
+}

@@ -15,8 +15,9 @@
 // ============================================================
 
 import { useState } from "react";
-import type { SessionSummary } from "../lib/use-sessions";
-import { formatClock } from "../lib/format";
+import type { SessionSummary } from "../../lib/use-sessions";
+import { formatClock } from "../../lib/format";
+import styles from "./session-list.module.css";
 
 type SessionListProps = {
   sessions: SessionSummary[];
@@ -57,18 +58,22 @@ export function SessionList({
   }
 
   return (
-    <aside className="sidebar">
-      <div className="sidebar-head">
-        <span className="sidebar-title">会话</span>
-        <span className="sidebar-count">{sessions.length}</span>
-        <button className="sidebar-new" type="button" onClick={onCreate}>
+    <aside className={styles.sidebar}>
+      <div className={styles.sidebarHead}>
+        <span className={styles.sidebarTitle}>会话</span>
+        <span className={styles.sidebarCount}>{sessions.length}</span>
+        <button
+          className={styles.sidebarNew}
+          type="button"
+          onClick={onCreate}
+        >
           ＋ 新建
         </button>
       </div>
 
-      <div className="session-list">
+      <div className={styles.sessionList}>
         {sessions.length === 0 ? (
-          <p className="session-empty">还没有会话，点「新建」开始。</p>
+          <p className={styles.sessionEmpty}>还没有会话，点「新建」开始。</p>
         ) : (
           sessions.map((session) => {
             const current = session.id === currentId;
@@ -77,12 +82,14 @@ export function SessionList({
             return (
               <div
                 key={session.id}
-                className={`session-item${current ? " is-current" : ""}`}
+                className={`${styles.sessionItem}${
+                  current ? " is-current" : ""
+                }`}
                 onClick={() => !editing && onSelect(session.id)}
               >
                 {editing ? (
                   <input
-                    className="session-rename-input"
+                    className={styles.sessionRenameInput}
                     value={draft}
                     autoFocus
                     onChange={(e) => setDraft(e.target.value)}
@@ -95,13 +102,15 @@ export function SessionList({
                   />
                 ) : (
                   <>
-                    <div className="session-title">
+                    <div className={styles.sessionTitle}>
                       {session.title ?? session.id}
                     </div>
                     {session.preview && (
-                      <div className="session-preview">{session.preview}</div>
+                      <div className={styles.sessionPreview}>
+                        {session.preview}
+                      </div>
                     )}
-                    <div className="session-meta">
+                    <div className={styles.sessionMeta}>
                       <span>{session.messageCount} 条</span>
                       <span>{formatClock(session.updatedAt)}</span>
                     </div>
@@ -109,9 +118,9 @@ export function SessionList({
                 )}
 
                 {!editing && (
-                  <div className="session-actions">
+                  <div className={styles.sessionActions}>
                     <button
-                      className="session-action"
+                      className={styles.sessionAction}
                       title="重命名"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -121,7 +130,7 @@ export function SessionList({
                       ✎
                     </button>
                     <button
-                      className="session-action"
+                      className={styles.sessionAction}
                       title="删除"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -144,7 +153,7 @@ export function SessionList({
         )}
       </div>
 
-      <div className="sidebar-foot">
+      <div className={styles.sidebarFoot}>
         <p>点击切换会话 · ✎ 重命名 · × 删除</p>
       </div>
     </aside>

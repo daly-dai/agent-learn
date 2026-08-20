@@ -8,7 +8,8 @@
 // 用户视线，这是 Phase 4 遗留体验问题的修正。
 // ============================================================
 
-import { shortId } from "../lib/format";
+import styles from "./nameplate.module.css";
+import { shortId } from "../../lib/format";
 
 // 状态灯的四档（相位）：由页面根据最近事件推导，这里只负责文案
 export const PHASES = {
@@ -38,21 +39,30 @@ export function Nameplate({
   onReset,
 }: NameplateProps) {
   return (
-    <header className="nameplate">
+    <header className={styles.nameplate}>
       <PenMark />
-      <span className="wordmark">Teaching Agent</span>
-      <span className="plate-rule" />
-      <span className="wordmark-cn">观测台</span>
+      <span className={styles.wordmark}>Teaching Agent</span>
+      <span className={styles.plateRule} />
+      <span className={styles.wordmarkCn}>观测台</span>
 
-      <div className="plate-right">
+      <div className={styles.plateRight}>
         {runId && (
-          <span className="readout-run" title={`run ${runId} · ${model}`}>
-            <span className="model">{model}</span>
-            <span className="plate-rule" />
-            <span className="run">run {shortId(runId)}</span>
+          <span
+            className={styles.readoutRun}
+            title={`run ${runId} · ${model}`}
+          >
+            <span className={styles.model}>{model}</span>
+            <span className={styles.plateRule} />
+            <span className={styles.run}>run {shortId(runId)}</span>
           </span>
         )}
-        <StatusBeacon phase={phase} turn={turn} />
+        {/* 相位是动态值，beacon-${phase} 保持全局字符串（见 module.css 注释） */}
+        <span className={`${styles.beacon} beacon-${phase}`}>
+          <span className={styles.beaconLens} />
+          <span className={styles.beaconLabel}>{PHASES[phase]}</span>
+          {turn > 0 && <span className={styles.beaconTurn}>T{turn}</span>}
+        </span>
+        {/* .btn 是跨组件共享按钮类，留在全局层 */}
         <button className="btn" onClick={onReset} disabled={!canReset}>
           清空记录
         </button>
@@ -64,7 +74,13 @@ export function Nameplate({
 /** 标志：一段笔迹。它和轨迹区画的是同一件事 */
 function PenMark() {
   return (
-    <svg className="mark" width="21" height="21" viewBox="0 0 21 21" aria-hidden="true">
+    <svg
+      className={styles.mark}
+      width="21"
+      height="21"
+      viewBox="0 0 21 21"
+      aria-hidden="true"
+    >
       <path
         d="M1.5 14.5H5L7.5 6l3 10.5L13 10l2 2h4.5"
         fill="none"
@@ -74,15 +90,5 @@ function PenMark() {
         strokeLinejoin="round"
       />
     </svg>
-  );
-}
-
-function StatusBeacon({ phase, turn }: { phase: Phase; turn: number }) {
-  return (
-    <span className={`beacon beacon-${phase}`}>
-      <span className="beacon-lens" />
-      <span className="beacon-label">{PHASES[phase]}</span>
-      {turn > 0 && <span className="beacon-turn">T{turn}</span>}
-    </span>
   );
 }

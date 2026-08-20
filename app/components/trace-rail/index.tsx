@@ -2,20 +2,21 @@
 
 // ============================================================
 // 轨迹区（走纸记录条）—— 把折叠好的行画成时间轴 + 底部统计
-// 折叠逻辑在 ../lib/trace-fold.ts（纯函数），这里只负责渲染
+// 折叠逻辑在 ../../lib/trace-fold.ts（纯函数），这里只负责渲染
 // ============================================================
 
 import type { RefObject } from "react";
 import type { SessionStats } from "@/lib/types";
-import type { ObservedEvent } from "../lib/sse";
-import type { TraceRow } from "../lib/trace-fold";
+import type { ObservedEvent } from "../../lib/sse";
+import type { TraceRow } from "../../lib/trace-fold";
 import {
   barWidth,
   formatElapsed,
   formatMs,
   formatTokens,
   inkWidth,
-} from "../lib/format";
+} from "../../lib/format";
+import styles from "./trace-rail.module.css";
 
 type TraceRailProps = {
   rows: TraceRow[];
@@ -27,18 +28,18 @@ type TraceRailProps = {
 
 export function TraceRail({ rows, observed, stats, reelRef }: TraceRailProps) {
   return (
-    <aside className="trace">
-      <div className="trace-head">
-        <span className="trace-title">Trace</span>
-        <span className="trace-sub">运行记录</span>
-        <span className="trace-clock">{formatElapsed(observed)}</span>
+    <aside className={styles.trace}>
+      <div className={styles.traceHead}>
+        <span className={styles.traceTitle}>Trace</span>
+        <span className={styles.traceSub}>运行记录</span>
+        <span className={styles.traceClock}>{formatElapsed(observed)}</span>
       </div>
 
-      <div className="trace-reel" ref={reelRef}>
+      <div className={styles.traceReel} ref={reelRef}>
         {rows.length === 0 ? (
           <TraceLegend />
         ) : (
-          <div className="trace-strip">
+          <div className={styles.traceStrip}>
             {rows.map((row, i) => (
               <TraceRowView key={i} row={row} />
             ))}
@@ -46,7 +47,7 @@ export function TraceRail({ rows, observed, stats, reelRef }: TraceRailProps) {
         )}
       </div>
 
-      <div className="trace-foot">
+      <div className={styles.traceFoot}>
         <Gauge value={stats.turns} label="轮次" />
         <Gauge value={stats.tools} label="工具调用" />
         <Gauge value={formatTokens(stats.tokens)} label="token" />
@@ -65,12 +66,15 @@ function TraceLegend() {
   ];
 
   return (
-    <div className="trace-empty">
+    <div className={styles.traceEmpty}>
       <p>发送指令后，这里会从上到下画出这次 run。</p>
-      <div className="legend">
+      <div className={styles.legend}>
         {keys.map((key) => (
-          <span key={key.tone} className={`legend-row legend-${key.tone}`}>
-            <span className="legend-key" />
+          <span
+            key={key.tone}
+            className={`${styles.legendRow} legend-${key.tone}`}
+          >
+            <span className={styles.legendKey} />
             {key.text}
           </span>
         ))}
@@ -80,13 +84,14 @@ function TraceLegend() {
 }
 
 function TraceRowView({ row }: { row: TraceRow }) {
-  const cls = `trace-row pen-${row.pen}`;
+  // pen-* 是动态笔色，保持全局字符串（见 module.css 注释）
+  const cls = `${styles.traceRow} pen-${row.pen}`;
 
   if (row.kind === "band") {
     return (
       <div className={`${cls} is-band`}>
-        <span className="band-label">{row.label}</span>
-        <span className="band-rule" />
+        <span className={styles.bandLabel}>{row.label}</span>
+        <span className={styles.bandRule} />
       </div>
     );
   }
@@ -94,10 +99,13 @@ function TraceRowView({ row }: { row: TraceRow }) {
   if (row.kind === "stroke") {
     return (
       <div className={cls}>
-        <div className={`stroke${row.live ? " is-live" : ""}`}>
-          <span className="stroke-label">{row.label}</span>
-          <span className="stroke-ink" style={{ width: inkWidth(row.size) }} />
-          <span className="stroke-note">{row.note}</span>
+        <div className={`${styles.stroke}${row.live ? " is-live" : ""}`}>
+          <span className={styles.strokeLabel}>{row.label}</span>
+          <span
+            className={styles.strokeInk}
+            style={{ width: inkWidth(row.size) }}
+          />
+          <span className={styles.strokeNote}>{row.note}</span>
         </div>
       </div>
     );
@@ -106,14 +114,17 @@ function TraceRowView({ row }: { row: TraceRow }) {
   if (row.kind === "span") {
     return (
       <div className={cls}>
-        <div className={`span${row.live ? " is-running" : ""}`}>
-          <span className="span-name">{row.label}</span>
-          <span className="span-bar" style={{ width: barWidth(row.size) }} />
-          <span className="span-note">
+        <div className={`${styles.span}${row.live ? " is-running" : ""}`}>
+          <span className={styles.spanName}>{row.label}</span>
+          <span
+            className={styles.spanBar}
+            style={{ width: barWidth(row.size) }}
+          />
+          <span className={styles.spanNote}>
             {row.live ? "运行中" : formatMs(row.size)}
           </span>
           {!row.live && (
-            <span className={row.ok ? "span-ok" : "span-bad"}>
+            <span className={row.ok ? styles.spanOk : styles.spanBad}>
               {row.ok ? "✓" : "✗"}
             </span>
           )}
@@ -124,8 +135,8 @@ function TraceRowView({ row }: { row: TraceRow }) {
 
   return (
     <div className={cls}>
-      <div className="signal">
-        <span className="signal-strong">{row.label}</span>
+      <div className={styles.signal}>
+        <span className={styles.signalStrong}>{row.label}</span>
         {row.note && <span>{row.note}</span>}
       </div>
     </div>
@@ -134,9 +145,9 @@ function TraceRowView({ row }: { row: TraceRow }) {
 
 function Gauge({ value, label }: { value: number | string; label: string }) {
   return (
-    <span className="gauge">
-      <span className="gauge-value">{value}</span>
-      <span className="gauge-label">{label}</span>
+    <span className={styles.gauge}>
+      <span className={styles.gaugeValue}>{value}</span>
+      <span className={styles.gaugeLabel}>{label}</span>
     </span>
   );
 }

@@ -1,0 +1,147 @@
+/* ============================================================
+   nameplate.module.css —— 铭牌（顶栏）+ 状态灯
+   归属组件：app/components/nameplate/index.tsx
+   ============================================================
+   设计约定（CSS Modules）：
+   - 基础类用 styles.xxx 引用（自动哈希隔离）
+   - 动态状态类（beacon-${phase}）用 :global() 标注：相位是运行时
+     动态值，JSX 直接拼字符串，模块里配合 scoped 类写组合选择器
+   - .btn / @keyframes lamp 是跨组件共享，留在全局 globals.css
+   ============================================================ */
+
+.nameplate {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 54px;
+  padding: 0 18px 0 20px;
+  background: var(--plate);
+  border-bottom: 1px solid var(--line);
+}
+
+.mark {
+  display: block;
+  flex: none;
+  color: var(--ink);
+}
+
+.wordmark {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.19em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.wordmarkCn {
+  font-size: 13px;
+  color: var(--ink-mid);
+  white-space: nowrap;
+}
+
+.plateRule {
+  width: 1px;
+  height: 18px;
+  background: var(--line);
+  flex: none;
+}
+
+.plateRight {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.readoutRun {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-mid);
+  letter-spacing: 0.06em;
+  min-width: 0;
+}
+
+.readoutRun .model {
+  text-transform: uppercase;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.readoutRun .run {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- 状态灯（仪器指示灯） ---- */
+.beacon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  color: var(--ink-mid);
+  white-space: nowrap;
+}
+
+.beaconLens {
+  position: relative;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--recorder);
+  box-shadow: inset 0 0 0 1px var(--line);
+  flex: none;
+}
+
+.beaconLens::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+}
+
+/* 相位状态类故意全局：JSX 拼 beacon-${phase}（thinking/tool/streaming） */
+.beacon:global(.beacon-thinking) .beaconLens::after {
+  background: var(--pen-signal);
+  animation: lamp 1.15s ease-in-out infinite;
+}
+
+.beacon:global(.beacon-tool) .beaconLens::after {
+  background: var(--pen-tool);
+}
+
+.beacon:global(.beacon-streaming) .beaconLens::after {
+  background: var(--pen-model);
+  animation: lamp 1.6s ease-in-out infinite;
+}
+
+.beaconLabel {
+  color: var(--ink);
+}
+
+.beaconTurn {
+  color: var(--ink-mid);
+}
+
+/* 窄屏：隐藏次要信息（中文名 / 分隔线 / 相位文字） */
+@media (max-width: 900px) {
+  .wordmarkCn,
+  .plateRule {
+    display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .beaconLabel,
+  .readoutRun .run {
+    display: none;
+  }
+}

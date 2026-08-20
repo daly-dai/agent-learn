@@ -1,0 +1,75 @@
+/* ============================================================
+   overture.module.css —— 空态起手式（引导 + 例句按钮）
+   归属组件：app/components/overture/index.tsx
+   全部静态类，无动态拼接，直接 styles.xxx 引用
+   ============================================================ */
+
+.overture {
+  max-width: 560px;
+  margin: 7vh auto 0;
+  padding: 0 4px;
+}
+
+.overtureEyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--pen-signal-ink);
+}
+
+.overtureTitle {
+  margin: 12px 0 0;
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0;
+}
+
+.overtureNote {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--ink-mid);
+}
+
+.seedGrid {
+  margin-top: 22px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.seed {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--plate);
+  cursor: pointer;
+}
+
+.seed:hover {
+  border-color: var(--pen-user);
+}
+
+.seedText {
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.seedTool {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--ink-mid);
+}
+
+/* 窄屏：例句变单列 */
+@media (max-width: 900px) {
+  .seedGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

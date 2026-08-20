@@ -1,0 +1,280 @@
+/* ============================================================
+   message-row.module.css —— 转录稿消息行 + 工具调用/结果
+   归属组件：app/components/message-row/index.tsx
+   ============================================================
+   CSS Modules 约定：
+   - 动态类用 :global（row-${tone}、is-attached、is-live）
+   - .markdown-body 是共享渲染层（留在全局 globals.css），
+     这里用 :global(.markdown-body) 引用它做微调
+   - apparatus-error / apparatus-clamped 是静态名，直接 scope
+     （JSX 里 styles.apparatusError / styles.apparatusClamped 组合）
+   ============================================================ */
+
+/* ---- 行骨架：元信息栏 + 内容。左栏对齐形成一条隐形的版心线，
+   比给每条消息包一张卡片更安静，也更像实验记录 ---- */
+.row {
+  display: grid;
+  grid-template-columns: var(--gutter) minmax(0, 1fr);
+  gap: 0 18px;
+}
+
+.row + .row {
+  margin-top: 22px;
+}
+
+/* 工具结果紧跟在发起它的模型消息之后：靠间距和连接符表达从属关系 */
+.row + .row:global(.is-attached) {
+  margin-top: 8px;
+}
+
+.rowGutter {
+  text-align: right;
+  padding-top: 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  min-width: 0;
+}
+
+.rowRole {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+/* 发言人动态类故意全局：JSX 拼 row-${tone}（user/agent/tool） */
+.row:global(.row-user) .rowRole {
+  color: var(--pen-user);
+}
+
+.rowTime {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.rowLink {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-faint);
+  padding-top: 2px;
+}
+
+.rowBody {
+  min-width: 0;
+}
+
+/* 用户指令：整段染上「用户笔」的墨色，一眼分清谁在说话 */
+.said {
+  background: rgba(47, 75, 153, 0.07);
+  border-left: 2px solid var(--pen-user);
+  border-radius: 0 var(--r) var(--r) 0;
+  padding: 11px 14px;
+}
+
+.said :global(.markdown-body) {
+  font-size: 14px;
+}
+
+/* 模型回答：直接印在纸上，不加边框，让它成为最主要的阅读面 */
+.reply {
+  padding-top: 1px;
+}
+
+/* 流式输出时的笔尖：接在最后一行文字后面，所以做成伪元素而不是独立节点 */
+.reply:global(.is-live) > :global(.markdown-body):last-child > :last-child::after {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 0.92em;
+  margin-left: 3px;
+  vertical-align: -0.1em;
+  background: var(--pen-signal);
+  animation: caret 1s steps(2, start) infinite;
+}
+
+.pondering {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--pen-signal-ink);
+  animation: lamp 1.15s ease-in-out infinite;
+}
+
+/* ---- 工具调用行（一台小装置的开头） ---- */
+.call {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  margin: 9px 0 0;
+  padding: 7px 10px;
+  background: rgba(156, 43, 110, 0.055);
+  border: 1px solid rgba(156, 43, 110, 0.22);
+  border-radius: var(--r);
+  min-width: 0;
+}
+
+.callTag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--pen-tool);
+  flex: none;
+}
+
+.callName {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink);
+  flex: none;
+}
+
+.callArgs {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-mid);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* bash 命令实时输出（Phase 4）：像真终端的黑底块 */
+.toolOutputLive {
+  margin-top: 6px;
+  padding: 8px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--ink);
+  background: var(--recorder);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r);
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+/* ---- 工具结果卡片（可折叠） ---- */
+.apparatus {
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--plate);
+  overflow: hidden;
+}
+
+.apparatusHead {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 9px 6px 11px;
+  border-bottom: 1px solid var(--line-soft);
+  background: rgba(29, 33, 39, 0.025);
+}
+
+.apparatusName {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.apparatusVerdict {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--pen-model);
+}
+
+.apparatusError .apparatusVerdict {
+  color: var(--pen-error);
+}
+
+.apparatusError {
+  border-color: rgba(163, 45, 31, 0.35);
+}
+
+.apparatusMeta {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-mid);
+  font-variant-numeric: tabular-nums;
+}
+
+.apparatusToggle {
+  border: none;
+  background: none;
+  padding: 2px 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--ink-mid);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.apparatusToggle:hover {
+  color: var(--ink);
+}
+
+.apparatusBody {
+  max-height: 340px;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+.apparatusBody::-webkit-scrollbar {
+  width: 9px;
+}
+
+.apparatusBody::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 99px;
+}
+
+.apparatusClamped .apparatusBody {
+  max-height: 128px;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(#000 68%, transparent);
+  mask-image: linear-gradient(#000 68%, transparent);
+}
+
+.toolOutput {
+  margin: 0;
+  padding: 9px 12px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.62;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--ink-mid);
+}
+
+/* 窄屏：元信息栏收到内容上方，保住小屏的正文宽度 */
+@media (max-width: 900px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
+  }
+
+  .rowGutter {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: flex-start;
+    gap: 8px;
+    text-align: left;
+  }
+}

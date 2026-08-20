@@ -12,8 +12,9 @@ import type {
   ToolCallContent,
   ToolResultMessage,
 } from "@/lib/types";
-import { Markdown } from "../markdown";
-import { formatClock } from "../lib/format";
+import { Markdown } from "../../markdown";
+import { formatClock } from "../../lib/format";
+import styles from "./message-row.module.css";
 
 /** 工具结果超过这个行数才默认折叠 */
 const CLAMP_LINES = 12;
@@ -30,7 +31,7 @@ export function MessageRow({ message, attached, live, toolOutputs }: MessageRowP
   if (message.role === "user") {
     return (
       <Row tone="user" role="你" timestamp={message.timestamp}>
-        <div className="said">
+        <div className={styles.said}>
           {message.content.map((block, i) => (
             <Markdown key={i}>{block.text}</Markdown>
           ))}
@@ -42,7 +43,7 @@ export function MessageRow({ message, attached, live, toolOutputs }: MessageRowP
   if (message.role === "assistant") {
     return (
       <Row tone="agent" role="Agent" timestamp={message.timestamp}>
-        <div className={`reply${live ? " is-live" : ""}`}>
+        <div className={`${styles.reply}${live ? " is-live" : ""}`}>
           {message.content.map((block, i) =>
             block.type === "toolCall" ? (
               <ToolCallLine
@@ -56,7 +57,7 @@ export function MessageRow({ message, attached, live, toolOutputs }: MessageRowP
           )}
           {/* 首个 token 还没到：给一行明确的等待态，而不是留一块空白 */}
           {live && message.content.length === 0 && (
-            <span className="pondering">思考中</span>
+            <span className={styles.pondering}>思考中</span>
           )}
         </div>
       </Row>
@@ -79,22 +80,25 @@ type RowProps = {
 };
 
 function Row({ tone, role, timestamp, attached, children }: RowProps) {
+  // row-${tone} 是动态发言人色（user/agent/tool），保持全局字符串
   return (
-    <article className={`row row-${tone}${attached ? " is-attached" : ""}`}>
-      <div className="row-gutter">
+    <article
+      className={`${styles.row} row-${tone}${attached ? " is-attached" : ""}`}
+    >
+      <div className={styles.rowGutter}>
         {role ? (
           <>
-            <span className="row-role">{role}</span>
-            <span className="row-time">{formatClock(timestamp)}</span>
+            <span className={styles.rowRole}>{role}</span>
+            <span className={styles.rowTime}>{formatClock(timestamp)}</span>
           </>
         ) : (
           // 工具结果没有独立身份：它属于上一条消息，用连接符表示从属
-          <span className="row-link" aria-hidden="true">
+          <span className={styles.rowLink} aria-hidden="true">
             ↳
           </span>
         )}
       </div>
-      <div className="row-body">{children}</div>
+      <div className={styles.rowBody}>{children}</div>
     </article>
   );
 }
@@ -107,13 +111,13 @@ function ToolCallLine({
   output?: string;
 }) {
   return (
-    <div className="call">
-      <span className="call-tag">CALL</span>
-      <span className="call-name">{block.name}</span>
-      <code className="call-args">{JSON.stringify(block.arguments)}</code>
+    <div className={styles.call}>
+      <span className={styles.callTag}>CALL</span>
+      <span className={styles.callName}>{block.name}</span>
+      <code className={styles.callArgs}>{JSON.stringify(block.arguments)}</code>
       {/* bash 命令的实时输出：逐块追加，像真终端；结束后结果卡片再显示最终版 */}
       {output !== undefined && output.length > 0 && (
-        <pre className="tool-output-live">{output}</pre>
+        <pre className={styles.toolOutputLive}>{output}</pre>
       )}
     </div>
   );
@@ -129,22 +133,22 @@ function ToolOutput({ message }: { message: ToolResultMessage }) {
   return (
     <div
       className={[
-        "apparatus",
-        message.isError ? "apparatus-error" : "",
-        clamped ? "apparatus-clamped" : "",
+        styles.apparatus,
+        message.isError ? styles.apparatusError : "",
+        clamped ? styles.apparatusClamped : "",
       ]
         .filter(Boolean)
         .join(" ")}
     >
-      <div className="apparatus-head">
-        <span className="apparatus-name">{message.toolName}</span>
-        <span className="apparatus-verdict">
+      <div className={styles.apparatusHead}>
+        <span className={styles.apparatusName}>{message.toolName}</span>
+        <span className={styles.apparatusVerdict}>
           {message.isError ? "✗ 失败" : "✓ 成功"}
         </span>
-        <span className="apparatus-meta">{lines} 行</span>
+        <span className={styles.apparatusMeta}>{lines} 行</span>
         {lines > CLAMP_LINES && (
           <button
-            className="apparatus-toggle"
+            className={styles.apparatusToggle}
             type="button"
             onClick={() => setExpanded(!expanded)}
           >
@@ -152,8 +156,8 @@ function ToolOutput({ message }: { message: ToolResultMessage }) {
           </button>
         )}
       </div>
-      <div className="apparatus-body">
-        <pre className="tool-output">{text}</pre>
+      <div className={styles.apparatusBody}>
+        <pre className={styles.toolOutput}>{text}</pre>
       </div>
     </div>
   );

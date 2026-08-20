@@ -1,0 +1,371 @@
+/* ============================================================
+   trace-rail.module.css —— 轨迹区（走纸记录条 + 读数盘）
+   归属组件：app/components/trace-rail/index.tsx
+   ============================================================
+   动态类（全部 :global 标注，JSX 拼字符串）：
+   - pen-${row.pen}（笔色：turn/user/model/tool/signal/error）
+   - is-band / is-live / is-running（状态）
+   - legend-${tone}（图例通道）
+   @keyframes lamp 是跨组件共享动画，留在全局 globals.css
+   ============================================================ */
+
+.trace {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 0;
+  min-width: 0;
+  background: var(--recorder);
+  border-left: 1px solid var(--line);
+}
+
+.traceHead {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 13px 14px 11px;
+  border-bottom: 1px solid var(--line);
+}
+
+.traceTitle {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.19em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.traceSub {
+  font-size: 11.5px;
+  color: var(--ink-mid);
+}
+
+.traceClock {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-mid);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 点阵纸：background-attachment:local 让纸随内容滚动，像走纸被拉过笔尖 */
+.traceReel {
+  overflow-y: auto;
+  min-height: 0;
+  padding: 13px 14px 18px;
+  background-image: radial-gradient(
+    circle,
+    rgba(29, 33, 39, 0.11) 0.7px,
+    transparent 0.8px
+  );
+  background-size: 13px 13px;
+  background-attachment: local;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+.traceReel::-webkit-scrollbar {
+  width: 9px;
+}
+
+.traceReel::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 99px;
+}
+
+.traceStrip {
+  position: relative;
+  padding-left: 20px;
+}
+
+.traceStrip::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 7px;
+  bottom: 7px;
+  width: 1px;
+  background: var(--line);
+}
+
+.traceRow {
+  position: relative;
+  padding: 3px 0;
+  min-width: 0;
+}
+
+/* 每行左侧的「笔迹」：形状表示通道类别，颜色表示哪支笔 */
+.traceRow::before {
+  content: "";
+  position: absolute;
+  left: -18px;
+  top: 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+  box-shadow: 0 0 0 3px var(--recorder);
+}
+
+/* 笔色动态类故意全局：JSX 拼 pen-${row.pen} */
+.traceRow:global(.pen-turn)::before {
+  background: var(--ink);
+  border-radius: 1px;
+  transform: rotate(45deg);
+}
+
+.traceRow:global(.pen-user)::before {
+  background: var(--pen-user);
+}
+
+.traceRow:global(.pen-model)::before {
+  background: var(--pen-model);
+}
+
+.traceRow:global(.pen-tool)::before {
+  background: var(--pen-tool);
+  border-radius: 1px;
+}
+
+.traceRow:global(.pen-signal)::before {
+  background: var(--pen-signal);
+}
+
+.traceRow:global(.pen-error)::before {
+  background: var(--pen-error);
+  border-radius: 1px;
+}
+
+/* 轮次带：轨迹的分节符。T1/T2 是真实序号，不是装饰 */
+.traceRow:global(.is-band) {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: 13px;
+  padding-top: 4px;
+}
+
+.traceRow:global(.is-band):first-child {
+  margin-top: 0;
+}
+
+.bandLabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink);
+  flex: none;
+}
+
+.bandRule {
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+/* 模型输出：一笔连续的墨迹，长度随字数增长 */
+.stroke {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.strokeLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--pen-model);
+  flex: none;
+}
+
+.strokeInk {
+  height: 2px;
+  background: var(--pen-model);
+  border-radius: 1px;
+  flex: none;
+}
+
+.stroke:global(.is-live) .strokeInk {
+  box-shadow: 5px 0 0 0 var(--pen-signal);
+  animation: lamp 0.9s ease-in-out infinite;
+}
+
+.strokeNote {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-mid);
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+  flex: none;
+}
+
+/* 工具执行：start 与 end 配成一段跨度，条长 = 真实耗时 */
+.span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.spanName {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--pen-tool);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spanBar {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(156, 43, 110, 0.3);
+  flex: none;
+}
+
+.span:global(.is-running) .spanBar {
+  background: var(--pen-signal);
+  animation: lamp 0.9s ease-in-out infinite;
+}
+
+.spanNote {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-mid);
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
+  flex: none;
+}
+
+.spanOk,
+.spanBad {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  flex: none;
+}
+
+.spanOk {
+  color: var(--pen-model);
+}
+
+.spanBad {
+  color: var(--pen-error);
+}
+
+/* 信号行：run 起止、审批干预、上下文压缩 */
+.signal {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--ink-mid);
+  word-break: break-word;
+}
+
+.signalStrong {
+  color: var(--ink);
+}
+
+.signalAlert {
+  color: var(--pen-error);
+}
+
+/* 空态：与其放一句「暂无事件」，不如把这张纸的读法讲清楚 */
+.traceEmpty {
+  padding: 4px 2px;
+}
+
+.traceEmpty p {
+  margin: 0 0 14px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--ink-mid);
+}
+
+.legend {
+  display: grid;
+  gap: 7px;
+}
+
+.legendRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-mid);
+}
+
+.legendKey {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--ink-faint);
+}
+
+/* 图例通道动态类故意全局：JSX 拼 legend-${tone} */
+.legendRow:global(.legend-turn) .legendKey {
+  background: var(--ink);
+  border-radius: 1px;
+  transform: rotate(45deg);
+}
+
+.legendRow:global(.legend-model) .legendKey {
+  background: var(--pen-model);
+}
+
+.legendRow:global(.legend-tool) .legendKey {
+  background: var(--pen-tool);
+  border-radius: 1px;
+}
+
+.legendRow:global(.legend-signal) .legendKey {
+  background: var(--pen-signal);
+}
+
+/* 读数盘：当前会话的累计数字（由服务端从会话文件算出，不是本次 run 的临时值） */
+.traceFoot {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  padding: 11px 14px 12px;
+  border-top: 1px solid var(--line);
+}
+
+.gauge {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.gaugeValue {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.gaugeLabel {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  color: var(--ink-mid);
+}
+
+/* 窄屏：轨迹变成底部抽屉（骨架 .deck 的改列在全局媒体查询里） */
+@media (max-width: 900px) {
+  .trace {
+    border-left: none;
+    border-top: 1px solid var(--line);
+  }
+}

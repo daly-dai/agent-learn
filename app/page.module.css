@@ -1,0 +1,170 @@
+/* ============================================================
+   page.module.css —— 页面级布局样式（组装层专属）
+   归属：app/page.tsx
+   ============================================================
+   骨架（.app/.deck 三列布局）留在全局 globals.css——
+   它是整页的外壳，不属于任何单个组件。
+   这里只管：对话面容器（stage/transcript/reel）+
+   指令台（console 系列）+ 错误横幅（alarm 系列）。
+   ============================================================ */
+
+/* ---- 对话面（转录稿） ---- */
+.stage {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 0;
+  background: var(--paper);
+}
+
+.transcript {
+  overflow-y: auto;
+  min-height: 0;
+  padding: 26px 26px 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+.transcript::-webkit-scrollbar {
+  width: 9px;
+}
+
+.transcript::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 99px;
+}
+
+.reel {
+  max-width: 830px;
+  margin: 0 auto;
+}
+
+/* ---- 指令台（输入） ---- */
+.console {
+  padding: 12px 26px 18px;
+}
+
+.consoleFrame {
+  max-width: 830px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+  padding: 9px 10px 9px 13px;
+  background: var(--plate);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+
+.consoleFrame:focus-within {
+  border-color: var(--pen-user);
+  box-shadow: 0 0 0 3px rgba(47, 75, 153, 0.1);
+}
+
+.consoleInput {
+  border: none;
+  background: none;
+  outline: none;
+  resize: none;
+  padding: 4px 0;
+  font-size: 14px;
+  line-height: 1.6;
+  max-height: 132px;
+}
+
+.consoleInput::placeholder {
+  color: var(--ink-faint);
+}
+
+.consoleSend {
+  border: none;
+  border-radius: var(--r);
+  background: var(--ink);
+  color: var(--plate);
+  padding: 9px 16px;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.consoleSend:hover:not(:disabled) {
+  background: #2c323c;
+}
+
+.consoleSend:disabled {
+  background: var(--line);
+  color: #8b8f85;
+  cursor: default;
+}
+
+/* 停止按钮：run 进行中发送按钮的「变身」（位置不变，角色切换）。
+   危险操作，用错误色系（与原来的 .btn-stop 同语言） */
+.consoleStop {
+  border: none;
+  border-radius: var(--r);
+  background: var(--pen-error);
+  color: var(--plate);
+  padding: 9px 16px;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+
+.consoleStop:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.consoleStop:disabled {
+  background: var(--line);
+  color: #8b8f85;
+  cursor: default;
+}
+
+.consoleHint {
+  max-width: 830px;
+  margin: 7px auto 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--ink-faint);
+}
+
+/* ---- 错误横幅 ---- */
+.alarm {
+  max-width: 830px;
+  margin: 0 auto 10px;
+  display: flex;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid rgba(163, 45, 31, 0.3);
+  border-left: 2px solid var(--pen-error);
+  border-radius: 0 var(--r) var(--r) 0;
+  background: rgba(163, 45, 31, 0.05);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.alarmTag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--pen-error);
+  padding-top: 1px;
+  flex: none;
+}
+
+/* 窄屏：转录稿和指令台收窄内边距（骨架 .deck 的改列在全局媒体查询） */
+@media (max-width: 900px) {
+  .transcript,
+  .console {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}

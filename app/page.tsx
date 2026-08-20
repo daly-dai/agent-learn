@@ -6,7 +6,11 @@
 // 它本身不含业务逻辑，只做三件事：
 //   1. 调 useAgentRun() 拿状态和行为（消息、事件、loading、发送、清空）
 //   2. 派生展示数据（phase / turn / rows 三个纯函数）
-//   3. 组合四个组件（Nameplate / Overture / MessageRow / TraceRail）
+//   3. 组合组件（Nameplate / Overture / MessageRow / TraceRail…）
+//
+// 样式：组件样式跟组件走（components/<组件>/<组件>.module.css）；
+// 页面自己的布局（对话面容器 + 指令台 + 错误横幅）在 ./page.module.css；
+// 骨架与设计令牌在 ./globals.css（全局层）。
 //
 // ── 调用地图：页面调用的每个东西是什么、在哪、干什么 ──
 //   useSessions()   app/lib/use-sessions.ts
@@ -24,25 +28,21 @@
 //                   实测塌成 2 行），结果喂给 <TraceRail> 渲染。
 //   derivePhase()   本文件底部（纯函数）—— 根据最近一条事件推断状态灯相位
 //   currentTurn()   本文件底部（纯函数）—— 从 turn_start 事件数出当前轮次
-//   <SessionList>   app/components/session-list.tsx —— 左侧会话栏
-//                   （列表 / 新建 / 行内重命名 / 删除）
-//   <Nameplate>     app/components/nameplate.tsx —— 页头：标志/标题/run 信息/
+//   <Nameplate>     app/components/nameplate/ —— 页头：标志/标题/run 信息/
 //                   状态灯/清空按钮
-//   <Overture>      app/components/overture.tsx —— 空态引导 + 例句按钮
-//   <SessionList>   app/components/session-list.tsx —— 左侧会话栏
+//   <SessionList>   app/components/session-list/ —— 左侧会话栏
 //                   （列表 / 新建 / 行内重命名 / 删除）
-//   <ApprovalDialog> app/components/approval-dialog.tsx —— 写/改/删工具的
-//                   人工确认弹框（允许/拒绝），配合 pendingApproval/approve
-//   <Nameplate>     app/components/nameplate.tsx —— 页头：标志/标题/run 信息/
-//                   状态灯/清空按钮
-//   <Overture>      app/components/overture.tsx —— 空态引导 + 例句按钮
-//   <MessageRow>    app/components/message-row.tsx —— 转录稿单条消息
+//   <Overture>      app/components/overture/ —— 空态引导 + 例句按钮
+//   <MessageRow>    app/components/message-row/ —— 转录稿单条消息
 //                   （用户/Agent 文本/工具调用行/工具结果卡片）
-//   <TraceRail>     app/components/trace-rail.tsx —— 右侧走纸记录条
+//   <TraceRail>     app/components/trace-rail/ —— 右侧走纸记录条
 //                   （时间轴 + 底部轮次/工具/token 统计）
+//   <ApprovalDialog> app/components/approval-dialog/ —— 写/改/删工具的
+//                   人工确认弹框（允许/拒绝），配合 pendingApproval/approve
 // ============================================================
 
 import { useEffect, useRef, useState } from "react";
+import styles from "./page.module.css";
 import { Nameplate, type Phase } from "./components/nameplate";
 import { Overture } from "./components/overture";
 import { MessageRow } from "./components/message-row";
@@ -163,9 +163,9 @@ export default function Home() {
           }}
         />
 
-        <main className="stage">
-          <div className="transcript" ref={transcriptRef}>
-            <div className="reel">
+        <main className={styles.stage}>
+          <div className={styles.transcript} ref={transcriptRef}>
+            <div className={styles.reel}>
               {/* 空态 → 起手式引导；有消息 → 逐条渲染。
                   attached：工具结果行从属于上一条消息（视觉上缩进连接）
                   live：最后一条且正在加载 → 流式增长动画 + 思考中占位 */}
@@ -187,22 +187,22 @@ export default function Home() {
 
           {/* 输入控制台：提交走 submit()；错误横幅显示在输入框上方 */}
           <form
-            className="console"
+            className={styles.console}
             onSubmit={(e) => {
               e.preventDefault();
               submit();
             }}
           >
             {error && (
-              <div className="alarm" role="alert">
-                <span className="alarm-tag">运行失败</span>
+              <div className={styles.alarm} role="alert">
+                <span className={styles.alarmTag}>运行失败</span>
                 <span>{error}</span>
               </div>
             )}
 
-            <div className="console-frame">
+            <div className={styles.consoleFrame}>
               <textarea
-                className="console-input"
+                className={styles.consoleInput}
                 ref={inputRef}
                 rows={1}
                 value={input}
@@ -223,7 +223,7 @@ export default function Home() {
                   stop 需要 runId（来自 SSE run 帧），未到时短暂不可点 */}
               {loading ? (
                 <button
-                  className="console-stop"
+                  className={styles.consoleStop}
                   type="button"
                   onClick={() => stop(runId)}
                   disabled={!runId}
@@ -232,7 +232,7 @@ export default function Home() {
                 </button>
               ) : (
                 <button
-                  className="console-send"
+                  className={styles.consoleSend}
                   type="submit"
                   disabled={!input.trim()}
                 >
@@ -240,7 +240,7 @@ export default function Home() {
                 </button>
               )}
             </div>
-            <p className="console-hint">
+            <p className={styles.consoleHint}>
               Enter 发送 · Shift + Enter 换行 · 每次发送开始新的一次 run
             </p>
           </form>
