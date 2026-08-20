@@ -42,7 +42,6 @@ type RunAgentLoopOptions = {
   onEvent?: (event: AgentEvent) => void;
 };
 
-
 function emitMessageLifecycle(
   message: AgentMessage,
   emit: (event: AgentEvent) => void,
@@ -91,7 +90,10 @@ async function executeToolCall(
   toolRegistry: ToolRegistry,
 ): Promise<ToolResultMessage> {
   try {
-    const result = await toolRegistry.execute(toolCall.name, toolCall.arguments);
+    const result = await toolRegistry.execute(
+      toolCall.name,
+      toolCall.arguments,
+    );
     return {
       role: "toolResult",
       toolCallId: toolCall.id,
@@ -185,6 +187,7 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<{
     // 非流式模型（MockModel）不调 onDelta，最终消息仍由 message_end 送达，
     // 所以这条路径对两者都成立。
     const streamingMessage = createAssistantMessage([text("")]);
+
     emit({ type: "message_start", message: streamingMessage });
 
     const assistant = await options.model.complete({
@@ -254,7 +257,10 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<{
 
       // block：不执行，伪造一条 isError 结果回给模型，然后跳到下一个工具
       if (decision.action === "block") {
-        const blockedResult = createBlockedToolResult(toolCall, decision.reason);
+        const blockedResult = createBlockedToolResult(
+          toolCall,
+          decision.reason,
+        );
 
         toolResults.push(blockedResult);
         context.push(blockedResult);
@@ -280,7 +286,10 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<{
       });
 
       // 真正执行工具
-      const toolResult = await executeToolCall(executableToolCall, options.toolRegistry);
+      const toolResult = await executeToolCall(
+        executableToolCall,
+        options.toolRegistry,
+      );
 
       // 关键：工具结果必须 push 进 context，模型下一轮才能"看到"它，
       // 这就是 ReAct 的短期记忆机制。

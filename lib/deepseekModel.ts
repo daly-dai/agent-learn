@@ -280,6 +280,7 @@ function toOpenAiMessages(
 
     if (message.role === "assistant") {
       const plainText = messageText(message);
+
       const toolCalls = message.content.filter(
         (block): block is ToolCallContent => block.type === "toolCall",
       );
@@ -288,6 +289,7 @@ function toOpenAiMessages(
         role: "assistant",
         // OpenAI 要求 content 为 string 或 null；纯工具调用消息给 null
         content: plainText.length > 0 ? plainText : null,
+        // 工具调用
         ...(toolCalls.length > 0
           ? {
               tool_calls: toolCalls.map((call) => ({
@@ -346,9 +348,11 @@ function toTeachingAssistantMessage(data: OpenAiResponse): AssistantMessage {
   }));
 
   const content: AssistantMessage["content"] = [];
+
   if (message?.content) {
     content.push(text(message.content));
   }
+
   content.push(...toolCalls);
 
   const usage: Usage = {
