@@ -10,7 +10,7 @@
 // ============================================================
 
 import type { ToolDefinition, ToolResult } from "../types";
-import type { RegisteredTool } from "./types";
+import type { RegisteredTool, ToolExecutorOptions } from "./types";
 import { createListTool } from "./list";
 import { createReadTool } from "./read";
 import { createWriteNoteTool } from "./write-note";
@@ -19,6 +19,7 @@ import { createEditTool } from "./edit";
 import { createDeleteTool } from "./delete";
 import { createGrepTool } from "./grep";
 import { createFindTool } from "./find";
+import { createBashTool } from "./bash";
 
 export class ToolRegistry {
   private readonly tools = new Map<string, RegisteredTool>();
@@ -40,13 +41,13 @@ export class ToolRegistry {
   async execute(
     name: string,
     args: Record<string, unknown>,
-    signal?: AbortSignal,
+    options?: ToolExecutorOptions, // signal（取消）+ onChunk（bash 流式）
   ): Promise<ToolResult> {
     const tool = this.tools.get(name);
     if (!tool) {
       throw new Error(`Tool not found: ${name}`);
     }
-    return tool.execute(args, signal);
+    return tool.execute(args, options);
   }
 }
 
@@ -63,6 +64,7 @@ export function createToolRegistry(workspaceRoot: string): ToolRegistry {
     createDeleteTool(workspaceRoot),
     createGrepTool(workspaceRoot),
     createFindTool(workspaceRoot),
+    createBashTool(workspaceRoot),
   ]) {
     registry.register(tool);
   }
