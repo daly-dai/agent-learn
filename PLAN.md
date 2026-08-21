@@ -442,6 +442,7 @@ type TraceEntry = {
 
 > 来源：`workspace/开源Agent功能盘点.md`（市面五类 agent 全景 + pi / DSH / smolagents 一手探索）。
 > 定位：**很后期**——主线（Phase 5/6）走稳后再回头。每一项都已确认"长在哪个接缝"，**不需要为此改架构**——这是"接缝由需求逼出来"的运用：先登记在路线图（文档级预留），需求真来了再实现。
+> 完整施工单（含三阶段排期与验收标准）见**第十三节**。
 
 ### Top 5（按"学到的东西 ÷ 改动量"排序）
 
@@ -471,3 +472,80 @@ type TraceEntry = {
 3. **记忆分层是标配**：上下文（短期）→ 摘要（长期）→ 外部记忆；我们只有第一层 + 拼贴式摘要。
 4. **权限分级是共识**：auto / plan / ask 三档；我们已在"ask 全量"这一档。
 5. **成熟产品必有沙箱**：OpenHands 容器、Codex 双层、DSH sandbox；我们是"路径沙箱 + 人工确认"的轻量版。
+
+---
+
+## 十三、综合长远规划（综述分类法 × 6 个项目）
+
+> 来源：《Agent Harness Engineering: A Survey》（110+ 论文 / 23 系统的 harness 分类法，本地中文版 `E:\agents-read\Agent-Harness-Survey-ZH-main\`）+ 本地 6 个参考项目（pi / DSH / smolagents / CodeWhale / Reasonix / how-pi-agent-works）。详细版见 `workspace/综合长远规划.md`。
+> 原则：**架构好的学架构，功能丰富的学功能**。每项标注"参考谁、长在哪、怎么验收"——落地意义 = 每步都知道做什么、为什么、跟谁学。
+> 定位：我们的项目 = mini-harness（综述分类法的实践投影）。三阶段：**主线收尾 → 工程化补齐 → 功能丰富**。
+> 学术背书（binding-constraint thesis，综述第 1 章）：实证显示——只改进 harness（不碰模型）就能让基准提升 **10 倍**（改编辑工具格式）、+13.7 个百分点（Terminal-Bench 2.0 纯 harness 优化）。结论：**执行环境（harness）比模型本身更能决定现实世界的可靠性**（OpenAI 2026-02 已把 harness engineering 确立为独立学科）。我们做的正是 harness——方向有学术背书。
+
+### 13.1 综述对照表（官方 ETCLOVG 七层 ↔ 我们 ↔ 差距）
+
+> 分类法出处：综述第 2.3 节。**E/T/C/L 是结构性骨架，O/V/G 是控制平面**——综述把可观测性（O）和治理（G）提为独立层，因为它们"藏在工业系统商业平台里、开源生态最稀疏"，而这恰是我们的主战场（轨迹 + 审批）。
+
+| 层 | 全称（回答的问题） | 我们现状 | 差距 | 参考 | 规划期 |
+|---|---|---|---|---|---|
+| **E** | Execution Environment & Sandbox（代码在哪运行、什么沙箱约束） | 路径沙箱 + 人工确认 | bash 一行 `cd ..` 出围栏；无容器隔离 | OpenHands / DSH sandbox | C |
+| **T** | Tool Interface & Protocol（工具如何描述/发现/调用） | 9 工具 + ToolRegistry | 无 MCP 外部工具源；edit 无 diff/模糊匹配 | Cline / smolagents mcp_client | B、C |
+| **C** | Context & Memory Management（模型能看到什么） | JSONL 会话树 + 拼贴式压缩 | 压缩不省 token；无记忆分层（回忆/遗忘/新鲜度） | pi compaction / Reasonix memory | B、C |
+| **L** | Lifecycle & Orchestration（步骤如何组织、简单循环→复杂编排） | 单 agent ReAct 循环 | 无 task 面板、子智能体、handoffs、issue-to-PR 流程 | DSH todo/subagent / CodeWhale todo_snapshot | A、C |
+| **O** | Observability & Operations（如何测量追踪/成本/可靠性） | 事件流 + L2 轨迹落盘 | L3 回放没有；无成本跟踪 | pi export-html / OpenHands 泳道 | A、B |
+| **V** | Verification & Evaluation（轨迹→反馈/护栏/回归） | 无测试框架 | 无单测、无 benchmark | smolagents / DSH test-support | A |
+| **G** | Governance & Security（权限/身份/策略/审计） | 全量弹框 + 60s 超时 | 无分级、无记忆、无审批日志；bash 不做危险分析 | CodeWhale 四档 / Reasonix 静态分析 | **B（最快见效）** |
+
+注：模型适配（TeachingModel 接口）与配置集中化不在七层内——综述把"模型本身"排除在研究范围外、配置属横切关注点（第 10 章），归入阶段 B/C 单独处理。
+
+### 13.2 六项目各取所长
+
+| 项目 | 最值得学 | 我们拿走什么 |
+|---|---|---|
+| **pi** | 架构纪律：monorepo 分层、core 文件、`.pi/` 用户配置目录 | 真摘要压缩（generateSummary）、配置即文件思想 |
+| **DSH** | 功能全景：50+ 包 = 完整功能目录；ui-primitives 自研原语库 | 功能清单（todo/hooks/skill/schedule/sandbox…）、原语库模式 |
+| **smolagents** | 轻量、代码执行器、一文件一能力 | 代码执行器思路、工具模块组织 |
+| **CodeWhale** | 审批四档 + Shift+Tab 切换 + approval_log；todo_snapshot；session_resume | 审批分级与日志、任务面板参考 |
+| **Reasonix** | 命令静态分析审批（只读放行）；memory 40 文件；shellrun/parse/safe 三层 | 审批智能化、记忆分层设计、终端安全分析 |
+| **how-pi-agent-works** | 教学路线（我们的根） | 每阶段的"为什么" |
+
+### 13.3 三阶段规划（带验收标准）
+
+**阶段 A：主线收尾（近期）**
+
+| # | 做什么 | 参考 | 长在哪 | 验收标准 |
+|---|---|---|---|---|
+| A1 | **Phase 5 task 面板** | DSH todo / CodeWhale todo_snapshot | 协议（todo 数组存会话）+ `app/components/task-panel/` | 模型产出任务清单，前端可勾选，刷新不丢 |
+| A2 | **测试框架 vitest** | smolagents / DSH test-support | `lib/tools/` 先补单测（纯函数+fs） | tools 全测过，`pnpm test` 绿 |
+| A3 | **L3 Trace Viewer** | pi export-html / OpenHands 泳道 | 轨迹数据已有，加回放视图（`app/components/trace-viewer/`） | 能按 turn 前进/后退，工具调用↔结果配对 |
+
+**阶段 B：工程化补齐（中期，从"能跑"到"好用"）**
+
+- **B1 审批升级三步（最快见效，先做）**：① **只读命令放行**（bash 只读白名单，命中不弹框——抄 Reasonix `bash_readonly.go`）② **分级模式**（Suggest/Auto/Bypass 三档 + 弹框加"本次会话记住"——抄 CodeWhale `approval_mode.rs`）③ **审批日志**（放行/拒绝记事件——抄 CodeWhale `approval_log.rs`）。长在哪：`app/api/chat/route.ts` 的 `TOOLS_NEEDING_CONFIRM` 判定处 + `lib/tools/bash.ts`
+- **B2 真摘要压缩**：compactIfNeeded 从拼贴升级为调模型生成结构化摘要（`## Goal / ## Progress / ## Key Decisions / ## Next Steps / ## Critical Context`）——抄 pi `compaction/compaction.ts`，复用 TeachingModel.complete。长在哪：`lib/sessionStore.ts`
+- **B3 UI 原语库**：建 `app/components/ui/`（dialog/collapse/select/stepper…），对标 DSH `dsh-client-ui-primitives`。长在哪：`app/components/ui/`
+- **B4 文件 diff 预览**：edit/write 前生成 diff 给你看（红绿视图）——抄 Cline 交互 + DSH DiffBlock。长在哪：`lib/tools/edit.ts` + `app/components/ui/diff/`
+- **B5 hooks 注册表**：beforeToolCall 泛化成 onBeforeTool/onAfterTool 注册表——抄 CodeWhale hooks / DSH hooks。长在哪：`lib/hooks.ts` + `lib/agent.ts` 透传
+- **B6 记忆分层**：会话（短期）+ 摘要（长期）已有雏形，补"主动回忆/新鲜度"——抄 Reasonix memory 设计思路。长在哪：`lib/sessionStore.ts` + 未来记忆工具
+- **B7 终端加固**：bash 输出全量落盘（界面显示尾部）+ shell 危险分析（重定向/嵌套检测，抄 Reasonix shellsafe）。长在哪：`lib/tools/bash-runner.ts`
+
+**阶段 C：功能丰富（远期，按需）**
+
+| # | 做什么 | 参考 | 长在哪 | 触发时机 |
+|---|---|---|---|---|
+| C1 | MCP 接入 | Cline / smolagents mcp_client | ToolRegistry 注册外部工具源 | 需要外部数据源时 |
+| C2 | 沙箱容器 | OpenHands / DSH sandbox | 新 Runner（与 BashRunner 平级） | 安全需求出现时 |
+| C3 | 子智能体 / handoffs | DSH subagent（8 种实现） | runAgentLoop 嵌套调用 | Phase 5 任务面板跑稳后 |
+| C4 | 定时任务 | DSH schedule | 产品层新 Runner | 有无人值守需求时 |
+| C5 | 遥测/分析面板 | pi usage-totals / DSH feedback | A3 Trace Viewer 的延伸 | 数据积累后 |
+| C6 | 工作区选择 | 第十一节已有设计 | resolveInsideWorkspace 参数化 | 多工作区需求 |
+| C7 | 设置页 | DSH settings / pi .pi/ | 配置集中化模块 | C6 前后 |
+| C8 | Skills | DSH skill / pi .pi/skills | systemPrompt 注入处 | 提示词体系稳定后 |
+
+### 13.4 落地原则
+
+1. **每步标注"参考谁"**：学的是思路不是代码；实现时对照参考项目源码（本地都有）
+2. **一个阶段一个 commit**：阶段内小步提交，每步展示清单等确认
+3. **先 PLAN.md 补思路再动手**：每个规划项开工前，在 PLAN.md 对应位置补"实现前补记"
+4. **验收标准先行**：每项有明确的"怎么算做完"（上表验收列）
+5. **B1 优先**：审批升级改动小、收益大、教学点密（命令分析=新一课），建议阶段 B 先做它
