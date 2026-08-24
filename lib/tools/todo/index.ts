@@ -12,9 +12,9 @@
 // 和 bash 的 onChunk 同一个模式，引擎只透传。
 // ============================================================
 
-import type { RegisteredTool } from "./types";
-import type { TodoItem } from "../types";
-import { text } from "../message";
+import type { RegisteredTool } from "../types";
+import type { TodoItem } from "../../types";
+import { text } from "../../message";
 
 export type TodoCounts = {
   pending: number;

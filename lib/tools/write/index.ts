@@ -4,10 +4,10 @@
 
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, relative } from "node:path";
-import type { RegisteredTool } from "./types";
-import { resolveInsideWorkspace, stringArg } from "./path-utils";
-import { isDirectory } from "./shared";
-import { text } from "../message";
+import type { RegisteredTool } from "../types";
+import { resolveInsideWorkspace, stringArg } from "../path-utils";
+import { isDirectory } from "../shared";
+import { text } from "../../message";
 
 export function createWriteTool(workspaceRoot: string): RegisteredTool {
   return {

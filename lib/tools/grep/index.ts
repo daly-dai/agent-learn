@@ -4,10 +4,10 @@
 
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
-import type { RegisteredTool } from "./types";
-import { resolveInsideWorkspace, stringArg } from "./path-utils";
-import { listFiles, truncate } from "./shared";
-import { text } from "../message";
+import type { RegisteredTool } from "../types";
+import { resolveInsideWorkspace, stringArg } from "../path-utils";
+import { listFiles, truncate } from "../shared";
+import { text } from "../../message";
 
 export function createGrepTool(workspaceRoot: string): RegisteredTool {
   return {

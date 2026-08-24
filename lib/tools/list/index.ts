@@ -3,10 +3,10 @@
 // ============================================================
 
 import { relative } from "node:path";
-import type { RegisteredTool } from "./types";
-import { resolveInsideWorkspace, stringArg } from "./path-utils";
-import { listFiles } from "./shared";
-import { text } from "../message";
+import type { RegisteredTool } from "../types";
+import { resolveInsideWorkspace, stringArg } from "../path-utils";
+import { listFiles } from "../shared";
+import { text } from "../../message";
 
 export function createListTool(workspaceRoot: string): RegisteredTool {
   return {

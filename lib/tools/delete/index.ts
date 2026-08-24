@@ -4,9 +4,9 @@
 
 import { rm, stat } from "node:fs/promises";
 import { relative } from "node:path";
-import type { RegisteredTool } from "./types";
-import { resolveInsideWorkspace, stringArg } from "./path-utils";
-import { text } from "../message";
+import type { RegisteredTool } from "../types";
+import { resolveInsideWorkspace, stringArg } from "../path-utils";
+import { text } from "../../message";
 
 export function createDeleteTool(workspaceRoot: string): RegisteredTool {
   return {

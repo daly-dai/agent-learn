@@ -7,9 +7,9 @@
 // 交互式 TTY（vim/REPL）天然跑不起来。
 // ============================================================
 
-import type { RegisteredTool } from "./types";
+import type { RegisteredTool } from "../types";
 import { BashRunner } from "./bash-runner";
-import { text } from "../message";
+import { text } from "../../message";
 
 export function createBashTool(workspaceRoot: string): RegisteredTool {
   const runner = new BashRunner();
