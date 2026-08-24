@@ -1,0 +1,79 @@
+/* ============================================================
+   confirm-dialog.module.css —— 通用确认弹框
+   归属组件：app/components/confirm-dialog/index.tsx
+   设计（走纸记录仪 + approval-dialog 同族）：
+   - mask/panel 骨架抄审批弹框：fixed 全屏遮罩 + 居中面板
+   - 危险主按钮用 error 红笔（--pen-error）= "刹车"直觉
+   - 取消按钮纸底静默，且默认聚焦（安全侧）
+   ============================================================ */
+
+.mask {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  background: rgba(29, 33, 39, 0.35);
+}
+
+.panel {
+  width: min(400px, calc(100vw - 48px));
+  padding: 16px 18px 14px;
+  background: var(--plate);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: 0 10px 30px rgba(29, 33, 39, 0.25);
+  outline: none; /* 焦点在取消按钮上，面板本身不抢焦点框 */
+}
+
+.title {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+}
+
+.message {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-mid);
+  word-break: break-word;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.cancelBtn {
+  padding: 5px 16px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  cursor: pointer;
+}
+
+.cancelBtn:hover {
+  border-color: var(--ink-mid);
+}
+
+.confirmBtn {
+  padding: 5px 16px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--plate);
+  background: var(--pen-error);
+  border: 1px solid var(--pen-error);
+  border-radius: var(--r);
+  cursor: pointer;
+}
+
+.confirmBtn:hover {
+  filter: brightness(1.08);
+}

@@ -11,12 +11,13 @@
 //   ＋新建      → 新建空会话并切过去
 //   ✎（悬停）  → 行内重命名：Enter 保存 / Esc 或失焦取消
 //                 （失焦不保存，避免和 Enter 触发两次提交）
-//   ×（悬停）  → 删除（confirm 确认）
+//   ×（悬停）  → 删除（项目自己的确认弹框，不用浏览器 confirm）
 // ============================================================
 
 import { useState } from "react";
 import type { SessionSummary } from "../../lib/use-sessions";
 import { formatClock } from "../../lib/format";
+import { ConfirmDialog } from "../confirm-dialog";
 import styles from "./session-list.module.css";
 
 type SessionListProps = {
@@ -39,6 +40,10 @@ export function SessionList({
   // 行内重命名的编辑态：editingId 是正在编辑的会话，draft 是输入框草稿
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  // 待删除的会话（非 null 时弹确认框）——替换浏览器 window.confirm
+  const [pendingDelete, setPendingDelete] = useState<SessionSummary | null>(
+    null,
+  );
 
   function startRename(session: SessionSummary) {
     setEditingId(session.id);
@@ -134,13 +139,8 @@ export function SessionList({
                       title="删除"
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (
-                          window.confirm(
-                            `删除会话「${session.title ?? session.id}」？`,
-                          )
-                        ) {
-                          onDelete(session.id);
-                        }
+                        // 不直接删：先弹项目自己的确认框，用户确认后才调 onDelete
+                        setPendingDelete(session);
                       }}
                     >
                       ×
@@ -156,6 +156,20 @@ export function SessionList({
       <div className={styles.sidebarFoot}>
         <p>点击切换会话 · ✎ 重命名 · × 删除</p>
       </div>
+
+      {/* 删除确认弹框：替换浏览器 confirm，走纸记录仪语言（危险操作 error 红） */}
+      {pendingDelete && (
+        <ConfirmDialog
+          title="删除会话"
+          message={`删除会话「${pendingDelete.title ?? pendingDelete.id}」？此操作不可恢复，会话记录将被清空。`}
+          confirmLabel="删除"
+          onConfirm={() => {
+            onDelete(pendingDelete.id);
+            setPendingDelete(null);
+          }}
+          onCancel={() => setPendingDelete(null)}
+        />
+      )}
     </aside>
   );
 }
