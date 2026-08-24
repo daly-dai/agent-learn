@@ -49,24 +49,33 @@ export type DeepSeekModelOptions = {
 };
 
 export class DeepSeekModel implements TeachingModel {
-
   constructor(private readonly options: DeepSeekModelOptions) {}
 
   async complete(input: CompleteInput): Promise<AssistantMessage> {
-    const baseUrl = (this.options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
+    const baseUrl = (this.options.baseUrl ?? DEFAULT_BASE_URL).replace(
+      /\/+$/,
+      "",
+    );
     const url = `${baseUrl}/chat/completions`;
 
     // ① 统一协议 → OpenAI 格式
     const messages = toOpenAiMessages(input.systemPrompt, input.messages);
-    const tools = input.tools.length > 0 ? toOpenAiTools(input.tools) : undefined;
+    const tools =
+      input.tools.length > 0 ? toOpenAiTools(input.tools) : undefined;
 
     // 临时调试日志：DEBUG_DEEPSEEK=true 时，打印这次请求的完整 messages + tools
     debugLog(this.options.model ?? DEFAULT_MODEL, url, messages, tools);
 
-    // 有 onDelta 回调就走真·流式，否则走非流式
-    return input.onDelta
-      ? this.completeStreaming(url, input, messages, tools)
-      : this.completeNonStreaming(url, input, messages, tools);
+    if(input.onDelta) {
+      return this.completeStreaming(url, input, messages, tools);
+    }
+
+
+    return this.completeNonStreaming(url, input, messages, tools);
+    // // 有 onDelta 回调就走真·流式，否则走非流式
+    // return input.onDelta
+    //   ? this.completeStreaming(url, input, messages, tools)
+    //   : this.completeNonStreaming(url, input, messages, tools);
   }
 
   // ----------------------------------------------------------
@@ -100,7 +109,8 @@ export class DeepSeekModel implements TeachingModel {
       });
     } catch (error) {
       // 网络错误 / 用户中止：不抛异常，转成受控的 AssistantMessage
-      if (input.signal?.aborted) return { kind: "error", message: abortedMessage() };
+      if (input.signal?.aborted)
+        return { kind: "error", message: abortedMessage() };
       return {
         kind: "error",
         message: errorAssistant(
@@ -111,7 +121,10 @@ export class DeepSeekModel implements TeachingModel {
     }
 
     if (!response.ok) {
-      return { kind: "error", message: errorAssistant("http", await httpErrorText(response)) };
+      return {
+        kind: "error",
+        message: errorAssistant("http", await httpErrorText(response)),
+      };
     }
 
     return { kind: "ok", response };
@@ -126,7 +139,13 @@ export class DeepSeekModel implements TeachingModel {
     messages: OpenAiMessage[],
     tools: OpenAiTool[] | undefined,
   ): Promise<AssistantMessage> {
-    const result = await this.postChatCompletion(url, input, messages, tools, false);
+    const result = await this.postChatCompletion(
+      url,
+      input,
+      messages,
+      tools,
+      false,
+    );
     if (result.kind === "error") return result.message;
 
     const data = (await result.response.json()) as OpenAiResponse;
@@ -142,10 +161,19 @@ export class DeepSeekModel implements TeachingModel {
     messages: OpenAiMessage[],
     tools: OpenAiTool[] | undefined,
   ): Promise<AssistantMessage> {
-    const result = await this.postChatCompletion(url, input, messages, tools, true);
+    // ② 供应商协议 → 统一协议
+    const result = await this.postChatCompletion(
+      url,
+      input,
+      messages,
+      tools,
+      true,
+    );
+
     if (result.kind === "error") return result.message;
 
     const response = result.response;
+
     if (!response.body) {
       return errorAssistant("http", "响应体为空，无法流式读取。");
     }
@@ -161,17 +189,24 @@ export class DeepSeekModel implements TeachingModel {
     // include_usage 时，流的最后一个 chunk（choices 为空）会带 usage
     let usage: Usage | undefined;
 
-    const toolCallsAcc = new Map<number, { id?: string; name?: string; args: string }>();
+    const toolCallsAcc = new Map<
+      number,
+      { id?: string; name?: string; args: string }
+    >();
 
     // 处理一个 SSE data chunk
     const consume = (chunk: OpenAiChunk) => {
       // usage chunk 没有 choices/delta，必须在下面的 delta 早退之前捕获
-      if (chunk.usage) usage = toUsage(chunk.usage);
+      if (chunk.usage) {
+        usage = toUsage(chunk.usage);
+      }
 
       const choice = chunk.choices?.[0];
+
       if (choice?.finish_reason) finishReason = choice.finish_reason;
 
       const delta = choice?.delta;
+
       if (!delta) return;
 
       // 文本增量 → 立刻推给 onDelta（这是"真·流式"的核心）
@@ -183,27 +218,39 @@ export class DeepSeekModel implements TeachingModel {
       // 工具调用增量 → 按 index 累积，finish 后再 parse
       for (const tc of delta.tool_calls ?? []) {
         const acc = toolCallsAcc.get(tc.index) ?? { args: "" };
+
         if (tc.id) acc.id = tc.id;
+
         if (tc.function?.name) acc.name = tc.function.name;
+
         if (tc.function?.arguments) acc.args += tc.function.arguments;
+
         toolCallsAcc.set(tc.index, acc);
       }
     };
 
     try {
       while (true) {
+        // 读取一个数据块
         const { done, value } = await reader.read();
+
         if (done) break;
+
+        // 解码数据块
         buffer += decoder.decode(value, { stream: true });
 
         // SSE 按行解析；一行可能是半截，留到下一轮
         let newline: number;
+
         while ((newline = buffer.indexOf("\n")) !== -1) {
           const line = buffer.slice(0, newline).trim();
+
           buffer = buffer.slice(newline + 1);
+
           if (!line.startsWith("data:")) continue;
 
           const chunk = parseSseData(line.slice(5).trim());
+
           if (chunk) consume(chunk);
         }
       }
@@ -212,7 +259,10 @@ export class DeepSeekModel implements TeachingModel {
       if (input.signal?.aborted) {
         return {
           role: "assistant",
-          content: textBuffer.length > 0 ? [text(textBuffer)] : [text("（请求已中止）")],
+          content:
+            textBuffer.length > 0
+              ? [text(textBuffer)]
+              : [text("（请求已中止）")],
           stopReason: "aborted",
           usage: EMPTY_USAGE,
           timestamp: Date.now(),
@@ -253,7 +303,9 @@ function buildStreamMessage(
     .sort((a, b) => a[0] - b[0]) // 按 index 排序，保证工具调用顺序
     .map(([, acc]) => ({
       type: "toolCall" as const,
-      id: acc.id ?? `call_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      id:
+        acc.id ??
+        `call_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       name: acc.name ?? "",
       arguments: safeJsonParse(acc.args || "{}"),
     }));
@@ -363,12 +415,14 @@ function toTeachingAssistantMessage(data: OpenAiResponse): AssistantMessage {
   const message = choice?.message;
   const finishReason = choice?.finish_reason;
 
-  const toolCalls: ToolCallContent[] = (message?.tool_calls ?? []).map((call) => ({
-    type: "toolCall",
-    id: call.id,
-    name: call.function.name,
-    arguments: safeJsonParse(call.function.arguments),
-  }));
+  const toolCalls: ToolCallContent[] = (message?.tool_calls ?? []).map(
+    (call) => ({
+      type: "toolCall",
+      id: call.id,
+      name: call.function.name,
+      arguments: safeJsonParse(call.function.arguments),
+    }),
+  );
 
   const content: AssistantMessage["content"] = [];
 
@@ -402,11 +456,15 @@ function stopReasonFor(
   finishReason: string | undefined,
   toolCallCount: number,
 ): AssistantMessage["stopReason"] {
-  return finishReason === "tool_calls" || toolCallCount > 0 ? "toolUse" : "stop";
+  return finishReason === "tool_calls" || toolCallCount > 0
+    ? "toolUse"
+    : "stop";
 }
 
 /** 内容为空时补占位文本，避免发出空消息 */
-function withFallbackText(content: AssistantMessage["content"]): AssistantMessage["content"] {
+function withFallbackText(
+  content: AssistantMessage["content"],
+): AssistantMessage["content"] {
   return content.length > 0 ? content : [text(FALLBACK_TEXT)];
 }
 
@@ -447,7 +505,10 @@ async function httpErrorText(response: Response): Promise<string> {
  * （断流/网络抖动时常见，忽略即可，别让整个流崩掉）。
  */
 function parseSseData(payload: string): OpenAiChunk | null {
-  if (payload === "[DONE]") return null;
+  if (payload === "[DONE]") {
+    return null;
+  }
+
   try {
     return JSON.parse(payload) as OpenAiChunk;
   } catch {
@@ -488,7 +549,8 @@ function debugLog(
   console.log("[DeepSeek] model:", model);
   console.log("[DeepSeek] messages:");
   for (const m of messages) {
-    const content = typeof m.content === "string" ? truncate(m.content, 200) : "(null)";
+    const content =
+      typeof m.content === "string" ? truncate(m.content, 200) : "(null)";
     console.log(`  - ${m.role}: ${content}`);
   }
   console.log("[DeepSeek] tools:", JSON.stringify(tools ?? [], null, 2));
