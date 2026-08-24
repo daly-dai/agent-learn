@@ -543,6 +543,8 @@ type TraceEntry = {
 | A1 | **Phase 5 task 面板** | DSH todo / CodeWhale todo_snapshot | 协议（todo 数组存会话）+ `app/components/task-panel/` | 模型产出任务清单，前端可勾选，刷新不丢 |
 | A2 | **测试框架 vitest** | smolagents / DSH test-support | `lib/tools/` 先补单测（纯函数+fs） | tools 全测过，`pnpm test` 绿 |
 | A3 | **L3 Trace Viewer** | pi export-html / OpenHands 泳道 | 轨迹数据已有，加回放视图（`app/components/trace-viewer/`） | 能按 turn 前进/后退，工具调用↔结果配对 |
+| A4 | **ask_user_question**（2026-08-24 增补，工具全景第一档） | DSH tool-ask-user / codex request_user_input | 新工具 + SSE 帧 + 前端弹层（复用 approval-dialog 模态形态） | 模型提问 → 弹层出现 → 用户回答 → 结果回模型继续；`lib/tools/` 补单测 |
+| A5 | **web_search / web_fetch**（2026-08-24 增补，工具全景第一档） | DSH tool-web / CodeWhale Web 聚合 | 新工具（独立，不依赖现有模块） | 模型能搜索并抓取网页；搜不到时 isError 回模型；`lib/tools/` 补单测 |
 
 **阶段 B：工程化补齐（中期，从"能跑"到"好用"）**
 
@@ -566,6 +568,12 @@ type TraceEntry = {
 | C6 | 工作区选择 | 第十一节已有设计 | resolveInsideWorkspace 参数化 | 多工作区需求 |
 | C7 | 设置页 | DSH settings / pi .pi/ | 配置集中化模块 | C6 前后 |
 | C8 | Skills | DSH skill / pi .pi/skills | systemPrompt 注入处 | 提示词体系稳定后 |
+| C9 | **代码执行器（python）**（2026-08-24 增补，第十二节已登记） | smolagents local_python_executor / CodeWhale js_execution | `lib/tools/` 新工具，复用 BashRunner 进程管理 | "代码即动作"需求出现时（第十二节远期地图第 5 项） |
+| C10 | **goal 三件套**（2026-08-24 增补） | DSH get/create/update_goal / CodeWhale goal / Reasonix update_goal | 新工具（模型可调）+ 会话事件（仿 todo 模式） | 需要跨会话长期目标追踪时 |
+| C11 | **complete_step 证据签收**（2026-08-24 增补） | Reasonix complete_step（证据 ≥1 条，verification 核对命令历史） | `lib/tools/` 新工具 + todo 配套 | todo 面板跑稳、要"步骤完成可验证"时 |
+| C12 | **move_file / read_image**（2026-08-24 增补） | Reasonix move_file（双 subject 审批）/ DSH read_image | `lib/tools/` 两个小工具 | 随做：30 分钟一个 |
+
+> **非核心/可选（暂不排期，条件触发）**：**LSP 代码智能**（重型依赖——要起语言服务器进程，教学项目收益低；真需要代码智能时再评估）和 **tool_search 工具发现**（工具超过 20 个才需要，现在 10 个；等工具膨胀时再评估）。这两项不是"不学"，是"条件触发"。
 
 ### 13.4 落地原则
 
