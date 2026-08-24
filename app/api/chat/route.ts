@@ -32,11 +32,13 @@ import { MockModel } from "@/lib/mockModel";
 import { DeepSeekModel } from "@/lib/deepseekModel";
 import type { TeachingModel } from "@/lib/model";
 import { createToolRegistry } from "@/lib/tools";
+import type { AskQuestion } from "@/lib/tools/ask-user";
 import { runAgentLoop, type ToolDecision } from "@/lib/agent";
 import { TraceRecorder } from "@/lib/trace";
 import { JsonlSessionStore } from "@/lib/sessionStore";
 import { isValidSessionId } from "@/lib/sessionManager";
 import { toolApprovals } from "@/lib/toolApproval";
+import { userAnswers, makeAskKey, clearRun } from "@/lib/userAnswers";
 import { runControllers } from "@/lib/runControl";
 
 // 显式声明 Node runtime：本路由（以及它的工具）会用 node:fs / node:path，
@@ -67,6 +69,7 @@ const systemPrompt = [
   "- write_note（写工作区笔记）",
   "- bash（执行 shell 命令；命令在 Windows 环境运行，避免 ls 等 Unix 专属命令；执行前会弹框确认）",
   "- todo_write（记录并更新任务清单：复杂任务开始前先列出任务，任务状态变化时更新整表；无需确认，因为它只改会话内的任务列表，不碰文件）",
+  "- ask_user_question（向用户提问并等待回答：仅当你需要用户提供信息、做决定或澄清需求时才调用；问题要具体，一次只问一个）。注意：用户可能「跳过」（返回文案会明确说明，此时直接继续你手头的任务，不要追问、不要解释原因）。这不是错误，直接进入下一步，绝不反复问同一问题。",
   "- 只有用户明确要求「列出 / 读取 / 写入 / 修改 / 删除 / 搜索 / 执行命令」时才调用工具；概念原理类问题直接回答，不要硬套工具。",
   "- 一次只调用当前步骤真正需要的工具；拿到工具结果后必须基于真实结果回答，绝不编造文件内容。",
   "- 工具失败或读不到内容时，如实说明，不要假装成功。",
@@ -105,7 +108,9 @@ type StreamFrame =
   // bash 命令的流式输出（旁路帧，不是 AgentEvent）：工具 → 这里 → SSE → 前端
   | { type: "tool_output"; toolCallId: string; text: string }
   // todo_write 更新任务清单（旁路帧，Phase 5）：工具 → 落盘会话 → 这里 → 前端面板
-  | { type: "tool_todo"; todos: TodoItem[] };
+  | { type: "tool_todo"; todos: TodoItem[] }
+  // ask_user_question 提问（旁路帧，A4）：模型 → 这里 → 前端逐题作答等用户回答
+  | { type: "ask_user_request"; toolCallId: string; questions: AskQuestion[] };
 
 // --- POST /api/chat ---
 export async function POST(req: NextRequest) {
@@ -176,6 +181,17 @@ export async function POST(req: NextRequest) {
         );
       };
 
+      // 客户端断开感知：标签页/浏览器关闭时，Next.js 会 abort 请求信号。
+      // 此时 SSE 流的 finally 不一定触发，这里主动清理该 run 的挂起提问，
+      // 防止 onAskUser Promise 永远等不到、残留内存。
+      let runFinalized = false;
+      const finalizeRun = () => {
+        if (runFinalized) return;
+        runFinalized = true;
+        clearRun(recorder.runId);
+      };
+      req.signal.addEventListener("abort", finalizeRun);
+
       try {
         // 0) run 级取消：注册 AbortController（停止按钮通过 /api/chat/stop 触发）
         const abortController = new AbortController();
@@ -231,6 +247,9 @@ export async function POST(req: NextRequest) {
             await store.appendTodo(todos);
             send({ type: "tool_todo", todos });
           },
+          // ask_user_question 旁路（A4）：推提问帧 → 挂起等用户逐题回答（不超时，用户可跳过）
+          // 返回未回答，run 不挂死）→ 回答回传工具结果给模型继续。
+          onAskUser: (questions) => askUserAnswer(questions, recorder.runId, send),
           onEvent: (event) => {
             recorder.record(event);
             send({ type: "event", event });
@@ -259,7 +278,11 @@ export async function POST(req: NextRequest) {
       } catch (e) {
         send({ type: "error", message: (e as Error).message });
       } finally {
-        // run 结束（无论正常/出错/被停止）：注销取消句柄，防止 Map 泄漏
+        // run 结束（正常/出错/被停止）：注销取消句柄 + 清理该 run 的挂起提问。
+        // 用 finalizeRun 收口（含移除 abort 监听器），和客户端断开路径一致，
+        // 避免两处重复。clearRun 强制 resolve 空数组，onAskUser Promise 不残留。
+        req.signal.removeEventListener("abort", finalizeRun);
+        finalizeRun();
         runControllers.delete(recorder.runId);
         await recorder.end({ messages: recorder.entries.length });
         controller.close();
@@ -315,6 +338,37 @@ export async function DELETE(req: NextRequest) {
   await store.reset();
   return NextResponse.json({ ok: true, sessionId });
 }
+
+// --- 模型提问（A4，多问题）：挂起一次提问 → 推帧（带全部 questions）→ 等逐题回答 ---
+// 与 askUserApproval 同模式，但语义是「回答问题列表」不是「允许/拒绝」：
+// 推 ask_user_request 帧（附 questions）给前端逐题作答 → 用户答完走
+// POST /api/chat/ask-user 回传 answers[] → resolve 交回 await 中的 onAskUser
+// → 工具结果回模型继续。
+// 【用户要求 2026-08-24】不设超时——模型无限等用户，用户想跳过就点「跳过」
+// （回传空数组 → 工具返回 SKIPPED_TEXT），不会被强制打断。
+// 但 run 结束（正常/被 stop/断连）时由 finally 里的 clearRun 清掉挂起，
+// 防止 Promise 残留（关浏览器/切会话的兜底）。
+function askUserAnswer(
+  questions: AskQuestion[],
+  runId: string,
+  send: (frame: StreamFrame) => void,
+): Promise<string[]> {
+  return new Promise((resolve) => {
+    // key 带 runId 前缀，run 结束时 clearRun(runId) 能按前缀精确清理
+    const key = makeAskKey(runId);
+
+    send({ type: "ask_user_request", toolCallId: key, questions });
+
+    userAnswers.set(key, {
+      resolve: (answers: string[]) => {
+        userAnswers.delete(key);
+        resolve(answers);
+      },
+    });
+  });
+}
+
+// --- POST /api/chat/ask-user ---（独立路由文件 app/api/chat/ask-user/route.ts）
 
 // --- 模型选择（环境变量 → 具体实现）---
 // 这个函数是"适配层"的入口：上层 runAgentLoop 只依赖 TeachingModel 接口，

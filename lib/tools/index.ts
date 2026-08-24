@@ -21,6 +21,7 @@ import { createGrepTool } from "./grep";
 import { createFindTool } from "./find";
 import { createBashTool } from "./bash";
 import { createTodoTool } from "./todo";
+import { createAskUserTool } from "./ask-user";
 
 export class ToolRegistry {
   private readonly tools = new Map<string, RegisteredTool>();
@@ -66,8 +67,9 @@ export function createToolRegistry(workspaceRoot: string): ToolRegistry {
     createGrepTool(workspaceRoot),
     createFindTool(workspaceRoot),
     createBashTool(workspaceRoot),
-    // todo_write 不绑定工作区（只改会话内任务清单），工厂不需要参数
+    // todo_write / ask_user_question 不绑定工作区（改会话内状态/提问），工厂不需要参数
     createTodoTool(),
+    createAskUserTool(),
   ]) {
     registry.register(tool);
   }

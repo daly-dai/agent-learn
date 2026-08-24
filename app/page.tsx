@@ -50,6 +50,7 @@ import { TraceRail } from "./components/trace-rail";
 import { SessionList } from "./components/session-list";
 import { ApprovalDialog } from "./components/approval-dialog";
 import { TaskPanel } from "./components/task-panel";
+import { AskUserCard } from "./components/ask-user-card";
 import { useAgentRun } from "./lib/use-agent-run";
 import { useSessions } from "./lib/use-sessions";
 import { foldEvents } from "./lib/trace-fold";
@@ -86,6 +87,8 @@ export default function Home() {
     stats,
     pendingApproval,
     approve,
+    pendingAsk,
+    answerAsk,
     toolOutputs,
     todos,
     stop,
@@ -195,65 +198,74 @@ export default function Home() {
             <TaskPanel todos={todos} sessionId={currentId} />
           </div>
 
-          {/* 输入控制台：提交走 submit()；错误横幅显示在输入框上方 */}
-          <form
-            className={styles.console}
-            onSubmit={(e) => {
-              e.preventDefault();
-              submit();
-            }}
-          >
-            {error && (
-              <div className={styles.alarm} role="alert">
-                <span className={styles.alarmTag}>运行失败</span>
-                <span>{error}</span>
-              </div>
-            )}
-
-            <div className={styles.consoleFrame}>
-              <textarea
-                className={styles.consoleInput}
-                ref={inputRef}
-                rows={1}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  // 回车发送；Shift+Enter 换行；中文输入法选词时的回车不算发送
-                  if (e.key !== "Enter" || e.shiftKey) return;
-                  if (e.nativeEvent.isComposing) return;
-                  e.preventDefault();
-                  submit();
-                }}
-                placeholder="给它一个目标，例如：读取 agent-notes.md 并总结要点"
-                disabled={loading}
-                autoFocus
-              />
-              {/* 发送按钮在 run 进行中「变身」为停止按钮：
-                  位置永远不变（操作跟随视线），角色随 loading 切换。
-                  stop 需要 runId（来自 SSE run 帧），未到时短暂不可点 */}
-              {loading ? (
-                <button
-                  className={styles.consoleStop}
-                  type="button"
-                  onClick={() => stop(runId)}
-                  disabled={!runId}
-                >
-                  停止
-                </button>
-              ) : (
-                <button
-                  className={styles.consoleSend}
-                  type="submit"
-                  disabled={!input.trim()}
-                >
-                  发送
-                </button>
-              )}
+          {/* 错误横幅：提到提问卡/输入框之外，两种状态下都可见 */}
+          {error && (
+            <div className={styles.alarm} role="alert">
+              <span className={styles.alarmTag}>运行失败</span>
+              <span>{error}</span>
             </div>
-            <p className={styles.consoleHint}>
-              Enter 发送 · Shift + Enter 换行 · 每次发送开始新的一次 run
-            </p>
-          </form>
+          )}
+
+          {/* 底部决策区二选一（Reasonix 式）：
+              模型提问时（pendingAsk）输入框隐藏，提问卡占据输入框的位置；
+              否则显示输入控制台。二者共用 .askBar/.console 的列宽（26px padding + 830 居中） */}
+          {pendingAsk ? (
+            <div className={styles.askBar}>
+              <AskUserCard ask={pendingAsk} onAnswer={answerAsk} />
+            </div>
+          ) : (
+            <form
+              className={styles.console}
+              onSubmit={(e) => {
+                e.preventDefault();
+                submit();
+              }}
+            >
+              <div className={styles.consoleFrame}>
+                <textarea
+                  className={styles.consoleInput}
+                  ref={inputRef}
+                  rows={1}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    // 回车发送；Shift+Enter 换行；中文输入法选词时的回车不算发送
+                    if (e.key !== "Enter" || e.shiftKey) return;
+                    if (e.nativeEvent.isComposing) return;
+                    e.preventDefault();
+                    submit();
+                  }}
+                  placeholder="给它一个目标，例如：读取 agent-notes.md 并总结要点"
+                  disabled={loading}
+                  autoFocus
+                />
+                {/* 发送按钮在 run 进行中「变身」为停止按钮：
+                    位置永远不变（操作跟随视线），角色随 loading 切换。
+                    stop 需要 runId（来自 SSE run 帧），未到时短暂不可点 */}
+                {loading ? (
+                  <button
+                    className={styles.consoleStop}
+                    type="button"
+                    onClick={() => stop(runId)}
+                    disabled={!runId}
+                  >
+                    停止
+                  </button>
+                ) : (
+                  <button
+                    className={styles.consoleSend}
+                    type="submit"
+                    disabled={!input.trim()}
+                  >
+                    发送
+                  </button>
+                )}
+              </div>
+              <p className={styles.consoleHint}>
+                Enter 发送 · Shift + Enter 换行 · 每次发送开始新的一次 run
+              </p>
+            </form>
+          )}
         </main>
 
         {/* 轨迹区：rows 是折叠后的行（时间轴），observed 用于耗时计算，

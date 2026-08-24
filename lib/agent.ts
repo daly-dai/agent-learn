@@ -9,6 +9,7 @@ import type {
 } from "./types";
 import type { TeachingModel } from "./model";
 import type { ToolRegistry } from "./tools";
+import type { AskQuestion } from "./tools/ask-user";
 import { createAssistantMessage, text } from "./message";
 
 // ------------------------------------------------------------
@@ -49,6 +50,9 @@ type RunAgentLoopOptions = {
   // todo_write 旁路：把整表任务清单交回使用端（route.ts 落盘会话 + 推 SSE 帧）。
   // 与 onToolOutput 同模式：引擎只透传给工具的 options.onTodoWrite，不理解内容。
   onTodoWrite?: (todos: TodoItem[]) => Promise<void> | void;
+  // ask_user_question 旁路（请求-响应）：把问题列表交回使用端，等用户逐题回答（A4）。
+  // 与 onTodoWrite 同模式：引擎只透传，不理解内容；使用端负责推帧/弹卡片/回传。
+  onAskUser?: (questions: AskQuestion[]) => Promise<string[]> | string[];
 };
 
 function emitMessageLifecycle(
@@ -101,6 +105,7 @@ async function executeToolCall(
     signal?: AbortSignal;
     onChunk?: (text: string) => void;
     onTodoWrite?: (todos: TodoItem[]) => Promise<void> | void;
+    onAskUser?: (questions: AskQuestion[]) => Promise<string[]> | string[];
   },
 ): Promise<ToolResultMessage> {
   try {
@@ -303,7 +308,8 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<{
 
       // 真正执行工具。toolOptions：signal（取消）+ onChunk（bash 流式
       // 输出 → 引擎不懂它，只是把它转给使用端的 onToolOutput）+
-      // onTodoWrite（todo 整表 → 转给使用端落盘会话）
+      // onTodoWrite（todo 整表 → 转给使用端落盘会话）+
+      // onAskUser（提问 → 转给使用端弹卡片等用户回答）
       const toolResult = await executeToolCall(
         executableToolCall,
         options.toolRegistry,
@@ -311,6 +317,7 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<{
           signal: options.signal,
           onChunk: (text) => options.onToolOutput?.(toolCall.id, text),
           onTodoWrite: options.onTodoWrite,
+          onAskUser: options.onAskUser,
         },
       );
 

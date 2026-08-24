@@ -47,6 +47,12 @@
   padding: 0 26px;
 }
 
+/* ---- 模型提问卡片容器（A4） ---- */
+/* 与 todoBar/console 同列：外层 26px padding，卡片内部 830 居中，与输入框对齐 */
+.askBar {
+  padding: 0 26px 6px;
+}
+
 /* ---- 指令台（输入） ---- */
 .console {
   padding: 6px 26px 18px;

@@ -3,6 +3,7 @@
 // ============================================================
 
 import type { TodoItem, ToolDefinition, ToolResult } from "../types";
+import type { AskQuestion } from "./ask-user";
 
 export type ToolExecutorOptions = {
   /** 取消信号：中止模型请求 / 杀死正在执行的命令（run 级取消，Phase 4） */
@@ -15,6 +16,12 @@ export type ToolExecutorOptions = {
    * 返回 Promise 是因为落盘要等（保证工具结果返回时 todo 已入库）。
    */
   onTodoWrite?: (todos: TodoItem[]) => Promise<void> | void;
+  /**
+   * ask_user_question 专用：向使用端提出 1-4 个问题并等待回答（请求-响应）。
+   * 与 onTodoWrite 同模式（引擎只透传），但它是「要等答案」——route.ts 推
+   * SSE 帧 → 前端逐题作答 → 回传 answers[] → resolve；超时兜底在使用端。
+   */
+  onAskUser?: (questions: AskQuestion[]) => Promise<string[]> | string[];
 };
 
 export type ToolExecutor = (

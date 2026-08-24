@@ -45,6 +45,14 @@ export function approveTool(params: ApproveParams): Promise<ApproveResult> {
   return api("/api/chat/approve", { method: "POST", body: params });
 }
 
+/** POST /api/chat/ask-user —— 回传模型提问的用户逐题回答（A4，多问题版） */
+export function answerUserQuestion(params: {
+  toolCallId: string;
+  answers: string[];
+}): Promise<{ ok: boolean }> {
+  return api("/api/chat/ask-user", { method: "POST", body: params });
+}
+
 /** POST /api/chat/stop —— 停止一次 run（中止模型请求 + 杀命令进程树） */
 export function stopRun(params: StopRunParams): Promise<StopRunResult> {
   return api("/api/chat/stop", { method: "POST", body: params });

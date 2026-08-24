@@ -19,12 +19,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { AgentMessage, SessionStats, TodoItem } from "@/lib/types";
+import type { AskQuestion } from "@/lib/tools/ask-user";
 import { appendDelta, replaceLast } from "./messages";
 import { readStream, type ObservedEvent, type StreamFrame } from "./sse";
 import {
   fetchHistory,
   clearHistory,
   approveTool,
+  answerUserQuestion,
   stopRun,
   sendMessage,
 } from "@/app/services/chat";
@@ -39,6 +41,12 @@ export type ToolApprovalRequest = {
   args: Record<string, unknown>;
 };
 
+/** 一次挂起的模型提问（A4）：前端逐题作答，全部答完后回传 /api/chat/ask-user */
+export type PendingAsk = {
+  toolCallId: string;
+  questions: AskQuestion[];
+};
+
 export function useAgentRun(sessionId: string) {
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [observed, setObserved] = useState<ObservedEvent[]>([]);
@@ -51,6 +59,8 @@ export function useAgentRun(sessionId: string) {
   // 挂起的工具确认：非 null 时前端要弹框，用户决定后回传 /api/chat/approve
   const [pendingApproval, setPendingApproval] =
     useState<ToolApprovalRequest | null>(null);
+  // 挂起的模型提问（A4）：非 null 时前端弹提问卡片，用户回答后回传
+  const [pendingAsk, setPendingAsk] = useState<PendingAsk | null>(null);
   // bash 命令的实时输出：toolCallId → 已累积的文本（tool_output 帧逐块追加）
   const [toolOutputs, setToolOutputs] = useState<Record<string, string>>({});
   // 任务清单（Phase 5）：来源 = GET 历史 todos（初始）+ tool_todo 帧（run 中）+ done 帧（最终）
@@ -67,6 +77,7 @@ export function useAgentRun(sessionId: string) {
     setModel("");
     setStats(ZERO_STATS);
     setPendingApproval(null);
+    setPendingAsk(null);
     setToolOutputs({});
     setTodos([]);
   }, []);
@@ -136,8 +147,9 @@ export function useAgentRun(sessionId: string) {
         setMessages(frame.messages);
         setRunId(frame.runId);
         setStats(frame.stats);
-        // run 结束了：服务端不再有挂起的确认（超时会自动拒绝），清掉弹框
+        // run 结束了：服务端不再有挂起的确认/提问（超时会自动处理），清掉弹框
         setPendingApproval(null);
+        setPendingAsk(null);
         // 任务清单权威值（Phase 5）：tool_todo 帧只是过程更新，done 是最终
         setTodos(frame.todos);
         break;
@@ -163,6 +175,13 @@ export function useAgentRun(sessionId: string) {
         // 任务清单实时更新（Phase 5）：模型整表替换后立刻刷新面板
         setTodos(frame.todos);
         break;
+      case "ask_user_request":
+        // 模型提问（A4）：交给页面逐题作答卡片
+        setPendingAsk({
+          toolCallId: frame.toolCallId,
+          questions: frame.questions,
+        });
+        break;
       default:
         // StreamFrame 新增类型时，TS 会在这里提示漏了分支
         break;
@@ -184,6 +203,23 @@ export function useAgentRun(sessionId: string) {
       }
     },
     [pendingApproval],
+  );
+
+  // 回传用户对模型提问的回答（A4，多问题版）。空数组 = 全部跳过，服务端给"未回答"降级。
+  const answerAsk = useCallback(
+    async (answers: string[]) => {
+      if (!pendingAsk) return;
+      const { toolCallId } = pendingAsk;
+      setPendingAsk(null); // 立即关掉卡片；服务端 resolve 后引擎继续
+      try {
+        await answerUserQuestion({ toolCallId, answers });
+      } catch (e) {
+        // 404 = 服务端没有这个挂起提问（已超时 / 或 ask-user 路由未加载）。
+        // 静默会掩盖问题（用户只看到 60s 超时文案），这里留个警告便于排查。
+        console.warn("回传提问回答失败", (e as Error).message, toolCallId);
+      }
+    },
+    [pendingAsk],
   );
 
   // 停止当前 run：中止模型请求 + 杀死正在执行的命令（Phase 4 停止按钮）
@@ -253,6 +289,8 @@ export function useAgentRun(sessionId: string) {
     stats,
     pendingApproval,
     approve,
+    pendingAsk,
+    answerAsk,
     toolOutputs,
     todos,
     stop,

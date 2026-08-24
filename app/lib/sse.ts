@@ -14,6 +14,7 @@ import type {
   TodoItem,
   ToolDefinition,
 } from "@/lib/types";
+import type { AskQuestion } from "@/lib/tools/ask-user";
 
 // SSE 帧的联合类型（服务端 route.ts 推送同名帧）
 export type StreamFrame =
@@ -40,7 +41,9 @@ export type StreamFrame =
   // bash 命令的流式输出（旁路帧）：按 toolCallId 累积显示，像真终端
   | { type: "tool_output"; toolCallId: string; text: string }
   // todo_write 更新任务清单（旁路帧，Phase 5）：前端面板实时更新
-  | { type: "tool_todo"; todos: TodoItem[] };
+  | { type: "tool_todo"; todos: TodoItem[] }
+  // ask_user_question 提问（旁路帧，A4）：前端逐题作答等用户回答
+  | { type: "ask_user_request"; toolCallId: string; questions: AskQuestion[] };
 
 /** 事件 + 前端观测到它的时刻（协议不动，时间戳加在这一层） */
 export type ObservedEvent = { seq: number; at: number; event: AgentEvent };
