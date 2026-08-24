@@ -12,6 +12,7 @@
    ============================================================ */
 
 .panel {
+  position: relative; /* 关闭按钮绝对定位的锚点 */
   max-width: 830px;
   margin: 0 auto 0;
   background: var(--plate);
@@ -80,6 +81,28 @@
 
 .header:hover .toggle {
   color: var(--ink);
+}
+
+/* 关闭按钮（Reasonix 式）：仅全部完成时出现；绝对定位右上角，
+   放在 header 外避免 button 嵌套 button。极轻，hover 变信号琥珀。 */
+.close {
+  position: absolute;
+  top: 5px;
+  right: 8px;
+  padding: 0 7px;
+  background: none;
+  border: none;
+  border-radius: var(--r);
+  font-family: var(--font-mono);
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+
+.close:hover {
+  color: var(--pen-signal-ink);
+  background: var(--paper);
 }
 
 /* 展开列表（reasonix 式）：grid 状态列 + 文本列，行间距薄 */

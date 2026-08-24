@@ -308,6 +308,16 @@ type TraceEntry = {
 - **系统提示词**：加 todo_write 工具说明（复杂任务先列任务清单，任务完成/进度更新时调用）。
 - **验收标准**（改自第十三节 A1）：模型在复杂任务时产出 todo_write 调用 → 会话落盘 → 前端面板显示进度 → 刷新/切换会话不丢。
 
+**Phase 5 增补（2026-08-24）：TodoPanel 关闭交互（抄 Reasonix todoVisibility）**
+
+> 背景：调研 7 项目（DSH/tether/Reasonix/CodeWhale/codex/pi/我们）发现"关闭"分三派——不提供（DSH/我们）、随时可关（tether 抽屉级/CodeWhale /rail off）、**未完成强制可见 + 全完成才可关**（Reasonix）。选 Reasonix 式，因为它最符合 todo 面板的存在意义：任务没做完不该被藏起来，关闭是"清理已看完的清单"的单向动作。
+
+- **判定是派生状态，不是事件点**：`show = todos.length > 0 && (有未完成 || !dismissed)`——每次渲染根据当前 todos + dismissed 重算（GET 恢复 / tool_todo 帧 / done 帧三条数据路径自然触发），幂等纯函数，不需要"记住上次判定"。只有两个事件：初始读 localStorage、点 X 写 localStorage。
+- **dismissed 只对"全完成"生效**：只要有未完成任务，强制显示（忽略 dismissed）→ 新任务到来面板自动复活，无需额外逻辑。
+- **存储**：`localStorage`，key 按 sessionId 隔离（`todoPanel:dismissed:<sessionId>`）——纯前端状态，后端零改动（todo 数据仍在会话里，面板可见性是前端视图状态）。
+- **改动范围**：`app/components/task-panel/index.tsx`（加 `useState(dismissed)` + 全完成时头部显示 X 按钮 + `show` 判定）+ `task-panel.module.css`（X 按钮样式，沿用走纸记录仪笔色 `--pen-signal` 或 `--ink-faint`）。
+- **验收**：任务全完成 → 面板出现 X → 点击后面板消失 → 刷新仍消失（localStorage）→ 模型写新任务（未完成）→ 面板自动复活 → 切换会话互不影响（按 sessionId 隔离）。
+
 ### Phase 6：对话面板打磨 + 架构加固
 - UI 打磨（消息渲染、工具调用卡片、事件时间线、终端面板、task 面板整合成统一布局）。
 - 补测试（`loop`、`sessionStore`、`tools` 的单元测试，教学版已有 `*.test.ts` 可参考）。
@@ -521,6 +531,8 @@ type TraceEntry = {
 | **CodeWhale** | 审批四档 + Shift+Tab 切换 + approval_log；todo_snapshot；session_resume | 审批分级与日志、任务面板参考 |
 | **Reasonix** | 命令静态分析审批（只读放行）；memory 40 文件；shellrun/parse/safe 三层 | 审批智能化、记忆分层设计、终端安全分析 |
 | **how-pi-agent-works** | 教学路线（我们的根） | 每阶段的"为什么" |
+
+> **工具全景参考源（2026-08-24）**：开工任何"工具"相关项（B1/B7/新工具），查 `workspace/工具全景对比-7项目.md`（7 项目工具全景 + 缺口三档）与 `workspace/三项目横向对照-施工决策表.md` 第五节（工具参考源 + 裁决增补）——那里已把 7 个项目的工具名实读核对完毕，含 ask_user_question / web_search / 后台任务三件套 / 只读放行等新缺口与抄谁。
 
 ### 13.3 三阶段规划（带验收标准）
 

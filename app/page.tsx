@@ -189,9 +189,10 @@ export default function Home() {
           </div>
 
           {/* 任务面板（Phase 5）：钉在输入台上方，与输入框同列宽（830 居中）。
-              只读展示（todo 唯一写者是模型）；头部常驻显示进度，展开看明细 */}
+              只读展示（todo 唯一写者是模型）；头部常驻显示进度，展开看明细；
+              sessionId 用于关闭状态按会话隔离（Reasonix 式，纯前端 localStorage） */}
           <div className={styles.todoBar}>
-            <TaskPanel todos={todos} />
+            <TaskPanel todos={todos} sessionId={currentId} />
           </div>
 
           {/* 输入控制台：提交走 submit()；错误横幅显示在输入框上方 */}
