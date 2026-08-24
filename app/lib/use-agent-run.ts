@@ -216,6 +216,7 @@ export function useAgentRun(sessionId: string) {
           const data = await res.json().catch(() => ({}));
           throw new Error(data.error || `HTTP ${res.status}`);
         }
+
         if (!res.body) throw new Error("当前浏览器不支持流式响应");
 
         await readStream(res.body, applyFrame);

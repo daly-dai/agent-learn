@@ -28,6 +28,7 @@ export function createWriteTool(workspaceRoot: string): RegisteredTool {
       required: ["path", "content"],
     },
     async execute(args) {
+      // 解析文件路径，沙箱
       const filePath = resolveInsideWorkspace(
         workspaceRoot,
         stringArg(args.path, ""),
@@ -36,8 +37,11 @@ export function createWriteTool(workspaceRoot: string): RegisteredTool {
       if (await isDirectory(filePath)) {
         throw new Error(`write_file: ${args.path} 是一个目录，无法写入。`);
       }
+      // 创建目录
       await mkdir(dirname(filePath), { recursive: true });
+      // 写文件
       await writeFile(filePath, stringArg(args.content, ""), "utf8");
+      // 返回结果
       return {
         content: [text(relative(workspaceRoot, filePath))],
         details: { path: relative(workspaceRoot, filePath) },
