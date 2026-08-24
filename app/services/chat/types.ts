@@ -4,14 +4,16 @@
 // DELETE 清空）、app/api/chat/approve/route.ts、app/api/chat/stop/route.ts
 // ============================================================
 
-import type { AgentMessage, SessionStats } from "@/lib/types";
+import type { AgentMessage, SessionStats, TodoItem } from "@/lib/types";
 
-/** GET /api/chat?sessionId= → 会话历史（叶子路径全部消息）+ 会话级统计 */
+/** GET /api/chat?sessionId= → 会话历史（叶子路径全部消息）+ 会话级统计 + 任务清单 */
 export type ChatHistoryResult = {
   sessionId: string;
   leafId: string;
   messages: AgentMessage[];
   stats: SessionStats;
+  /** 任务清单（Phase 5）：叶子回溯取最新 todo 条目；没有则为空数组 */
+  todos: TodoItem[];
 };
 
 /** POST /api/chat/approve 参数：回传用户对挂起确认的决定 */

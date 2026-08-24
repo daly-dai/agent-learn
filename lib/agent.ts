@@ -5,6 +5,7 @@ import type {
   ToolCallContent,
   ToolDefinition,
   ToolResultMessage,
+  TodoItem,
 } from "./types";
 import type { TeachingModel } from "./model";
 import type { ToolRegistry } from "./tools";
@@ -45,6 +46,9 @@ type RunAgentLoopOptions = {
   // 工具执行中逐块输出（bash 的 stdout/stderr 流）。引擎不理解它，
   // 只原样透传给工具的 execute options.onChunk——这是"旁路"，不进事件流。
   onToolOutput?: (toolCallId: string, text: string) => void;
+  // todo_write 旁路：把整表任务清单交回使用端（route.ts 落盘会话 + 推 SSE 帧）。
+  // 与 onToolOutput 同模式：引擎只透传给工具的 options.onTodoWrite，不理解内容。
+  onTodoWrite?: (todos: TodoItem[]) => Promise<void> | void;
 };
 
 function emitMessageLifecycle(
@@ -93,7 +97,11 @@ function createBlockedToolResult(
 async function executeToolCall(
   toolCall: ToolCallContent,
   toolRegistry: ToolRegistry,
-  toolOptions?: { signal?: AbortSignal; onChunk?: (text: string) => void },
+  toolOptions?: {
+    signal?: AbortSignal;
+    onChunk?: (text: string) => void;
+    onTodoWrite?: (todos: TodoItem[]) => Promise<void> | void;
+  },
 ): Promise<ToolResultMessage> {
   try {
     const result = await toolRegistry.execute(
@@ -294,13 +302,15 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<{
       });
 
       // 真正执行工具。toolOptions：signal（取消）+ onChunk（bash 流式
-      // 输出 → 引擎不懂它，只是把它转给使用端的 onToolOutput）
+      // 输出 → 引擎不懂它，只是把它转给使用端的 onToolOutput）+
+      // onTodoWrite（todo 整表 → 转给使用端落盘会话）
       const toolResult = await executeToolCall(
         executableToolCall,
         options.toolRegistry,
         {
           signal: options.signal,
           onChunk: (text) => options.onToolOutput?.(toolCall.id, text),
+          onTodoWrite: options.onTodoWrite,
         },
       );
 

@@ -41,9 +41,15 @@
   margin: 0 auto;
 }
 
+/* ---- 任务面板容器（Phase 5） ---- */
+/* 与指令台同列：外层左右 padding，面板内部 830 居中，与输入框 x 范围对齐 */
+.todoBar {
+  padding: 0 26px;
+}
+
 /* ---- 指令台（输入） ---- */
 .console {
-  padding: 12px 26px 18px;
+  padding: 6px 26px 18px;
 }
 
 .consoleFrame {
@@ -163,7 +169,8 @@
 /* 窄屏：转录稿和指令台收窄内边距（骨架 .deck 的改列在全局媒体查询） */
 @media (max-width: 900px) {
   .transcript,
-  .console {
+  .console,
+  .todoBar {
     padding-left: 16px;
     padding-right: 16px;
   }

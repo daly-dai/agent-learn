@@ -2,13 +2,19 @@
 // 工具系统的共享类型（lib/tools/ 内部使用）
 // ============================================================
 
-import type { ToolDefinition, ToolResult } from "../types";
+import type { TodoItem, ToolDefinition, ToolResult } from "../types";
 
 export type ToolExecutorOptions = {
   /** 取消信号：中止模型请求 / 杀死正在执行的命令（run 级取消，Phase 4） */
   signal?: AbortSignal;
   /** 工具执行中逐块吐数据（bash 的 stdout/stderr 用）；其他工具忽略 */
   onChunk?: (text: string) => void;
+  /**
+   * todo_write 专用：把整表替换后的任务清单交回使用端（route.ts 落盘会话 + 推 SSE 帧）。
+   * 仿 onChunk 旁路模式——工具不碰 store，引擎只透传，其他工具零改动。
+   * 返回 Promise 是因为落盘要等（保证工具结果返回时 todo 已入库）。
+   */
+  onTodoWrite?: (todos: TodoItem[]) => Promise<void> | void;
 };
 
 export type ToolExecutor = (

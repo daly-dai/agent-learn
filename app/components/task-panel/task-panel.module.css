@@ -1,0 +1,156 @@
+/* ============================================================
+   task-panel.module.css —— 任务面板（Phase 5）
+   归属组件：app/components/task-panel/index.tsx
+
+   设计（走纸记录仪的一支笔 + reasonix 的清晰度）：
+   - 纸墨底 + 等宽仪标签/读数 = 项目身份（PLAN.md 第十节）
+   - 状态用「胶囊 pill」不折行（修掉 width:3em 折行变形）
+   - 状态走笔色：进行中=琥珀笔、完成=模型绿、待办=灰
+   - 完成项加删除线 = 记录仪上「划掉已完成」的直觉
+   - 头部：左侧仪标签 + 读数，右侧 meta 用细竖线分隔（reasonix 式）
+   动态类（全局，JSX 拼字符串）：todo-${status} 控制文本状态
+   ============================================================ */
+
+.panel {
+  max-width: 830px;
+  margin: 0 auto 0;
+  background: var(--plate);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+
+/* 头部 = 铭牌一行：不填色、不加粗块，靠等宽字距与读数立起来 */
+.header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--font-mono);
+  color: var(--ink);
+}
+
+.header:hover {
+  background: var(--paper);
+}
+
+.title {
+  flex: none;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.19em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+/* 读数：N/M 完成，模型色 + 等宽数字，读数盘的感觉 */
+.badge {
+  flex: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--pen-model);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 当前任务摘要：左侧细竖线分隔（reasonix 式），单行截断 */
+.meta {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-left: 10px;
+  border-left: 1px solid var(--line-soft);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--ink-mid);
+}
+
+/* 折叠箭头：常驻但极轻，hover 变深 */
+.toggle {
+  flex: none;
+  font-size: 10px;
+  color: var(--ink-faint);
+}
+
+.header:hover .toggle {
+  color: var(--ink);
+}
+
+/* 展开列表（reasonix 式）：grid 状态列 + 文本列，行间距薄 */
+.list {
+  margin: 0;
+  padding: 4px 12px 10px;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* 状态胶囊：nowrap，绝不折行（修掉 width:3em 的变形） */
+.status {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  background: var(--paper);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.4;
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+.status_pending {
+  color: var(--ink-faint);
+}
+
+.status_in_progress {
+  color: var(--pen-signal-ink);
+  border-color: color-mix(in srgb, var(--pen-signal) 34%, var(--line-soft));
+  background: color-mix(in srgb, var(--pen-signal) 9%, var(--paper));
+}
+
+.status_completed {
+  color: var(--pen-model);
+  border-color: color-mix(in srgb, var(--pen-model) 30%, var(--line-soft));
+}
+
+/* 文本：默认墨色；状态由 item 全局动态类 todo-${status} 控制 */
+.text {
+  min-width: 0;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+  word-break: break-word;
+}
+
+.item:global(.todo-pending) .text {
+  color: var(--ink-mid);
+}
+
+.item:global(.todo-in_progress) .text {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.item:global(.todo-completed) .text {
+  color: var(--ink-faint);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--pen-model) 55%, transparent);
+}

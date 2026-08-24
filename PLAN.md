@@ -295,6 +295,19 @@ type TraceEntry = {
 - 后期可加 subagent 委派（把子任务交给子 agent 跑，汇总结果）。DSH 和 pi 的扩展系统都是这个方向。
 - 先做最简单版：session 内持久化一个 todo 数组 + 面板展示，跑通再谈多 agent。
 
+**实现前补记（2026-08-22，来源：走读 07 DSH todo + 走读 18 Reasonix TodoPanel）**
+
+**核心思想：todo 是会话事件，不是独立存储**（DSH 走读 07）——`SessionEntry` 加 `type: "todo"` 条目，与对话同生命周期、可回放、可审计。前端形态抄 Reasonix TodoPanel（走读 18）：进度徽章 + 当前任务 + 折叠。
+
+- **数据模型**（`lib/types.ts`）：`TodoItem = { content: string; status: "pending" | "in_progress" | "completed" }`；`SessionEntry` 加 `{ type: "todo", id, parentId, timestamp, todos: TodoItem[] }`。
+- **工具**（`lib/tools/todo.ts` 新文件）：`todo_write`，**整表替换语义**（工具描述写明"Send the ENTIRE list every call, it REPLACES the previous list"——幂等，模型不会漂移）；校验 content trim 非空 + 去重 + 最多一个 in_progress（教学版固定单 active，allowParallel 留扩展）；返回 `counts { pending, inProgress, completed }` + 完整 todos（给模型的即时反馈）；**不进 `TOOLS_NEEDING_CONFIRM`**（低危：只改会话内 todo 列表，不碰文件）。
+- **写会话机制**（仿 onToolOutput 旁路模式，引擎只透传）：`ToolExecutorOptions` 加 `onTodoWrite?: (todos) => void`；todo 工具 execute 调它；route.ts 注入 `(todos) => store.appendTodo(todos)`；`lib/agent.ts` executeToolCall 原样透传（与 onChunk 同模式，其他工具零改动）。
+- **Store**（`lib/sessionStore.ts`）：`appendTodo(todos)`（复用 appendEntry）+ `getLatestTodos()`（叶子回溯找最新 todo 条目）。
+- **API**（`app/api/chat/route.ts`）：POST 新增 SSE 帧 `{ type: "tool_todo", todos }`（run 中实时更新面板），done 帧带 `todos`（权威值）；GET 返回 `todos`（挂载/刷新恢复）。
+- **前端**（`app/components/task-panel/` 新组件）：进度徽章 `done/total` + 当前任务（in_progress）+ 状态标签 + 折叠（默认折叠）；数据源 = GET todos（初始）+ tool_todo 帧（run 中）+ done 帧（最终）；**只读展示**（todo 唯一写者是模型，与 DSH/Reasonix 一致——"可勾选"改为"可查看进度"，勾选交互暂缓）。
+- **系统提示词**：加 todo_write 工具说明（复杂任务先列任务清单，任务完成/进度更新时调用）。
+- **验收标准**（改自第十三节 A1）：模型在复杂任务时产出 todo_write 调用 → 会话落盘 → 前端面板显示进度 → 刷新/切换会话不丢。
+
 ### Phase 6：对话面板打磨 + 架构加固
 - UI 打磨（消息渲染、工具调用卡片、事件时间线、终端面板、task 面板整合成统一布局）。
 - 补测试（`loop`、`sessionStore`、`tools` 的单元测试，教学版已有 `*.test.ts` 可参考）。

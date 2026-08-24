@@ -109,11 +109,21 @@ export type AgentEvent =
     }
   | { type: "compaction"; summary: string; tokensBefore: number; firstKeptEntryId: string };
 
+// --- 任务（Phase 5 task 面板） ---
+// todo 是会话事件不是独立存储（DSH 走读 07）：模型通过 todo_write 工具
+// 整表替换维护，前端只读展示。三态对应 DSH/Reasonix 的 TodoItem。
+
+export type TodoItem = {
+  content: string;
+  status: "pending" | "in_progress" | "completed";
+};
+
 // --- 会话存储条目（JSONL 会话文件的一行） ---
 // 会话树：id 唯一，parentId 指向前一条（叶子 leafId = 当前最新）。
 // 为什么有 parentId：Phase 2 要做分支切换（一条对话可以岔出多条线），
 // 没有它就只能线性追加，无法回溯到任意历史节点重新分支。
 // compaction 条目记录「旧消息摘要」：上下文超窗口时用它替代被压缩的旧消息。
+// todo 条目记录「任务清单快照」：模型每次整表替换，叶子回溯取最新一条。
 export type SessionEntry =
   | {
       type: "session";
@@ -140,6 +150,13 @@ export type SessionEntry =
       summary: string;
       firstKeptEntryId: string;
       tokensBefore: number;
+    }
+  | {
+      type: "todo";
+      id: string;
+      parentId: string | null;
+      timestamp: string;
+      todos: TodoItem[];
     };
 
 // --- 会话统计（读数盘：会话级累计，由服务端从会话文件算出） ---

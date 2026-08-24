@@ -49,6 +49,7 @@ import { MessageRow } from "./components/message-row";
 import { TraceRail } from "./components/trace-rail";
 import { SessionList } from "./components/session-list";
 import { ApprovalDialog } from "./components/approval-dialog";
+import { TaskPanel } from "./components/task-panel";
 import { useAgentRun } from "./lib/use-agent-run";
 import { useSessions } from "./lib/use-sessions";
 import { foldEvents } from "./lib/trace-fold";
@@ -72,6 +73,7 @@ export default function Home() {
   //               切换会话/run 结束时更新，读数盘直接展示
   //   pendingApproval  挂起的工具确认（写/改/删弹框用）；approve(allow) 回传决定
   //   toolOutputs  bash 命令的实时输出（toolCallId → 文本）；stop(runId) 停止当前 run
+  //   todos        任务清单（Phase 5）：模型 todo_write 更新，前端只读展示
   const {
     messages,
     observed,
@@ -85,6 +87,7 @@ export default function Home() {
     pendingApproval,
     approve,
     toolOutputs,
+    todos,
     stop,
   } = useAgentRun(currentId);
 
@@ -183,6 +186,12 @@ export default function Home() {
                 ))
               )}
             </div>
+          </div>
+
+          {/* 任务面板（Phase 5）：钉在输入台上方，与输入框同列宽（830 居中）。
+              只读展示（todo 唯一写者是模型）；头部常驻显示进度，展开看明细 */}
+          <div className={styles.todoBar}>
+            <TaskPanel todos={todos} />
           </div>
 
           {/* 输入控制台：提交走 submit()；错误横幅显示在输入框上方 */}

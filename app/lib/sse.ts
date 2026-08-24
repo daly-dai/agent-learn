@@ -11,6 +11,7 @@ import type {
   AgentEvent,
   AgentMessage,
   SessionStats,
+  TodoItem,
   ToolDefinition,
 } from "@/lib/types";
 
@@ -25,6 +26,8 @@ export type StreamFrame =
       runId: string;
       // 会话级累计统计（读数盘）：服务端从会话文件算出
       stats: SessionStats;
+      // 任务清单（Phase 5）：权威恢复值
+      todos: TodoItem[];
     }
   | { type: "error"; message: string }
   // 写/改/删工具需要人工确认：前端弹框，用户决定后回传 /api/chat/approve
@@ -35,7 +38,9 @@ export type StreamFrame =
       args: Record<string, unknown>;
     }
   // bash 命令的流式输出（旁路帧）：按 toolCallId 累积显示，像真终端
-  | { type: "tool_output"; toolCallId: string; text: string };
+  | { type: "tool_output"; toolCallId: string; text: string }
+  // todo_write 更新任务清单（旁路帧，Phase 5）：前端面板实时更新
+  | { type: "tool_todo"; todos: TodoItem[] };
 
 /** 事件 + 前端观测到它的时刻（协议不动，时间戳加在这一层） */
 export type ObservedEvent = { seq: number; at: number; event: AgentEvent };

@@ -22,11 +22,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { appendFile, rm } from "node:fs/promises";
 import { dirname } from "node:path";
-import type { AgentMessage, SessionEntry, SessionStats } from "./types";
+import type { AgentMessage, SessionEntry, SessionStats, TodoItem } from "./types";
 import { isTextContent, text } from "./message";
 
 type MessageEntry = Extract<SessionEntry, { type: "message" }>;
 type CompactionEntry = Extract<SessionEntry, { type: "compaction" }>;
+type TodoEntry = Extract<SessionEntry, { type: "todo" }>;
 
 export class JsonlSessionStore {
   // 内存态：entries 全量 + byId 索引 + leafId 叶子 + counter 自增 id 计数器。
@@ -114,6 +115,32 @@ export class JsonlSessionStore {
     await this.appendEntry(entry);
     this.leafId = id;
     return id;
+  }
+
+  /** 追加一条任务清单条目（Phase 5）：todo 是会话事件不是独立存储（DSH 走读 07）。
+   *  与对话同生命周期、可回放；parentId 指向当前叶子，新条目成为叶子。 */
+  async appendTodo(todos: TodoItem[]): Promise<string> {
+    const id = this.nextId();
+    const entry: TodoEntry = {
+      type: "todo",
+      id,
+      parentId: this.leafId,
+      timestamp: new Date().toISOString(),
+      todos,
+    };
+    await this.appendEntry(entry);
+    this.leafId = id;
+    return id;
+  }
+
+  /** 从叶子回溯找最新一条 todo 条目（没有则 undefined）——前端面板恢复用 */
+  getLatestTodos(): TodoItem[] | undefined {
+    const path = this.pathToLeaf();
+    for (let i = path.length - 1; i >= 0; i -= 1) {
+      const entry = path[i];
+      if (entry.type === "todo") return entry.todos;
+    }
+    return undefined;
   }
 
   /**

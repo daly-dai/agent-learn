@@ -23,6 +23,7 @@ import type {
   AgentEvent,
   AgentMessage,
   SessionStats,
+  TodoItem,
   ToolCallContent,
   ToolDefinition,
 } from "@/lib/types";
@@ -65,6 +66,7 @@ const systemPrompt = [
   "- grep（按正则搜内容）、find（按文件名找文件）",
   "- write_note（写工作区笔记）",
   "- bash（执行 shell 命令；命令在 Windows 环境运行，避免 ls 等 Unix 专属命令；执行前会弹框确认）",
+  "- todo_write（记录并更新任务清单：复杂任务开始前先列出任务，任务状态变化时更新整表；无需确认，因为它只改会话内的任务列表，不碰文件）",
   "- 只有用户明确要求「列出 / 读取 / 写入 / 修改 / 删除 / 搜索 / 执行命令」时才调用工具；概念原理类问题直接回答，不要硬套工具。",
   "- 一次只调用当前步骤真正需要的工具；拿到工具结果后必须基于真实结果回答，绝不编造文件内容。",
   "- 工具失败或读不到内容时，如实说明，不要假装成功。",
@@ -89,6 +91,8 @@ type StreamFrame =
       runId: string;
       // 会话级累计统计（读数盘）：done 时点由 store 从会话文件算出
       stats: SessionStats;
+      // 任务清单（Phase 5）：叶子回溯取最新 todo 条目，前端面板权威恢复值
+      todos: TodoItem[];
     }
   | { type: "error"; message: string }
   // 写/改/删工具需要人工确认：推给前端弹框，用户决定后回传 /api/chat/approve
@@ -99,7 +103,9 @@ type StreamFrame =
       args: Record<string, unknown>;
     }
   // bash 命令的流式输出（旁路帧，不是 AgentEvent）：工具 → 这里 → SSE → 前端
-  | { type: "tool_output"; toolCallId: string; text: string };
+  | { type: "tool_output"; toolCallId: string; text: string }
+  // todo_write 更新任务清单（旁路帧，Phase 5）：工具 → 落盘会话 → 这里 → 前端面板
+  | { type: "tool_todo"; todos: TodoItem[] };
 
 // --- POST /api/chat ---
 export async function POST(req: NextRequest) {
@@ -219,6 +225,12 @@ export async function POST(req: NextRequest) {
           onToolOutput: (toolCallId, text) => {
             send({ type: "tool_output", toolCallId, text });
           },
+          // todo_write 旁路（Phase 5）：先落盘会话（todo 是会话事件），
+          // 再推 SSE 帧让前端面板实时更新。await 保证工具结果返回时已入库。
+          onTodoWrite: async (todos) => {
+            await store.appendTodo(todos);
+            send({ type: "tool_todo", todos });
+          },
           onEvent: (event) => {
             recorder.record(event);
             send({ type: "event", event });
@@ -242,6 +254,7 @@ export async function POST(req: NextRequest) {
           tools: toolRegistry.definitions(),
           runId: recorder.runId,
           stats: store.stats(),
+          todos: store.getLatestTodos() ?? [],
         });
       } catch (e) {
         send({ type: "error", message: (e as Error).message });
@@ -283,6 +296,7 @@ export async function GET(req: NextRequest) {
     leafId: store.getLeafId(),
     messages: store.buildContext(),
     stats: store.stats(),
+    todos: store.getLatestTodos() ?? [],
   });
 }
 
