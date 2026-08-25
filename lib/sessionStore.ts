@@ -23,7 +23,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { appendFile, rm } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { AgentMessage, SessionEntry, SessionStats, TodoItem } from "./types";
-import { isTextContent, text } from "./message";
+import { createCompactionSummaryMessage, isTextContent, text } from "./message";
 
 type MessageEntry = Extract<SessionEntry, { type: "message" }>;
 type CompactionEntry = Extract<SessionEntry, { type: "compaction" }>;
@@ -166,8 +166,24 @@ export class JsonlSessionStore {
       return undefined;
     }
 
-    const kept = messageEntries.slice(-keepRecentMessages);
-    const summarized = messageEntries.slice(0, -keepRecentMessages);
+    // 保留区：从尾部取最近 keepRecentMessages 条消息。
+    // 关键约束（2026-08-25 修）：保留区第一条【不能是 toolResult】。
+    // 原因：ReAct 里 assistant(toolCall) 先出现、toolResult 后出现；若切点落在
+    // toolResult 上，它配对的 assistant toolCall 被压进摘要，重建上下文时产生
+    // "孤儿 tool"（role:"tool" 前面没有带 tool_calls 的 assistant），
+    // 真实模型 API（DeepSeek）会 400：Messages with role 'tool' must be a
+    // response to a preceding message with 'tool_calls'。
+    // 修法：切点落在 toolResult 上时往前多保留一条，直到第一条不是 toolResult。
+    let keepFrom = messageEntries.length - keepRecentMessages;
+    while (
+      keepFrom > 0 &&
+      messageEntries[keepFrom].message.role === "toolResult"
+    ) {
+      keepFrom -= 1;
+    }
+
+    const kept = messageEntries.slice(keepFrom);
+    const summarized = messageEntries.slice(0, keepFrom);
     const summary = summarizeEntries(summarized);
     const firstKeptEntryId = kept[0]?.id;
 
@@ -192,11 +208,13 @@ export class JsonlSessionStore {
 
   /**
    * 重建发给模型的上下文：从叶子回溯到根，把路径上的消息转成 AgentMessage[]。
-   * 若有压缩条目：用一条合成的 user 消息（内含摘要文本）替代被压缩的旧消息，
+   * 若有压缩条目：用一条 compactionSummary 消息（B2 新增类型）替代被压缩的旧消息，
    * 再拼接 firstKeptEntryId 之后和压缩条目之后的消息。
    *
-   * 为什么摘要用 role:"user"：它本质是给模型的指令（"旧内容已摘要，参考它"），
-   * 不是真实用户消息；教学版选 user 是务实之举——模型对 user 指令的遵循最稳。
+   * 为什么不用 role:"user"（2026-08-25 改）：摘要既给模型（指令参考）又给前端
+   * （展示）。伪装 user 会让前端把它当用户气泡渲染——多轮后页面出现一大坨
+   * "user:/assistant:/toolResult:" 前缀文本。独立类型 compactionSummary 让
+   * 模型侧（deepseekModel 转换时伪装 user）和前端侧（渲染成折叠卡片）各取所需。
    */
   buildContext(): AgentMessage[] {
     const path = this.pathToLeaf();
@@ -212,16 +230,13 @@ export class JsonlSessionStore {
 
     const compaction = path[latestCompactionIndex] as CompactionEntry;
 
+    // 摘要消息：独立类型（不是 user）——前端能认出它是"压缩卡片"
     const messages: AgentMessage[] = [
-      {
-        role: "user",
-        content: [
-          text(
-            `以下是旧上下文摘要。后续回答必须参考它，但最近消息优先级更高。\n\n${compaction.summary}`,
-          ),
-        ],
-        timestamp: new Date(compaction.timestamp).getTime(),
-      },
+      createCompactionSummaryMessage(
+        compaction.summary,
+        compaction.tokensBefore,
+        new Date(compaction.timestamp).getTime(),
+      ),
     ];
 
     // 摘要之后、压缩点之前：只保留 firstKeptEntryId 起的那部分（它们未被压缩）
@@ -364,6 +379,10 @@ function estimateTokens(messages: AgentMessage[]): number {
 }
 
 function extractText(message: AgentMessage): string {
+  // compactionSummary 没有 content 数组，它的"文本"就是 summary
+  if (message.role === "compactionSummary") {
+    return message.summary;
+  }
   const parts: string[] = [];
   for (const block of message.content) {
     if (isTextContent(block)) {
