@@ -18,7 +18,7 @@
 // ============================================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import type {
   AgentEvent,
   AgentMessage,
@@ -40,21 +40,17 @@ import { isValidSessionId } from "@/lib/sessionManager";
 import { toolApprovals } from "@/lib/toolApproval";
 import { userAnswers, makeAskKey, clearRun } from "@/lib/userAnswers";
 import { runControllers } from "@/lib/runControl";
+import { config, shouldCompact, compactKeepRecent } from "@/lib/config";
 
 // 显式声明 Node runtime：本路由（以及它的工具）会用 node:fs / node:path，
 // 后面 Phase 4 还要用 node:child_process 跑终端。
 export const runtime = "nodejs";
 
-// 工作区根目录
-const workspaceRoot = resolve(process.cwd(), "workspace");
-// 轨迹（Trace）目录
-const traceDir = resolve(process.cwd(), ".traces");
-// 会话（Session）目录：多轮对话的 JSONL 落盘位置，与 .traces/ 平级。
-// 为什么不在 workspace/sessions：workspace 是 agent 的工作区（工具可读写），
-// 会话数据是运行时状态，不该被 agent 工具碰到。
-const sessionDir = resolve(process.cwd(), ".sessions");
-// 工具注册表
-const toolRegistry = createToolRegistry(workspaceRoot);
+// 路径与行为配置：全部来自 lib/config.ts（唯一入口，环境变量可覆盖）。
+// 工作区根目录 / 轨迹目录 / 会话目录 / 压缩阈值 / 审批超时都收编在这里。
+const { workspace: workspaceRoot, traces: traceDir, sessions: sessionDir } = config.paths;
+// 工具注册表【不在这里建单例】（贴 pi create-harness）：
+// 它在每次 POST 请求内组装，业务 hooks 闭包捕获当次的 store/send。
 
 const systemPrompt = [
   "你是 Teaching Agent，一个帮助初学者理解 AI Agent 核心机制的教学助手。",
@@ -73,7 +69,7 @@ const systemPrompt = [
   "- 只有用户明确要求「列出 / 读取 / 写入 / 修改 / 删除 / 搜索 / 执行命令」时才调用工具；概念原理类问题直接回答，不要硬套工具。",
   "- 一次只调用当前步骤真正需要的工具；拿到工具结果后必须基于真实结果回答，绝不编造文件内容。",
   "- 工具失败或读不到内容时，如实说明，不要假装成功。",
-  "- 写/改/删文件时，引擎会弹框请用户确认；被拒绝（或用户 60 秒未回应）时工具结果会报错，如实向用户说明，不要反复重试同一操作。",
+  "- 写/改/删文件时，引擎会弹框请用户确认；被拒绝时工具结果会报错，如实向用户说明，不要反复重试同一操作。",
   "",
   "## 输出要求",
   "- 始终用中文回答。",
@@ -224,6 +220,21 @@ export async function POST(req: NextRequest) {
         await store.appendMessage(userMessage);
         const context = store.buildContext();
 
+        // 1c) 每请求组装工具注册表（贴 pi create-harness：每次会话组装）。
+        //     业务 hooks 闭包捕获「这次请求」的 store/send——工具不用引擎透传。
+        //     signal/onChunk 仍是运行时参（引擎执行时注入），这里只烙业务。
+        const toolRegistry = createToolRegistry(workspaceRoot, {
+          // todo_write：先落盘会话（todo 是会话事件），再推 SSE 帧让前端面板实时更新。
+          // await 保证工具结果返回时已入库。
+          onTodoWrite: async (todos) => {
+            await store.appendTodo(todos);
+            send({ type: "tool_todo", todos });
+          },
+          // ask_user_question（A4）：推提问帧 → 挂起等用户逐题回答（不超时，用户可跳过，
+          // 返回未回答，run 不挂死）→ 回答回传工具结果给模型继续。
+          onAskUser: (questions) => askUserAnswer(questions, recorder.runId, send),
+        });
+
         // 2) 运行 Agent Loop。onEvent 同时做两件事：
         //    - recorder.record(event)  → 落盘成轨迹（黑匣子）
         //    - send({type:"event"})    → 推给浏览器（实时仪表盘）
@@ -241,15 +252,6 @@ export async function POST(req: NextRequest) {
           onToolOutput: (toolCallId, text) => {
             send({ type: "tool_output", toolCallId, text });
           },
-          // todo_write 旁路（Phase 5）：先落盘会话（todo 是会话事件），
-          // 再推 SSE 帧让前端面板实时更新。await 保证工具结果返回时已入库。
-          onTodoWrite: async (todos) => {
-            await store.appendTodo(todos);
-            send({ type: "tool_todo", todos });
-          },
-          // ask_user_question 旁路（A4）：推提问帧 → 挂起等用户逐题回答（不超时，用户可跳过）
-          // 返回未回答，run 不挂死）→ 回答回传工具结果给模型继续。
-          onAskUser: (questions) => askUserAnswer(questions, recorder.runId, send),
           onEvent: (event) => {
             recorder.record(event);
             send({ type: "event", event });
@@ -260,8 +262,13 @@ export async function POST(req: NextRequest) {
         for (const message of result.newMessages) {
           await store.appendMessage(message);
         }
-        // 2c) 上下文超窗口时压缩旧消息为摘要，防止上下文无限膨胀
-        await store.compactIfNeeded(4000, 8);
+        // 2c) 上下文超窗口时压缩旧消息为摘要，防止上下文无限膨胀。
+        //     阈值按 provider 的上下文窗口算（config.provider.contextWindow
+        //     - reserveTokens），DeepSeek V4 是 1M 窗口，几十上百轮才触发。
+        await store.compactIfNeeded(
+          config.provider.contextWindow - config.provider.reserveTokens,
+          compactKeepRecent(),
+        );
 
         // 3) 全部结束后，推送最终权威结果。
         //    messages 带「全量会话历史」（buildContext 从叶子回溯），
@@ -370,16 +377,18 @@ function askUserAnswer(
 
 // --- POST /api/chat/ask-user ---（独立路由文件 app/api/chat/ask-user/route.ts）
 
-// --- 模型选择（环境变量 → 具体实现）---
+// --- 模型选择（config.provider → 具体实现）---
 // 这个函数是"适配层"的入口：上层 runAgentLoop 只依赖 TeachingModel 接口，
 // 用哪个实现，在这里决定，引擎完全无感。
+// provider 可扩展：config.provider 指向当前厂商（默认 deepseek），
+// 换厂商 = 换 AI_PROVIDER + 在下面加分支（见 lib/config.ts PROVIDERS）。
 
 function selectModel(): { model: TeachingModel; label: string } {
-  if (process.env.MOCK_MODE === "true") {
+  if (config.modelSecrets.mockMode) {
     return { model: new MockModel(), label: "mock" };
   }
 
-  const apiKey = process.env.DEEPSEEK_API_KEY;
+  const apiKey = config.modelSecrets.apiKey;
 
   if (!apiKey || apiKey === "sk-your-key-here") {
     throw new Error(
@@ -389,11 +398,11 @@ function selectModel(): { model: TeachingModel; label: string } {
 
   const model = new DeepSeekModel({
     apiKey,
-    baseUrl: process.env.DEEPSEEK_BASE_URL || undefined,
-    model: process.env.DEEPSEEK_MODEL || undefined,
+    baseUrl: config.provider.baseUrl,
+    model: config.provider.model,
   });
 
-  return { model, label: process.env.DEEPSEEK_MODEL || "deepseek-v4-flash" };
+  return { model, label: config.provider.label };
 }
 
 // --- 工具审批：硬性策略 + 人工确认 ---
@@ -402,7 +411,7 @@ function selectModel(): { model: TeachingModel; label: string } {
 //   1. 硬性安全策略：secret/秘密 文件名直接拦，不弹框（这类永远不该发生）
 //   2. 人工确认：写/改/删工具推确认帧给前端弹框，用户当场允许/拒绝
 // 只读工具（list/read/grep/find）默认放行。
-// 超时兜底：用户 60 秒不回应自动拒绝（block），避免挂起。
+// 超时兜底：用户 5 小时不回应自动拒绝（block），避免挂起（前端不展示时间）。
 
 /** 需要人工确认的工具：全部写/改/删操作 + bash（已确认：全量弹框） */
 const TOOLS_NEEDING_CONFIRM = [
@@ -413,7 +422,9 @@ const TOOLS_NEEDING_CONFIRM = [
   "bash",
 ] as const;
 
-const APPROVAL_TIMEOUT_MS = 60_000;
+// 人工确认超时：默认 5 小时（用户要长时间思考/离开也不该被打断；是"兜底防挂死"，
+// 不是"催促"——前端已不展示任何时间提示）。可用 APPROVAL_TIMEOUT_MS 环境变量覆盖。
+const APPROVAL_TIMEOUT_MS = config.approval.timeoutMs;
 
 async function handleToolApproval(
   call: ToolCallContent,
@@ -471,7 +482,7 @@ function askUserApproval(
       args: call.arguments,
     });
 
-    // 超时兜底：60 秒不回应自动拒绝（block），run 不会被挂死
+    // 超时兜底：5 小时不回应自动拒绝（block），run 不会被挂死（前端不展示时间）
     const timer = setTimeout(() => {
       toolApprovals.delete(call.id);
       resolve(false);

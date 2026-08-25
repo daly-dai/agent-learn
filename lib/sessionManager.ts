@@ -151,6 +151,10 @@ async function summarizeSessionFile(
 }
 
 function messageText(message: AgentMessage): string {
+  // compactionSummary 没有 content 数组（它只有 summary 文本）——单独处理
+  if (message.role === "compactionSummary") {
+    return `（旧上下文压缩摘要）${message.summary}`;
+  }
   // 注意：不要用 filter(isTextContent) —— message.content 在 AgentMessage
   // 联合类型下是「两种数组的联合」，类型守卫在联合数组上收窄不稳。
   // flatMap + 内联窄化（block.type === "text"）对两种数组都成立。

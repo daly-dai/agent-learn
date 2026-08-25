@@ -34,9 +34,12 @@ import type {
 } from "./types";
 import type { CompleteInput, TeachingModel } from "./model";
 import { messageText, text } from "./message";
+import { config } from "./config";
 
-const DEFAULT_BASE_URL = "https://api.deepseek.com";
-const DEFAULT_MODEL = "deepseek-v4-flash"; // V4 系列（flash / pro），具体 model id 以官方文档为准，正式使用请用 DEEPSEEK_MODEL 显式指定
+// 模型/地址/调试开关全部来自 lib/config.ts（唯一配置入口）：
+// DEFAULT 只是"config 兜底"，正式使用在 .env.local 用环境变量覆盖
+const DEFAULT_BASE_URL = config.provider.baseUrl;
+const DEFAULT_MODEL = config.provider.model; // V4 系列（flash / pro），具体 model id 以官方文档为准
 
 // 错误 / 中止 / 流式消息没有真实 token 统计，统一用零值
 const EMPTY_USAGE: Usage = { input: 0, output: 0, totalTokens: 0 };
@@ -353,6 +356,17 @@ function toOpenAiMessages(
       continue;
     }
 
+    // compactionSummary → user 指令（B2，2026-08-25）
+    // 摘要消息在协议里是独立类型（前端能认出、渲染成卡片），但对模型
+    // 它本质是"旧内容已摘要，参考它"的指令——转成 user 消息，模型无感。
+    if (message.role === "compactionSummary") {
+      result.push({
+        role: "user",
+        content: `以下是旧上下文摘要。后续回答必须参考它，但最近消息优先级更高。\n\n${message.summary}`,
+      });
+      continue;
+    }
+
     if (message.role === "assistant") {
       const plainText = messageText(message);
 
@@ -542,7 +556,7 @@ function debugLog(
   messages: OpenAiMessage[],
   tools: OpenAiTool[] | undefined,
 ): void {
-  if (process.env.DEBUG_DEEPSEEK !== "true") return;
+  if (!config.agent.debugDeepSeek) return;
 
   console.log("\n[DeepSeek] ============ 请求 ============");
   console.log("[DeepSeek] url:", url);

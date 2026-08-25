@@ -17,16 +17,14 @@
 // ============================================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { resolve } from "node:path";
 import { SessionManager, isValidSessionId } from "@/lib/sessionManager";
+import { config } from "@/lib/config";
 
 export const runtime = "nodejs";
 
 // SessionManager 无内存态（方法直接打文件系统），模块级单例安全
-const manager = new SessionManager(
-  resolve(process.cwd(), ".sessions"),
-  resolve(process.cwd(), "workspace"),
-);
+// 路径来自 lib/config.ts（唯一配置入口，环境变量可覆盖）
+const manager = new SessionManager(config.paths.sessions, config.paths.workspace);
 
 // --- GET /api/sessions：会话列表 ---
 export async function GET() {
