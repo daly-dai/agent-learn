@@ -15,6 +15,8 @@
 // ============================================================
 
 import { spawn } from "node:child_process";
+import { createOutputDecoder } from "../../process-output";
+import { config } from "../../config";
 
 export type BashRunOptions = {
   /** 工作目录（锁 workspace） */
@@ -40,22 +42,22 @@ export type BashResult = {
   truncated: boolean;
 };
 
-const DEFAULT_TIMEOUT_MS = 30_000;
-const DEFAULT_MAX_OUTPUT_CHARS = 64 * 1024;
+// 默认值来自 lib/config.ts（唯一配置入口，环境变量可覆盖）
+const DEFAULT_TIMEOUT_MS = config.bash.timeoutMs;
+const DEFAULT_MAX_OUTPUT_CHARS = config.bash.maxOutputChars;
 // SIGTERM 发出后等 5 秒，还不退出就 SIGKILL 处决（防死循环命令装死）
 const FORCE_KILL_DELAY_MS = 5_000;
 
 export class BashRunner {
   async run(command: string, options: BashRunOptions): Promise<BashResult> {
     return new Promise((resolve) => {
-      // Windows 乱码修复：cmd 默认输出 GBK（代码页 936），Node 按 UTF-8
-      // 解码会乱码（实测 ping/dir 的中文全乱）。chcp 65001 把输出切到
-      // UTF-8，字节流和默认解码就对上了。`&` 无条件连接：chcp 失败
-      // 也不影响命令本身执行。
-      const effectiveCommand =
-        process.platform === "win32" ? `chcp 65001 >nul & ${command}` : command;
-
-      const proc = spawn(effectiveCommand, {
+      // 为什么不再拼 chcp 65001 前缀（2026-08-25 改）：chcp 只改 cmd 的
+      // "显示代码页"，对 dir 这类内建命令写入管道的字节并不可靠（实测
+      // 仍输出 GBK）。改为：不干预命令，在接收端用 createOutputDecoder
+      // 按平台解码（Windows → GBK，其余 → UTF-8）。对照 DSH：它用 pwsh
+      // 双 pin Console.OutputEncoding；我们用 cmd 没有等价物，接收端解码
+      // 是更贴合 cmd 生态的做法。
+      const proc = spawn(command, {
         cwd: options.cwd,
         shell: true, // 走系统 shell（Windows 上是 cmd.exe），命令原样执行
         stdio: ["ignore", "pipe", "pipe"],
@@ -79,11 +81,21 @@ export class BashRunner {
       };
 
       // ---- 清理：去 ANSI 色码、去 \r（Windows 换行残留）----
-      const sanitize = (raw: Buffer) =>
-        raw.toString().replace(/\x1b\[[0-9;]*m/g, "").replace(/\r/g, "");
+      // 输入已经是解码后的文本（decoder 负责字节 → 正确编码）
+      const sanitize = (text: string) =>
+        text.replace(/\x1b\[[0-9;]*m/g, "").replace(/\r/g, "");
 
-      proc.stdout?.on("data", (data) => push(sanitize(data)));
-      proc.stderr?.on("data", (data) => push(sanitize(data)));
+      // stdout / stderr 各一个 decoder：TextDecoder 有内部状态，
+      // 两个流共用会把一端的半个字符交给另一端补齐，照样乱码。
+      const stdoutDecoder = createOutputDecoder();
+      const stderrDecoder = createOutputDecoder();
+
+      proc.stdout?.on("data", (data: Buffer) =>
+        push(sanitize(stdoutDecoder.decode(data))),
+      );
+      proc.stderr?.on("data", (data: Buffer) =>
+        push(sanitize(stderrDecoder.decode(data))),
+      );
 
       // ---- 终止进程：Windows 杀进程树，Unix 两级（SIGTERM → 5 秒后 SIGKILL）----
       let killed = false;
@@ -114,6 +126,9 @@ export class BashRunner {
       proc.on("close", (code) => {
         clearTimeout(timer);
         options.signal?.removeEventListener("abort", killProcess);
+        // 流结束：吐出两个 decoder 里可能残留的半个字符
+        const tail = stdoutDecoder.flush() + stderrDecoder.flush();
+        if (tail.length > 0) push(sanitize(tail));
         resolve({
           output: chunks.join(""),
           exitCode: killed ? null : code,
