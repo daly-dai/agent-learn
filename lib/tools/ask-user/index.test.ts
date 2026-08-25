@@ -78,23 +78,20 @@ describe("parseOptions —— 单个问题的选项校验", () => {
 
 describe("ask_user_question.execute —— 请求-响应", () => {
   it("onAskUser 收到 questions 数组，回传 answers 后渲染清单", async () => {
-    const tool = createAskUserTool();
     let received: unknown;
-    const result = await tool.execute(
-      {
-        questions: [
-          { question: "颜色？", options: [{ label: "红" }, { label: "蓝" }] },
-          { question: "语言？" },
-        ],
+    const tool = createAskUserTool({
+      onAskUser: async (questions) => {
+        received = questions;
+        return ["红", "TypeScript"];
       },
-      {
-        onAskUser: async (questions) => {
-          received = questions;
-          return ["红", "TypeScript"];
-        },
-      },
-    );
-    // 工具确实把 questions 数组原样交给了使用端
+    });
+    const result = await tool.execute({
+      questions: [
+        { question: "颜色？", options: [{ label: "红" }, { label: "蓝" }] },
+        { question: "语言？" },
+      ],
+    });
+    // 工具确实把 questions 数组原样交给了使用端（闭包烙的 hooks）
     expect(received).toEqual([
       { question: "颜色？", options: [{ label: "红" }, { label: "蓝" }] },
       { question: "语言？" },
@@ -109,11 +106,8 @@ describe("ask_user_question.execute —— 请求-响应", () => {
   });
 
   it("全部跳过（空数组）返回引导文案", async () => {
-    const tool = createAskUserTool();
-    const result = await tool.execute(
-      { questions: [{ question: "有人吗？" }] },
-      { onAskUser: async () => [] },
-    );
+    const tool = createAskUserTool({ onAskUser: async () => [] });
+    const result = await tool.execute({ questions: [{ question: "有人吗？" }] });
     expect(result.details).toMatchObject({ skipped: true });
     if (result.content[0].type === "text") {
       expect(result.content[0].text).toBe(SKIPPED_TEXT);
@@ -121,17 +115,16 @@ describe("ask_user_question.execute —— 请求-响应", () => {
   });
 
   it("无 onAskUser 回调时降级为跳过（不挂死）", async () => {
-    const tool = createAskUserTool();
-    const result = await tool.execute({ questions: [{ question: "x" }] }, {});
+    const tool = createAskUserTool({});
+    const result = await tool.execute({ questions: [{ question: "x" }] });
     expect(result.details).toMatchObject({ skipped: true });
   });
 
-  it("python：非空回答（如模型给的自定义文本）原样呈现", async () => {
-    const tool = createAskUserTool();
-    const result = await tool.execute(
-      { questions: [{ question: "自定义答案？" }] },
-      { onAskUser: async () => ["我选自定义：绿色"] },
-    );
+  it("非空回答（如模型给的自定义文本）原样呈现", async () => {
+    const tool = createAskUserTool({ onAskUser: async () => ["我选自定义：绿色"] });
+    const result = await tool.execute({
+      questions: [{ question: "自定义答案？" }],
+    });
     const details = result.details as { answers: string[] };
     expect(details.answers).toEqual(["我选自定义：绿色"]);
     if (result.content[0].type === "text") {

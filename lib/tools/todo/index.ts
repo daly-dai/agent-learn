@@ -8,11 +8,11 @@
 // 的 diff"，容易漂移；整表替换时模型只需写出"现在该有什么"。
 //
 // 低危工具：只改会话内的 todo 列表，不碰文件，所以不进 TOOLS_NEEDING_CONFIRM。
-// 写会话走旁路回调（onTodoWrite）：工具不碰 store，把列表交回使用端落盘——
-// 和 bash 的 onChunk 同一个模式，引擎只透传。
+// 写会话走「工厂参数 + 闭包烙」（贴 pi）：hooks 由 route.ts 组装时传入并烙进
+// execute 身体，工具不碰 store、不经过引擎——和 bash 的 onChunk 同模式。
 // ============================================================
 
-import type { RegisteredTool } from "../types";
+import type { RegisteredTool, ToolHooks } from "../types";
 import type { TodoItem } from "../../types";
 import { text } from "../../message";
 
@@ -22,7 +22,7 @@ export type TodoCounts = {
   completed: number;
 };
 
-export function createTodoTool(): RegisteredTool {
+export function createTodoTool(hooks: ToolHooks): RegisteredTool {
   return {
     name: "todo_write",
     description:
@@ -52,12 +52,13 @@ export function createTodoTool(): RegisteredTool {
       },
       required: ["todos"],
     },
-    async execute(args, options) {
+    async execute(args) {
       const todos = validateTodos(args.todos);
 
-      // 旁路回调：整表交回使用端（route.ts 落盘会话 + 推 SSE 帧）。
+      // 闭包烙进来的 hooks（业务回调，route.ts 组装时注入）：
+      // 整表交回使用端落盘会话 + 推 SSE 帧。
       // await 保证工具结果返回时 todo 已入库（落盘顺序确定）。
-      await options?.onTodoWrite?.(todos);
+      await hooks.onTodoWrite?.(todos);
 
       const counts = countTodos(todos);
       return {

@@ -5,16 +5,16 @@
 // 自定义、逐题作答、进度显示、跳题/返回。codex request_user_input、
 // smolagents user_input 佐证：结构化多问题提问是成熟 agent 标配。
 //
-// 核心机制：旁路回调「请求-响应」——execute 里 `await options.onAskUser(questions)`，
+// 核心机制：旁路回调「请求-响应」——execute 里 `await hooks.onAskUser(questions)`，
 // 把「问题数组」一次交回使用端（route.ts 推 SSE 帧带全部 questions → 前端
-// AskCard 逐题作答 → 一次 POST 回传 answers[] → resolve）。与 onTodoWrite 同模式
-// （工具不碰前端/route，引擎只透传），但它是「要等答案」的请求-响应。
+// AskCard 逐题作答 → 一次 POST 回传 answers[] → resolve）。hooks 走「工厂参数 +
+// 闭包烙」（贴 pi），工具不碰前端/route，引擎无感。它是「要等答案」的请求-响应。
 //
 // 回传 answers[]：每题一个字符串——点选的 option.label / 自定义文本 / 跳过（空串）。
 // 超时在使用端兜底（60s 无回答返回超时文案）。
 // ============================================================
 
-import type { RegisteredTool } from "../types";
+import type { RegisteredTool, ToolHooks } from "../types";
 import { text } from "../../message";
 
 /** 单个可选项（模型给 A/B/C 选项让用户点选） */
@@ -39,7 +39,7 @@ export const QUESTIONS_MAX = 4;
 export const SKIPPED_TEXT =
   "用户跳过了这个问题，无需回答。请基于已有信息继续你手头的任务，不要反复问同一问题。";
 
-export function createAskUserTool(): RegisteredTool {
+export function createAskUserTool(hooks: ToolHooks): RegisteredTool {
   return {
     name: "ask_user_question",
     description:
@@ -83,11 +83,12 @@ export function createAskUserTool(): RegisteredTool {
       },
       required: ["questions"],
     },
-    async execute(args, options) {
+    async execute(args) {
       const questions = parseQuestions(args.questions);
 
-      // 请求-响应：把问题数组交回使用端（route.ts 推帧→前端逐题作答→回传 answers[]）
-      const answers = (await options?.onAskUser?.(questions)) ?? [];
+      // 请求-响应：闭包烙进来的 hooks——把问题数组交回使用端
+      // （route.ts 推帧 → 前端逐题作答 → 回传 answers[]）
+      const answers = (await hooks.onAskUser?.(questions)) ?? [];
 
       if (answers.length === 0) {
         // 无任何回答（全部跳过 / 无回调降级）

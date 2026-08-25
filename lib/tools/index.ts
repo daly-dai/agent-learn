@@ -10,7 +10,7 @@
 // ============================================================
 
 import type { ToolDefinition, ToolResult } from "../types";
-import type { RegisteredTool, ToolExecutorOptions } from "./types";
+import type { RegisteredTool, ToolExecutorOptions, ToolHooks } from "./types";
 import { createListTool } from "./list";
 import { createReadTool } from "./read";
 import { createWriteNoteTool } from "./write-note";
@@ -53,8 +53,16 @@ export class ToolRegistry {
   }
 }
 
-/** 创建预装文件系统工具的 ToolRegistry（每个工具闭包捕获 workspaceRoot） */
-export function createToolRegistry(workspaceRoot: string): ToolRegistry {
+/**
+ * 创建预装文件系统工具的 ToolRegistry（每请求组装，贴 pi create-harness）。
+ * - 文件工具 + bash：闭包捕获 workspaceRoot，不需要 hooks，工厂签名不变。
+ * - todo/ask-user：接收 hooks（业务回调）并闭包烙进 execute——引擎无感。
+ * hooks 由使用端（route.ts）每次请求组装时传入，捕获当次的 store/send。
+ */
+export function createToolRegistry(
+  workspaceRoot: string,
+  hooks: ToolHooks,
+): ToolRegistry {
   const registry = new ToolRegistry();
 
   for (const tool of [
@@ -67,12 +75,14 @@ export function createToolRegistry(workspaceRoot: string): ToolRegistry {
     createGrepTool(workspaceRoot),
     createFindTool(workspaceRoot),
     createBashTool(workspaceRoot),
-    // todo_write / ask_user_question 不绑定工作区（改会话内状态/提问），工厂不需要参数
-    createTodoTool(),
-    createAskUserTool(),
   ]) {
     registry.register(tool);
   }
+
+  // todo_write / ask_user_question 不绑定工作区（改会话内状态/提问），
+  // 但需要业务 hooks——工厂参数接收并闭包烙（贴 pi：context 烙进工具）
+  registry.register(createTodoTool(hooks));
+  registry.register(createAskUserTool(hooks));
 
   return registry;
 }

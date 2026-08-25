@@ -5,11 +5,9 @@ import type {
   ToolCallContent,
   ToolDefinition,
   ToolResultMessage,
-  TodoItem,
 } from "./types";
 import type { TeachingModel } from "./model";
 import type { ToolRegistry } from "./tools";
-import type { AskQuestion } from "./tools/ask-user";
 import { createAssistantMessage, text } from "./message";
 
 // ------------------------------------------------------------
@@ -47,12 +45,9 @@ type RunAgentLoopOptions = {
   // 工具执行中逐块输出（bash 的 stdout/stderr 流）。引擎不理解它，
   // 只原样透传给工具的 execute options.onChunk——这是"旁路"，不进事件流。
   onToolOutput?: (toolCallId: string, text: string) => void;
-  // todo_write 旁路：把整表任务清单交回使用端（route.ts 落盘会话 + 推 SSE 帧）。
-  // 与 onToolOutput 同模式：引擎只透传给工具的 options.onTodoWrite，不理解内容。
-  onTodoWrite?: (todos: TodoItem[]) => Promise<void> | void;
-  // ask_user_question 旁路（请求-响应）：把问题列表交回使用端，等用户逐题回答（A4）。
-  // 与 onTodoWrite 同模式：引擎只透传，不理解内容；使用端负责推帧/弹卡片/回传。
-  onAskUser?: (questions: AskQuestion[]) => Promise<string[]> | string[];
+  // 注意：引擎不再有 onTodoWrite / onAskUser（业务字段）。
+  // 业务 hooks 走「工厂参数 + 闭包烙」——route.ts 组装工具时直接烙进
+  // todo/ask-user 的 execute 身体，引擎从头到尾不接触业务（贴 pi）。
 };
 
 function emitMessageLifecycle(
@@ -104,8 +99,6 @@ async function executeToolCall(
   toolOptions?: {
     signal?: AbortSignal;
     onChunk?: (text: string) => void;
-    onTodoWrite?: (todos: TodoItem[]) => Promise<void> | void;
-    onAskUser?: (questions: AskQuestion[]) => Promise<string[]> | string[];
   },
 ): Promise<ToolResultMessage> {
   try {
@@ -307,17 +300,14 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<{
       });
 
       // 真正执行工具。toolOptions：signal（取消）+ onChunk（bash 流式
-      // 输出 → 引擎不懂它，只是把它转给使用端的 onToolOutput）+
-      // onTodoWrite（todo 整表 → 转给使用端落盘会话）+
-      // onAskUser（提问 → 转给使用端弹卡片等用户回答）
+      // 输出 → 引擎不懂它，只是把它转给使用端的 onToolOutput）。
+      // 业务 hooks 不在这里——它们已由 route.ts 组装时闭包烙进工具的 execute。
       const toolResult = await executeToolCall(
         executableToolCall,
         options.toolRegistry,
         {
           signal: options.signal,
           onChunk: (text) => options.onToolOutput?.(toolCall.id, text),
-          onTodoWrite: options.onTodoWrite,
-          onAskUser: options.onAskUser,
         },
       );
 

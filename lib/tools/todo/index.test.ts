@@ -75,17 +75,14 @@ describe("validateTodos —— 整表校验", () => {
 
 describe("todo_write.execute —— 统计反馈（counts）", () => {
   it("返回三类计数与完整清单", async () => {
-    const tool = createTodoTool();
-    const result = await tool.execute(
-      {
-        todos: [
-          { content: "a", status: "pending" },
-          { content: "b", status: "in_progress" },
-          { content: "c", status: "completed" },
-        ],
-      },
-      {}, // options 可为空：onTodoWrite 是可选的旁路回调
-    );
+    const tool = createTodoTool({}); // hooks 可为空：onTodoWrite 是可选的旁路回调
+    const result = await tool.execute({
+      todos: [
+        { content: "a", status: "pending" },
+        { content: "b", status: "in_progress" },
+        { content: "c", status: "completed" },
+      ],
+    });
     expect(result.details).toMatchObject({
       counts: { pending: 1, inProgress: 1, completed: 1 },
     });
@@ -94,9 +91,7 @@ describe("todo_write.execute —— 统计反馈（counts）", () => {
   });
 
   it("校验失败时 execute 抛错（fail loud）", async () => {
-    const tool = createTodoTool();
-    await expect(tool.execute({ todos: "bad" }, {})).rejects.toThrow(
-      /必须是数组/,
-    );
+    const tool = createTodoTool({});
+    await expect(tool.execute({ todos: "bad" })).rejects.toThrow(/必须是数组/);
   });
 });
