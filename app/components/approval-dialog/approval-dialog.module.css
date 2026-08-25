@@ -53,13 +53,6 @@
   word-break: break-all;
 }
 
-.approvalNote {
-  margin-top: 10px;
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  color: var(--ink-faint);
-}
-
 .approvalActions {
   display: flex;
   justify-content: flex-end;
