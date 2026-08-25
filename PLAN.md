@@ -633,3 +633,57 @@ type TraceEntry = {
 **决策点（已定稿）**：① hooks 用工厂闭包（贴 pi `createCodingAgentHarnessTool`）② `onToolOutput` 留在引擎（= pi execute 第 4 参 onUpdate）③ `beforeToolCall` 审批钩子保留（pi 同款）。
 
 **验收**：`RunAgentLoopOptions`/`ToolExecutorOptions` 无业务字段；todo/ask-user 通过闭包拿到 hooks（不经引擎）；`pnpm test`（84 用例）全绿 + `tsc --noEmit` 通过；行为与 A4 commit 前完全一致（无功能回归）。
+
+---
+
+**B2 真摘要压缩 · 实现前补记（2026-08-25 升级，触发：多轮对话后页面渲染异常 + 孤儿 tool 400）**
+
+> 原 B2（PLAN:552）只写了"拼贴 → 调模型摘要"。本次升级补三点：**摘要消息类型（修渲染）**、**切点不落在 toolResult（修 400，已实现于 `sessionStore.ts`）**、**LLM 结构化摘要 + retainedTail（对齐 pi）**。三家对照精读完毕。
+
+**症状与根因（本次触发）**：
+1. **页面渲染奇怪**：`buildContext` 把 compaction 摘要合成一条 `role:"user"` 消息（`sessionStore.ts:231-241`），文本是 `"以下是旧上下文摘要...\n\nuser: ...\nassistant: ...\ntoolResult: ..."`（`summarizeEntries` 拼了 role 前缀）。前端 `message-row` 把它当**用户气泡**渲染 → 几轮后出现一大坨带 `user:/assistant:/toolResult:` 前缀的混乱文本。
+2. **孤儿 tool 400**（已修）：切点落在 toolResult 上，它配对的 assistant toolCall 被压进摘要 → DeepSeek 400。已用 `while` 循环前移切点修复 + 单测（`lib/sessionStore.test.ts`）。
+
+**三家对照（精读结论）**：
+
+| | pi | DSH | codex |
+|---|---|---|---|
+| 摘要消息类型 | **独立 role**：`compactionSummary`（`messages.ts createCompactionSummaryMessage`），有 `summary`/`tokensBefore` 字段 | 不截断上下文（持久化层不管窗口），靠前端折叠 | 独立 summary 记录，不冒充 user |
+| 切点规则 | **`findValidCutPoints`（compaction.ts:312-344）：toolResult 不是合法切点**，user/assistant/bashExecution/custom 才是；按 token 预算反向累计选点 | —（无窗口压缩） | — |
+| 摘要生成 | **LLM 生成**：`SUMMARIZATION_PROMPT`（Goal/Constraints/Progress/Key Decisions/Next Steps/Critical Context，compaction.ts:424-459），`generateSummary` 调模型；前次摘要传 `<previous-summary>` 增量更新 | — | 调模型生成摘要 |
+| 保留策略 | **`retainedTail` 存进 compaction entry**（不是重建时临时算），cut 时 split turn 单独摘要前缀 | — | 保留最近 N 条 |
+
+**改造方案（三步，对应三个症状）**：
+
+- **① 摘要消息类型（修渲染）**：`lib/types.ts` 新增 `role: "compactionSummary"` 消息类型（`{ summary, tokensBefore, timestamp }`）；`buildContext` 产出它而非 `role:"user"`；`deepseekModel.ts` `toOpenAiMessages` 把 compactionSummary 转成 user 消息（对模型仍是指令）；`message-row` 新增渲染分支（折叠卡片"旧上下文已压缩"，点开展示摘要）——**模型看到的是 user 指令，前端看到的是压缩卡片，互不干扰**。
+- **② 切点不落 toolResult（已做）**：`compactIfNeeded` 切点前移 while 循环 + `lib/sessionStore.test.ts` 3 用例（已提交待归档）。
+- **③ LLM 结构化摘要（对齐 pi）**：`compactIfNeeded` 从 `summarizeEntries`（拼贴）升级为调 `TeachingModel.complete` 生成 pi 同款结构化摘要；`retainedTail` 存进 compaction entry（可选，二期）。
+- **④ 压缩阈值配置化（2026-08-25 增补）**：原 `compactIfNeeded(4000, 8)` 是教学随手值（4~5 轮就压，浪费 DeepSeek 1M 窗口）。已建 `lib/config.ts`（全项目配置唯一入口）：provider 结构可扩展（每厂商自带 contextWindow/reserveTokens/keepRecent），触发对齐 pi `shouldCompact`（`contextTokens > 窗口 - 预留`）。DeepSeek V4 默认 1M 窗口，几十上百轮才触发；换厂商 = `AI_PROVIDER` 换 key + config 加一项。**注意：阈值随 provider 走，不同家窗口不一样（如 Anthropic 200K / OpenAI 128K）**。
+
+**涉及文件**：`lib/types.ts`（新消息类型）、`lib/sessionStore.ts`（buildContext 产出 compactionSummary + compactIfNeeded 摘要生成）、`lib/deepseekModel.ts`（转换）、`lib/message.ts`（构造函数）、`app/components/message-row/`（渲染分支）、`lib/sessionStore.test.ts`（补用例）。
+
+**验收**：多轮对话（>8 条 + 超 4000 token）后触发压缩，页面不出现"user: 摘要"大块文本而是折叠卡片；`tsc --noEmit` 通过；`pnpm test` 全绿；MOCK_MODE 下 `TeachingModel.complete` 降级为拼贴（无 key 不崩）。
+
+> 注：①②是必做（修当前 bug），③是 B2 正题（对齐 pi）。①完成即解"渲染奇怪"；③单独一批 commit。
+
+---
+
+**C7 前置 · 配置整合（2026-08-25 立项，lib/config.ts 已建骨架）**
+
+> 触发：用户要求"项目里零零散散的配置（写死在代码里）都要变成可配的"，且要为多 provider（不止 DeepSeek）留口子。这是 C7 设置页（PLAN:569）的前置——先有统一配置入口，设置页 UI 才能读写它。
+
+**已完成（本次）**：`lib/config.ts` = 全项目配置唯一入口。结构：
+- `config.provider`：当前厂商（默认 deepseek），每厂商自带 `contextWindow/reserveTokens/keepRecentTokens/keepRecentMessages`（压缩阈值随 provider 走）
+- `config.modelSecrets`：apiKey / mockMode（适配层用）
+- `config.paths`：workspace / traces / sessions（环境变量可覆盖）
+- `config.approval` / `config.bash`：超时等行为参数
+- `shouldCompact()`：对齐 pi 触发判断（`token > 窗口 - 预留`）
+
+**已收编的硬编码**：route.ts 路径/压缩阈值/审批超时、sessions/route.ts 路径、deepseekModel 的 model/baseUrl/debug、bash-runner 超时/输出上限。全部经 `lib/config.ts`，环境变量可覆盖。
+
+**将来（C7 设置页，未做）**：
+- **UI 读写**：设置页把配置持久化（写 `config.json` 或类似），不再只靠 `.env.local`——对齐 pi `.pi/` 配置即文件思想（PLAN:493）
+- **provider 注册**：加 Anthropic / OpenAI / ollama 时 = `lib/config.ts` 的 PROVIDERS 加一项 + 适配器 + route.ts 分支（骨架已留）
+- **审批策略可配**（B1 关联）：`TOOLS_NEEDING_CONFIRM` 等从硬编码变配置
+
+**原则**：配置是"横切关注点"（PLAN:522），不进引擎；`lib/config.ts` 是唯一入口，引擎/工具不直接读 `process.env`。

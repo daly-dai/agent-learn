@@ -8,6 +8,7 @@
 import { useState } from "react";
 import type {
   AgentMessage,
+  CompactionSummaryMessage,
   TextContent,
   ToolCallContent,
   ToolResultMessage,
@@ -28,6 +29,13 @@ type MessageRowProps = {
 };
 
 export function MessageRow({ message, attached, live, toolOutputs }: MessageRowProps) {
+  if (message.role === "compactionSummary") {
+    // 旧上下文压缩摘要（B2）：独立渲染成"压缩卡片"，不是用户气泡/工具行。
+    // 为什么独立类型：摘要伪装 user 会被当用户消息渲染（多轮后页面出现
+    // 一大坨 user:/assistant: 前缀文本）；独立类型让这里能认出它。
+    return <CompactionCard message={message} />;
+  }
+
   if (message.role === "user") {
     return (
       <Row tone="user" role="你" timestamp={message.timestamp}>
@@ -118,6 +126,33 @@ function ToolCallLine({
       {/* bash 命令的实时输出：逐块追加，像真终端；结束后结果卡片再显示最终版 */}
       {output !== undefined && output.length > 0 && (
         <pre className={styles.toolOutputLive}>{output}</pre>
+      )}
+    </div>
+  );
+}
+
+/** 旧上下文压缩摘要卡片（B2）：默认折叠，点开展示摘要内容 */
+function CompactionCard({ message }: { message: CompactionSummaryMessage }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className={styles.compaction}>
+      <button
+        className={styles.compactionHead}
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
+      >
+        <span className={styles.compactionTag}>压缩</span>
+        <span className={styles.compactionLabel}>
+          旧上下文已压缩（{message.tokensBefore} token）
+        </span>
+        <span className={styles.compactionToggle}>
+          {expanded ? "收起" : "展开"}
+        </span>
+      </button>
+      {expanded && (
+        <pre className={styles.compactionBody}>{message.summary}</pre>
       )}
     </div>
   );

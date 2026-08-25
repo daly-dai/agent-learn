@@ -46,7 +46,28 @@ export type ToolResultMessage = {
   timestamp: number;
 };
 
-export type AgentMessage = UserMessage | AssistantMessage | ToolResultMessage;
+/**
+ * 旧上下文压缩摘要（B2，2026-08-25 新增）。
+ * 为什么独立类型而不是伪装成 user：摘要既给模型（作为指令参考）
+ * 又给前端（要展示成"压缩卡片"）。伪装成 user 会让前端把它当用户
+ * 气泡渲染（多轮后页面出现一大坨 user:/assistant: 前缀文本）。
+ * 独立类型让两端各自处理：模型侧转换时伪装 user（模型无感），
+ * 前端侧渲染成折叠卡片（用户看清"旧内容已压缩"）。
+ */
+export type CompactionSummaryMessage = {
+  role: "compactionSummary";
+  /** 被压缩的旧对话摘要（文本） */
+  summary: string;
+  /** 压缩前的估算 token 数 */
+  tokensBefore: number;
+  timestamp: number;
+};
+
+export type AgentMessage =
+  | UserMessage
+  | AssistantMessage
+  | ToolResultMessage
+  | CompactionSummaryMessage;
 
 // --- 用量 ---
 

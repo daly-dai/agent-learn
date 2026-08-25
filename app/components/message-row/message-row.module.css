@@ -108,6 +108,70 @@
   animation: lamp 1.15s ease-in-out infinite;
 }
 
+/* ---- 旧上下文压缩卡片（B2）----
+   摘要独立类型渲染：区别于用户气泡/工具结果，用「信号笔」色弱化它——
+   它是"系统折叠了旧内容"，不是对话的一部分。默认折叠，点开展示。 */
+.compaction {
+  border: 1px dashed var(--line);
+  border-radius: var(--r);
+  background: var(--plate);
+  overflow: hidden;
+}
+
+.compactionHead {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 11px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.compactionHead:hover {
+  background: rgba(29, 33, 39, 0.03);
+}
+
+.compactionTag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--pen-signal-ink);
+  flex: none;
+}
+
+.compactionLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-mid);
+}
+
+.compactionToggle {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-mid);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.compactionBody {
+  margin: 0;
+  padding: 9px 12px;
+  border-top: 1px solid var(--line-soft);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--ink-mid);
+  max-height: 240px;
+  overflow: auto;
+}
+
 /* ---- 工具调用行（一台小装置的开头） ---- */
 .call {
   display: flex;

@@ -3,7 +3,13 @@
 // 对应 teaching-agent/src/server/agent/message.ts
 // ============================================================
 
-import type { AssistantMessage, TextContent, ToolCallContent, UserMessage } from "./types";
+import type {
+  AssistantMessage,
+  CompactionSummaryMessage,
+  TextContent,
+  ToolCallContent,
+  UserMessage,
+} from "./types";
 
 const EMPTY_USAGE = {
   input: 0,
@@ -34,6 +40,15 @@ export function createAssistantMessage(
     usage: EMPTY_USAGE,
     timestamp: Date.now(),
   };
+}
+
+/** 旧上下文压缩摘要消息（B2）：buildContext 压缩后用它替代被压缩的旧消息 */
+export function createCompactionSummaryMessage(
+  summary: string,
+  tokensBefore: number,
+  timestamp: number,
+): CompactionSummaryMessage {
+  return { role: "compactionSummary", summary, tokensBefore, timestamp };
 }
 
 /** 从消息内容中提取纯文本（用于 MockModel 关键词匹配等） */
