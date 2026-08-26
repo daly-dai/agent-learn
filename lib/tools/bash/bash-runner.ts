@@ -48,20 +48,64 @@ const DEFAULT_MAX_OUTPUT_CHARS = config.bash.maxOutputChars;
 // SIGTERM 发出后等 5 秒，还不退出就 SIGKILL 处决（防死循环命令装死）
 const FORCE_KILL_DELAY_MS = 5_000;
 
+// 为什么选 pwsh 而不是 cmd（2026-08-25 定稿，对齐 DSH）：
+//   cmd 生态的输出编码天生混合（内建报错 GBK + 读 UTF-8 文件内容 UTF-8），
+//   接收端猜一个固定编码物理上做不到全对。DSH 的做法是【统一输出编码】：
+//   让 stdout/stderr 一律 UTF-8，接收端固定 UTF-8 解。这是治本。
+//
+// 受限语言模式（ConstrainedLanguage）的坑（2026-08-26 实测发现）：
+//   Windows 的 Smart App Control / WDAC / 安全软件会把 pwsh 压进受限模式，
+//   其中【.NET 类型创建被禁】——DSH 的 preamble 双 pin
+//   （[System.Text.UTF8Encoding]::new()）在受限模式下整行报
+//   "Cannot create type. Only core types are supported"，pin 不生效，
+//   pwsh 仍按系统代码页（GBK）输出，接收端 UTF-8 解 → 乱码依旧。
+//   沙箱实测：属性 setter、静态方法调用也全被禁，preamble 无 .NET 可用。
+//
+// 正解（不碰 .NET，受限/非受限环境通用）：
+//   cmd /c "chcp 65001 >nul & pwsh -NoProfile -EncodedCommand <base64>"
+//   - chcp 是 cmd 内建命令，改的是【控制台代码页】；pwsh 作为 cmd 的
+//     子进程【启动时】读到 65001 → 输出 UTF-8（pwsh 运行中再 chcp 无效，
+//     它启动时就缓存了 OutputEncoding，实测过）。
+//   - -EncodedCommand 用 UTF-16LE base64 传命令：base64 只有字母数字+/=，
+//     天然避开 cmd 对引号、&、|、% 等字符的解析（直接 -Command 拼字符串
+//     会被 cmd 二次解析，命令里带双引号就炸）。
+//   - 为什么不用 shell:true 或 spawn("pwsh")：spawn("pwsh") 没有 cmd 层，
+//     chcp 无从执行；shell:true 是 Node 内部拼 cmd /c，转义不可控。
+//
+// 注意：WindowsApps 里的 pwsh.exe 可能是"执行别名"（第一次跑弹商店），
+//   若 spawn 失败可用 PWSH_PATH 环境变量指到真实 pwsh 安装路径。
+
+/** Windows 上把命令包成 cmd 层：先 chcp 65001，再起 pwsh 用 base64 传命令 */
+export function buildWindowsCommandLine(command: string): string {
+  // pwsh -EncodedCommand 要求 UTF-16LE（含 BOM 语义）的 base64
+  const encoded = Buffer.from(command, "utf16le").toString("base64");
+  // PWSH_PATH 指向真实 pwsh 时加引号（路径可能含空格）
+  const pwsh = process.env.PWSH_PATH
+    ? `"${process.env.PWSH_PATH}"`
+    : "pwsh";
+  return `chcp 65001 >nul & ${pwsh} -NoProfile -EncodedCommand ${encoded}`;
+}
+
 export class BashRunner {
   async run(command: string, options: BashRunOptions): Promise<BashResult> {
     return new Promise((resolve) => {
-      // 为什么不再拼 chcp 65001 前缀（2026-08-25 改）：chcp 只改 cmd 的
-      // "显示代码页"，对 dir 这类内建命令写入管道的字节并不可靠（实测
-      // 仍输出 GBK）。改为：不干预命令，在接收端用 createOutputDecoder
-      // 按平台解码（Windows → GBK，其余 → UTF-8）。对照 DSH：它用 pwsh
-      // 双 pin Console.OutputEncoding；我们用 cmd 没有等价物，接收端解码
-      // 是更贴合 cmd 生态的做法。
-      const proc = spawn(command, {
-        cwd: options.cwd,
-        shell: true, // 走系统 shell（Windows 上是 cmd.exe），命令原样执行
-        stdio: ["ignore", "pipe", "pipe"],
-      });
+      // Windows：cmd 包一层（chcp 65001 → pwsh -EncodedCommand），
+      // 避开受限模式禁 .NET 的问题（见文件头注释）。
+      // 非 Windows：直接 bash -c。
+      const proc =
+        process.platform === "win32"
+          ? spawn(
+              "cmd",
+              ["/d", "/s", "/c", buildWindowsCommandLine(command)],
+              {
+                cwd: options.cwd,
+                stdio: ["ignore", "pipe", "pipe"],
+              },
+            )
+          : spawn("bash", ["-c", command], {
+              cwd: options.cwd,
+              stdio: ["ignore", "pipe", "pipe"],
+            });
 
       // ---- 滚动缓冲：始终保留最新，超限丢最旧 ----
       const chunks: string[] = [];
@@ -104,9 +148,9 @@ export class BashRunner {
         killed = true;
 
         if (process.platform === "win32") {
-          // Windows 坑（实测踩到）：spawn(shell:true) 实际起的是 cmd.exe，
-          // proc.kill 只能杀 cmd，它派生的子进程（如 ping）还活着、持有管道，
-          // 导致 close 不触发、run 一直挂着。taskkill /t 杀整棵进程树。
+          // Windows 坑：proc 是 cmd（再带 pwsh 子进程），proc.kill 只能杀
+          // cmd 本体，它派生的 pwsh（以及 git/npm 等孙进程）还活着、持有
+          // 管道，导致 close 不触发、run 一直挂着。taskkill /t 杀整棵进程树。
           spawn("taskkill", ["/pid", String(proc.pid), "/t", "/f"], {
             stdio: "ignore",
           });

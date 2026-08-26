@@ -17,7 +17,7 @@ export function createBashTool(workspaceRoot: string): RegisteredTool {
   return {
     name: "bash",
     description:
-      "在工作区内执行一条 shell 命令，流式返回输出；执行前会弹框请用户确认。命令在 Windows 环境运行（cmd.exe），避免 ls 等 Unix 专属命令。",
+      "在工作区内执行一条 shell 命令，流式返回输出；执行前会弹框请用户确认。命令在 Windows 环境的 PowerShell 中运行（pwsh），可用 dir/type/get-content 等；避免 ls 等 Unix 专属命令。",
     parameters: {
       type: "object",
       properties: {
