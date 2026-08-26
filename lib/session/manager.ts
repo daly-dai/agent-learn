@@ -13,8 +13,8 @@
 
 import { readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { AgentMessage, SessionEntry } from "./types";
-import { JsonlSessionStore } from "./sessionStore";
+import type { AgentMessage, SessionEntry } from "../types";
+import { JsonlSessionStore } from "./store";
 
 export type SessionSummary = {
   id: string;

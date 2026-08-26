@@ -17,7 +17,7 @@
 // ============================================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { SessionManager, isValidSessionId } from "@/lib/sessionManager";
+import { SessionManager, isValidSessionId } from "@/lib/session";
 import { config } from "@/lib/config";
 
 export const runtime = "nodejs";

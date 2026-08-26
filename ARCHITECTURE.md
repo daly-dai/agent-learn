@@ -97,7 +97,7 @@ flowchart TB
 - **实例**：bash（已有）→ Python 代码执行器（抄 smolagents）→ 沙箱容器（抄 OpenHands/DSH sandbox）
 
 ### 接缝 ④ 记忆接缝（记与忘）
-- **是什么**：`lib/sessionStore.ts` 的 JsonlSessionStore + `compactIfNeeded`
+- **是什么**：`lib/session/store.ts` 的 JsonlSessionStore + `compactIfNeeded`
 - **怎么加**：升级压缩策略（现在拼贴 → 调模型生成结构化摘要，复用 `TeachingModel.complete`）；加记忆层（短期/摘要/长期，抄 Reasonix memory 的 recall/forget/freshness 设计）
 - **不变量**：`buildContext()` 永远从会话文件重建上下文——"内存 = 磁盘"
 

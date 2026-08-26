@@ -302,7 +302,7 @@ type TraceEntry = {
 - **数据模型**（`lib/types.ts`）：`TodoItem = { content: string; status: "pending" | "in_progress" | "completed" }`；`SessionEntry` 加 `{ type: "todo", id, parentId, timestamp, todos: TodoItem[] }`。
 - **工具**（`lib/tools/todo.ts` 新文件）：`todo_write`，**整表替换语义**（工具描述写明"Send the ENTIRE list every call, it REPLACES the previous list"——幂等，模型不会漂移）；校验 content trim 非空 + 去重 + 最多一个 in_progress（教学版固定单 active，allowParallel 留扩展）；返回 `counts { pending, inProgress, completed }` + 完整 todos（给模型的即时反馈）；**不进 `TOOLS_NEEDING_CONFIRM`**（低危：只改会话内 todo 列表，不碰文件）。
 - **写会话机制**（仿 onToolOutput 旁路模式，引擎只透传）：`ToolExecutorOptions` 加 `onTodoWrite?: (todos) => void`；todo 工具 execute 调它；route.ts 注入 `(todos) => store.appendTodo(todos)`；`lib/agent.ts` executeToolCall 原样透传（与 onChunk 同模式，其他工具零改动）。
-- **Store**（`lib/sessionStore.ts`）：`appendTodo(todos)`（复用 appendEntry）+ `getLatestTodos()`（叶子回溯找最新 todo 条目）。
+- **Store**（`lib/session/store.ts`）：`appendTodo(todos)`（复用 appendEntry）+ `getLatestTodos()`（叶子回溯找最新 todo 条目）。
 - **API**（`app/api/chat/route.ts`）：POST 新增 SSE 帧 `{ type: "tool_todo", todos }`（run 中实时更新面板），done 帧带 `todos`（权威值）；GET 返回 `todos`（挂载/刷新恢复）。
 - **前端**（`app/components/task-panel/` 新组件）：进度徽章 `done/total` + 当前任务（in_progress）+ 状态标签 + 折叠（默认折叠）；数据源 = GET todos（初始）+ tool_todo 帧（run 中）+ done 帧（最终）；**只读展示**（todo 唯一写者是模型，与 DSH/Reasonix 一致——"可勾选"改为"可查看进度"，勾选交互暂缓）。
 - **系统提示词**：加 todo_write 工具说明（复杂任务先列任务清单，任务完成/进度更新时调用）。
@@ -549,11 +549,11 @@ type TraceEntry = {
 **阶段 B：工程化补齐（中期，从"能跑"到"好用"）**
 
 - **B1 审批升级三步（最快见效，先做）**：① **只读命令放行**（bash 只读白名单，命中不弹框——抄 Reasonix `bash_readonly.go`）② **分级模式**（Suggest/Auto/Bypass 三档 + 弹框加"本次会话记住"——抄 CodeWhale `approval_mode.rs`）③ **审批日志**（放行/拒绝记事件——抄 CodeWhale `approval_log.rs`）。长在哪：`app/api/chat/route.ts` 的 `TOOLS_NEEDING_CONFIRM` 判定处 + `lib/tools/bash.ts`
-- **B2 真摘要压缩**：compactIfNeeded 从拼贴升级为调模型生成结构化摘要（`## Goal / ## Progress / ## Key Decisions / ## Next Steps / ## Critical Context`）——抄 pi `compaction/compaction.ts`，复用 TeachingModel.complete。长在哪：`lib/sessionStore.ts`
+- **B2 真摘要压缩**：compactIfNeeded 从拼贴升级为调模型生成结构化摘要（`## Goal / ## Progress / ## Key Decisions / ## Next Steps / ## Critical Context`）——抄 pi `compaction/compaction.ts`，复用 TeachingModel.complete。长在哪：`lib/session/store.ts` + `lib/summarize.ts`
 - **B3 UI 原语库**：建 `app/components/ui/`（dialog/collapse/select/stepper…），对标 DSH `dsh-client-ui-primitives`。长在哪：`app/components/ui/`
 - **B4 文件 diff 预览**：edit/write 前生成 diff 给你看（红绿视图）——抄 Cline 交互 + DSH DiffBlock。长在哪：`lib/tools/edit.ts` + `app/components/ui/diff/`
 - **B5 hooks 注册表**：beforeToolCall 泛化成 onBeforeTool/onAfterTool 注册表——抄 CodeWhale hooks / DSH hooks。长在哪：`lib/hooks.ts` + `lib/agent.ts` 透传
-- **B6 记忆分层**：会话（短期）+ 摘要（长期）已有雏形，补"主动回忆/新鲜度"——抄 Reasonix memory 设计思路。长在哪：`lib/sessionStore.ts` + 未来记忆工具
+- **B6 记忆分层**：会话（短期）+ 摘要（长期）已有雏形，补"主动回忆/新鲜度"——抄 Reasonix memory 设计思路。长在哪：`lib/session/store.ts` + 未来记忆工具
 - **B7 终端加固**：bash 输出全量落盘（界面显示尾部）+ shell 危险分析（重定向/嵌套检测，抄 Reasonix shellsafe）。长在哪：`lib/tools/bash-runner.ts`
 
 **阶段 C：功能丰富（远期，按需）**
@@ -572,8 +572,36 @@ type TraceEntry = {
 | C10 | **goal 三件套**（2026-08-24 增补） | DSH get/create/update_goal / CodeWhale goal / Reasonix update_goal | 新工具（模型可调）+ 会话事件（仿 todo 模式） | 需要跨会话长期目标追踪时 |
 | C11 | **complete_step 证据签收**（2026-08-24 增补） | Reasonix complete_step（证据 ≥1 条，verification 核对命令历史） | `lib/tools/` 新工具 + todo 配套 | todo 面板跑稳、要"步骤完成可验证"时 |
 | C12 | **move_file / read_image**（2026-08-24 增补） | Reasonix move_file（双 subject 审批）/ DSH read_image | `lib/tools/` 两个小工具 | 随做：30 分钟一个 |
+| C13 | **斜杠命令面板**（2026-08-25 增补） | pi `core/slash-commands.ts` / Reasonix `.reasonix/commands/*.md` | `lib/commands/` 注册表 + 前端斜杠输入 | 立即（一步到位，不做 API+按钮过渡） |
 
 > **非核心/可选（暂不排期，条件触发）**：**LSP 代码智能**（重型依赖——要起语言服务器进程，教学项目收益低；真需要代码智能时再评估）和 **tool_search 工具发现**（工具超过 20 个才需要，现在 10 个；等工具膨胀时再评估）。这两项不是"不学"，是"条件触发"。
+
+---
+
+**C13 斜杠命令面板 · 立项补记（2026-08-25，用户拍板"一步到位"）**
+
+> 触发：用户指出成熟 agent 都有自带斜杠命令（DeepSeek CLI 自带压缩/导出/模型选择/skill 列表；pi `BUILTIN_SLASH_COMMANDS` 22 个内置命令；Reasonix `.reasonix/commands/*.md` 命令即文件；codex `/compact /review`）。我们 PLAN 无此规划——缺口。**决定：直接做命令面板，不做"独立 API + 按钮"中间过渡**（有现成成熟参考项）。
+
+**pi 机制精读结论**（`core/slash-commands.ts` + `interactive-mode.ts:675-773`）：
+- **命令模型**：`SlashCommandInfo { name, description, source: "extension"|"prompt"|"skill", sourceInfo }`——命令有来源分类
+- **内置命令表**：`BUILTIN_SLASH_COMMANDS`（settings/model/tree/thinking/export/import/compact/…22 个）
+- **聚合**：内置 + 提示词模板 + 扩展命令 + 技能（`skill:xxx`）全部转成 SlashCommand 进**同一个自动补全**——命令 = 统一功能入口抽象
+- **参数补全**：每个命令可挂 `getArgumentCompletions`（如 /model 补全 `provider/model`、/thinking 补全级别）
+- **执行**：斜杠命令在输入时识别（不走模型），各走各的处理逻辑
+
+**我们第一批命令**（对齐 DeepSeek 自带那几项）：
+- `/compact`——手动压缩当前会话（**核心**：接 B2 ③ 的 prepare→generate→commit 三步，复用共享函数）
+- `/model`——模型选择/展示（config 驱动；切换接口按 selectModel 扩展）
+- `/skills`——技能列表（C8 未做，先占位展示"规划中"或列 PLAN）
+- `/export`——导出当前会话（下载 JSONL，简单）
+
+**设计**：
+- **`lib/commands/` 注册表**：`SlashCommand { name, description, argumentHint?, run(args, ctx) }`——同 ToolRegistry 思路，一命令一文件
+- **后端**：`app/api/chat/compact/route.ts`（手动压缩端点，返回 { ok, summary, tokensBefore }）；命令执行 = 调对应 API
+- **前端**：输入框识别 `/` 开头 → 命令补全下拉（name + description）→ 选中执行（不走模型，直接调 API）；结果作为系统消息展示
+- **验收**：输入 `/` 弹命令列表 → 选 /compact → 会话被压缩 → 前端出现压缩卡片（compactionSummary 渲染已有）；/export 下载会话文件；/model 展示当前模型
+
+**关联**：`compactSession` 共享函数（从 route.ts 抽出的三步）同时服务自动路径（run 结束后）和 /compact 命令——对齐 DSH 的 compactIfNeeded / compactNow 共享底层。
 
 **A2 实现前补记（2026-08-24，用户已确认规划）**
 
@@ -642,7 +670,7 @@ type TraceEntry = {
 
 **症状与根因（本次触发）**：
 1. **页面渲染奇怪**：`buildContext` 把 compaction 摘要合成一条 `role:"user"` 消息（`sessionStore.ts:231-241`），文本是 `"以下是旧上下文摘要...\n\nuser: ...\nassistant: ...\ntoolResult: ..."`（`summarizeEntries` 拼了 role 前缀）。前端 `message-row` 把它当**用户气泡**渲染 → 几轮后出现一大坨带 `user:/assistant:/toolResult:` 前缀的混乱文本。
-2. **孤儿 tool 400**（已修）：切点落在 toolResult 上，它配对的 assistant toolCall 被压进摘要 → DeepSeek 400。已用 `while` 循环前移切点修复 + 单测（`lib/sessionStore.test.ts`）。
+2. **孤儿 tool 400**（已修）：切点落在 toolResult 上，它配对的 assistant toolCall 被压进摘要 → DeepSeek 400。已用 `while` 循环前移切点修复 + 单测（`lib/session/store.test.ts`）。
 
 **三家对照（精读结论）**：
 
@@ -656,15 +684,35 @@ type TraceEntry = {
 **改造方案（三步，对应三个症状）**：
 
 - **① 摘要消息类型（修渲染）**：`lib/types.ts` 新增 `role: "compactionSummary"` 消息类型（`{ summary, tokensBefore, timestamp }`）；`buildContext` 产出它而非 `role:"user"`；`deepseekModel.ts` `toOpenAiMessages` 把 compactionSummary 转成 user 消息（对模型仍是指令）；`message-row` 新增渲染分支（折叠卡片"旧上下文已压缩"，点开展示摘要）——**模型看到的是 user 指令，前端看到的是压缩卡片，互不干扰**。
-- **② 切点不落 toolResult（已做）**：`compactIfNeeded` 切点前移 while 循环 + `lib/sessionStore.test.ts` 3 用例（已提交待归档）。
+- **② 切点不落 toolResult（已做）**：`compactIfNeeded` 切点前移 while 循环 + `lib/session/store.test.ts` 3 用例（已提交待归档）。
 - **③ LLM 结构化摘要（对齐 pi）**：`compactIfNeeded` 从 `summarizeEntries`（拼贴）升级为调 `TeachingModel.complete` 生成 pi 同款结构化摘要；`retainedTail` 存进 compaction entry（可选，二期）。
 - **④ 压缩阈值配置化（2026-08-25 增补）**：原 `compactIfNeeded(4000, 8)` 是教学随手值（4~5 轮就压，浪费 DeepSeek 1M 窗口）。已建 `lib/config.ts`（全项目配置唯一入口）：provider 结构可扩展（每厂商自带 contextWindow/reserveTokens/keepRecent），触发对齐 pi `shouldCompact`（`contextTokens > 窗口 - 预留`）。DeepSeek V4 默认 1M 窗口，几十上百轮才触发；换厂商 = `AI_PROVIDER` 换 key + config 加一项。**注意：阈值随 provider 走，不同家窗口不一样（如 Anthropic 200K / OpenAI 128K）**。
 
-**涉及文件**：`lib/types.ts`（新消息类型）、`lib/sessionStore.ts`（buildContext 产出 compactionSummary + compactIfNeeded 摘要生成）、`lib/deepseekModel.ts`（转换）、`lib/message.ts`（构造函数）、`app/components/message-row/`（渲染分支）、`lib/sessionStore.test.ts`（补用例）。
+**涉及文件**：`lib/types.ts`（新消息类型）、`lib/session/store.ts`（buildContext 产出 compactionSummary + compactIfNeeded 摘要生成）、`lib/deepseekModel.ts`（转换）、`lib/message.ts`（构造函数）、`app/components/message-row/`（渲染分支）、`lib/session/store.test.ts`（补用例）。
 
 **验收**：多轮对话（>8 条 + 超 4000 token）后触发压缩，页面不出现"user: 摘要"大块文本而是折叠卡片；`tsc --noEmit` 通过；`pnpm test` 全绿；MOCK_MODE 下 `TeachingModel.complete` 降级为拼贴（无 key 不崩）。
 
 > 注：①②是必做（修当前 bug），③是 B2 正题（对齐 pi）。①完成即解"渲染奇怪"；③单独一批 commit。
+
+**B2 ③ 实现定稿（2026-08-25，四家精读后拍板，方案全文见 `doc/02-B2-LLM结构化摘要-改造方案.md`）**
+
+> 用户要求：核心功能改造必须多方案对照（pi/codex/Reasonix/DSH 四家源码精读）→ 讲透取舍 → 确认后才动手。已确认开工。
+
+**四家结论（一句话）**：pi 独立请求+显式增量（最教科书）；codex 服务端压缩+保留 user 原文（最工程）；Reasonix 缓存对齐+经济性检查（最省钱）；DSH 缓存对齐+8 段检查点格式（最产品化）。共识：压缩=调模型重写交接单；摘要伪装 user 回上下文；toolResult 不能当切点。
+
+**决策（用户已确认）**：
+- D1 摘要调用**独立请求**（不学缓存对齐：复杂度换钱不划算，DeepSeek cache 不透明）
+- D2 格式 = **pi EXACT 结构 + DSH 的 Files and Code / Errors and Fixes 两段**（coding agent 刚需）
+- D3 增量更新**显式机制**（pi UPDATE prompt + previousSummary，四家最可靠）
+- D4 **不引入 retainedTail**（我们 JSONL 只追加不删，firstKeptEntryId 定位即可）
+- D6 经济性检查（Reasonix：待压 region < 400 token 不压）
+- D7 工具参数防泄漏（Reasonix：arguments 摘要成 `{key} (N keys)`）
+- D9 截断检测（DSH：摘要非空检查，fail-closed）
+- 不做：codex 服务端压缩（DeepSeek 无端点）/ tokPerChar 校准（二期）/ source 标记（独立 role 更简单）/ hooks 遥测（B5/C5）
+
+**改动**：新建 `lib/summarize.ts`（提示词×3 + serializeConversation + generateSummary 降级 null）；`sessionStore.ts` compactIfNeeded → `prepareCompaction`（含经济性检查）+ `commitCompaction`；`types.ts` 加 `CompactionPreparation`；`route.ts` 三步组合（MOCK 降级拼贴）；新增 summarize.test.ts + 适配 sessionStore.test.ts。
+
+**验收**：tsc + pnpm test 全绿；压缩后摘要为结构化 Markdown（含 Files/Errors 段）；第二次压缩 previousSummary 携带（信息链不断）；MOCK 降级拼贴不崩；切点/孤儿 tool 防护不回归。
 
 ---
 

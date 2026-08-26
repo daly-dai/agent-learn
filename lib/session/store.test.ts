@@ -13,9 +13,16 @@ import { describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { JsonlSessionStore } from "./sessionStore";
-import { createAssistantMessage, createUserMessage, text } from "./message";
-import type { AgentMessage } from "./types";
+import { JsonlSessionStore, summarizeEntries } from "./store";
+import { createAssistantMessage, createUserMessage, text } from "../message";
+import type { AgentMessage } from "../types";
+
+/** 触发准备 + 落盘（B2 ③：prepareCompaction + commitCompaction 两步） */
+async function compact(store: JsonlSessionStore, maxTokens: number, keepRecent: number) {
+  const prep = store.prepareCompaction(maxTokens, keepRecent);
+  if (!prep) return undefined;
+  return store.commitCompaction(prep, summarizeEntries(prep.messagesToSummarize));
+}
 
 function makeStore(): { store: JsonlSessionStore; cleanup: () => void } {
   const dir = mkdtempSync(join(tmpdir(), "session-store-test-"));
@@ -85,7 +92,7 @@ describe("compactIfNeeded —— 压缩切点", () => {
     await store.appendMessage(toolResultMessage("t2", "结果二"));
 
     // 触发压缩：maxApproxTokens 设极小，keepRecentMessages=1（最极端切点）
-    const entry = await store.compactIfNeeded(1, 1);
+    const entry = await compact(store, 1, 1);
     expect(entry).toBeDefined();
     if (!entry) return;
 
@@ -123,7 +130,7 @@ describe("compactIfNeeded —— 压缩切点", () => {
     await store.appendMessage(createUserMessage("二"));
     await store.appendMessage(createUserMessage("三"));
 
-    const entry = await store.compactIfNeeded(1, 2);
+    const entry = await compact(store, 1, 2);
     expect(entry).toBeDefined();
     if (!entry) return;
 
@@ -147,7 +154,7 @@ describe("compactIfNeeded —— 压缩切点", () => {
     await store.appendMessage(toolResultMessage("t1", "结果一"));
     await store.appendMessage(createUserMessage("二"));
 
-    const entry = await store.compactIfNeeded(1, 2);
+    const entry = await compact(store, 1, 2);
     expect(entry).toBeDefined();
     if (!entry) return;
 
@@ -174,7 +181,7 @@ describe("buildContext —— 压缩摘要消息类型（B2，2026-08-25）", ()
     await store.appendMessage(createUserMessage("二"));
     await store.appendMessage(createUserMessage("三"));
 
-    await store.compactIfNeeded(1, 2); // 触发压缩
+    await compact(store, 1, 2); // 触发压缩
     const context = store.buildContext();
 
     // 摘要消息必须是 compactionSummary 类型，不是 user
@@ -185,6 +192,79 @@ describe("buildContext —— 压缩摘要消息类型（B2，2026-08-25）", ()
     // 摘要内容正确（含被压缩的旧消息）
     expect(first.summary).toContain("user");
     expect(first.summary).toContain("assistant");
+
+    cleanup();
+  });
+});
+
+describe("prepareCompaction —— B2 ③ LLM 摘要准备（2026-08-25）", () => {
+  it("第二次压缩时 previousSummary 携带上一次的摘要（信息链不断，pi 增量更新）", async () => {
+    const { store, cleanup } = makeStore();
+
+    // 第一轮：塞满消息并压缩
+    await store.appendMessage(createUserMessage("一"));
+    await store.appendMessage(assistantWithToolCall("t1"));
+    await store.appendMessage(toolResultMessage("t1", "结果一"));
+    await store.appendMessage(createUserMessage("二"));
+    await store.appendMessage(createUserMessage("三"));
+
+    const firstPrep = store.prepareCompaction(1, 2);
+    expect(firstPrep).toBeDefined();
+    if (!firstPrep) return;
+    // 第一次压缩：没有旧摘要
+    expect(firstPrep.previousSummary).toBeUndefined();
+    await store.commitCompaction(firstPrep, "## Goal\n第一轮目标");
+
+    // 第二轮：新消息进来，再次触发压缩
+    await store.appendMessage(createUserMessage("四"));
+    await store.appendMessage(createUserMessage("五"));
+    await store.appendMessage(createUserMessage("六"));
+
+    const secondPrep = store.prepareCompaction(1, 2);
+    expect(secondPrep).toBeDefined();
+    if (!secondPrep) return;
+
+    // 关键：第二次压缩必须带上第一次的摘要（否则旧信息永久丢失）
+    expect(secondPrep.previousSummary).toBe("## Goal\n第一轮目标");
+    // 待压区不应包含第一次压缩点之前被压过的原文（它们由 previousSummary 代表）
+    const texts = secondPrep.messagesToSummarize.map((m) =>
+      m.role === "user" ? m.content.map((c) => c.text).join("") : "",
+    );
+    expect(texts.some((t) => t.includes("一"))).toBe(false);
+
+    cleanup();
+  });
+
+  it("tokensToSummarize 字段提供经济性检查的输入（Reasonix D6）", async () => {
+    const { store, cleanup } = makeStore();
+
+    await store.appendMessage(createUserMessage("一"));
+    await store.appendMessage(assistantWithToolCall("t1"));
+    await store.appendMessage(toolResultMessage("t1", "结果一"));
+    await store.appendMessage(createUserMessage("二"));
+    await store.appendMessage(createUserMessage("三"));
+
+    const prep = store.prepareCompaction(1, 2);
+    expect(prep).toBeDefined();
+    if (!prep) return;
+
+    // 待压区域有内容 → token 数 > 0（route.ts 拿它跟 config.agent.minCompactTokens 比）
+    expect(prep.tokensToSummarize).toBeGreaterThan(0);
+    expect(prep.tokensToSummarize).toBeLessThanOrEqual(prep.tokensBefore);
+
+    cleanup();
+  });
+
+  it("没超限时 prepareCompaction 返回 undefined（不触发压缩）", async () => {
+    const { store, cleanup } = makeStore();
+
+    await store.appendMessage(createUserMessage("一"));
+    await store.appendMessage(createUserMessage("二"));
+
+    // 消息太少（<= keepRecentMessages）不压
+    expect(store.prepareCompaction(1, 5)).toBeUndefined();
+    // token 没超阈值不压
+    expect(store.prepareCompaction(10_000, 1)).toBeUndefined();
 
     cleanup();
   });

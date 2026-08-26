@@ -22,12 +22,29 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { appendFile, rm } from "node:fs/promises";
 import { dirname } from "node:path";
-import type { AgentMessage, SessionEntry, SessionStats, TodoItem } from "./types";
-import { createCompactionSummaryMessage, isTextContent, text } from "./message";
+import type { AgentMessage, SessionEntry, SessionStats, TodoItem } from "../types";
+import { createCompactionSummaryMessage, isTextContent, text } from "../message";
 
 type MessageEntry = Extract<SessionEntry, { type: "message" }>;
 type CompactionEntry = Extract<SessionEntry, { type: "compaction" }>;
 type TodoEntry = Extract<SessionEntry, { type: "todo" }>;
+
+/**
+ * 压缩准备结果（B2 ③）：prepareCompaction 的产出，供产品层调模型生成摘要。
+ * 对齐 pi 的 CompactionPreparation（compaction.ts:596）——纯计算与副作用分离。
+ */
+export type CompactionPreparation = {
+  /** 要喂给摘要模型的消息（上一个压缩点之后 → 新切点之前） */
+  messagesToSummarize: AgentMessage[];
+  /** 压缩前的估算 token 数（写入 entry，前端压缩卡片展示） */
+  tokensBefore: number;
+  /** 待压区域的估算 token 数（经济性检查用：太小就不值得调模型） */
+  tokensToSummarize: number;
+  /** 摘要之后第一条保留消息的 id（buildContext 定位保留区用） */
+  firstKeptEntryId: string;
+  /** 上一次压缩的摘要（增量更新用：pi UPDATE prompt，信息链不断） */
+  previousSummary?: string;
+};
 
 export class JsonlSessionStore {
   // 内存态：entries 全量 + byId 索引 + leafId 叶子 + counter 自增 id 计数器。
@@ -144,26 +161,51 @@ export class JsonlSessionStore {
   }
 
   /**
-   * 上下文超窗口时压缩：把「最旧的、超出 keepRecentMessages 条的部分」压成一条摘要，
-   * 记录 firstKeptEntryId（摘要之后第一条保留消息），新摘要成为叶子。
-   * 返回压缩条目；没超限则返回 undefined。
+   * 上下文超窗口时【准备】压缩（纯计算，不碰模型——可单测）：
+   * 选切点（保留区第一条不能是 toolResult）、算待压消息/旧摘要/token 数。
+   * 返回 CompactionPreparation；没超限则返回 undefined。
+   *
+   * 模型调用发生在产品层（route.ts），落盘走 commitCompaction——
+   * 对齐 pi 的 prepareCompaction → compact 分离（纯计算 vs 副作用，
+   * 见 doc/02 决策 D1 与 pi compaction.ts:616 prepareCompaction）。
    */
-  async compactIfNeeded(
+  prepareCompaction(
     maxApproxTokens: number,
     keepRecentMessages: number,
-  ): Promise<CompactionEntry | undefined> {
+  ): CompactionPreparation | undefined {
+    // 从叶子回溯到根，把路径上的消息转成 AgentMessage[]。
     const path = this.pathToLeaf();
+    // 过滤出消息条目（B2 ②）。
     const messageEntries = path.filter(
       (entry): entry is MessageEntry => entry.type === "message",
     );
+    // 计算当前上下文的 token 数（B2 ④）。
     const currentContext = this.buildContext();
+    // 估算 token 数（B2 ⑤）。
     const tokensBefore = estimateTokens(currentContext);
 
+    // 经济性检查：如果 token 数不超过阈值或消息数不超过阈值，则不压缩。
     if (
       tokensBefore <= maxApproxTokens ||
       messageEntries.length <= keepRecentMessages
     ) {
       return undefined;
+    }
+
+    // 找上一个压缩点：previousSummary（增量更新，D3）+ 待压区起点。
+    // 关键：被压过的旧消息（上一个压缩点之前）不再喂给模型——它们的
+    // 信息由 previousSummary 代表（增量合并不丢）；待压区从「上一个压缩
+    // 的保留区第一条」开始，包含上次保留的最近消息 + 之后的新消息。
+    let prevCompaction: CompactionEntry | undefined;
+    let summarizeStart = 0; // messageEntries 里第一个要摘要的消息下标
+    
+    for (const entry of path) {
+      if (entry.type !== "compaction") continue;
+      prevCompaction = entry;
+      const idx = messageEntries.findIndex(
+        (m) => m.id === entry.firstKeptEntryId,
+      );
+      if (idx >= 0) summarizeStart = idx;
     }
 
     // 保留区：从尾部取最近 keepRecentMessages 条消息。
@@ -182,21 +224,41 @@ export class JsonlSessionStore {
       keepFrom -= 1;
     }
 
+    const summarized = messageEntries.slice(summarizeStart, keepFrom);
     const kept = messageEntries.slice(keepFrom);
-    const summarized = messageEntries.slice(0, keepFrom);
-    const summary = summarizeEntries(summarized);
     const firstKeptEntryId = kept[0]?.id;
 
     if (!firstKeptEntryId) return undefined;
 
+    return {
+      // 
+      messagesToSummarize: summarized.map((entry) => entry.message),
+      tokensBefore,
+      // 经济性检查用（Reasonix D6，判断在 route.ts）：要压的区域多大
+      tokensToSummarize: estimateTokens(
+        summarized.map((entry) => entry.message),
+      ),
+      firstKeptEntryId,
+      previousSummary: prevCompaction?.summary,
+    };
+  }
+
+  /**
+   * 【落盘】压缩条目：追加 compaction entry 并成为新叶子。
+   * 产品层调模型生成摘要后调用（MOCK/失败时传拼贴降级摘要）。
+   */
+  async commitCompaction(
+    prep: CompactionPreparation,
+    summary: string,
+  ): Promise<CompactionEntry> {
     const entry: CompactionEntry = {
       type: "compaction",
       id: this.nextId(),
       parentId: this.leafId,
       timestamp: new Date().toISOString(),
       summary,
-      firstKeptEntryId,
-      tokensBefore,
+      firstKeptEntryId: prep.firstKeptEntryId,
+      tokensBefore: prep.tokensBefore,
     };
 
     await this.appendEntry(entry);
@@ -361,12 +423,10 @@ function entryToMessage(entry: SessionEntry): AgentMessage[] {
   return [entry.message];
 }
 
-function summarizeEntries(entries: MessageEntry[]): string {
-  return entries
-    .map((entry) => {
-      const content = extractText(entry.message);
-      return `${entry.message.role}: ${content}`;
-    })
+/** 拼贴式摘要（降级用）：MOCK 模式 / 模型失败时保信息不崩 */
+export function summarizeEntries(messages: AgentMessage[]): string {
+  return messages
+    .map((message) => `${message.role}: ${extractText(message)}`)
     .join("\n");
 }
 

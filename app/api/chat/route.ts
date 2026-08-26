@@ -35,8 +35,9 @@ import { createToolRegistry } from "@/lib/tools";
 import type { AskQuestion } from "@/lib/tools/ask-user";
 import { runAgentLoop, type ToolDecision } from "@/lib/agent";
 import { TraceRecorder } from "@/lib/trace";
-import { JsonlSessionStore } from "@/lib/sessionStore";
-import { isValidSessionId } from "@/lib/sessionManager";
+import { JsonlSessionStore, summarizeEntries } from "@/lib/session";
+import { generateSummary } from "@/lib/summarize";
+import { isValidSessionId } from "@/lib/session";
 import { toolApprovals } from "@/lib/toolApproval";
 import { userAnswers, makeAskKey, clearRun } from "@/lib/userAnswers";
 import { runControllers } from "@/lib/runControl";
@@ -63,8 +64,8 @@ const systemPrompt = [
   "- delete_file（删除文件；写/改/删都会弹框请你确认）",
   "- grep（按正则搜内容）、find（按文件名找文件）",
   "- write_note（写工作区笔记）",
-  "- bash（执行 shell 命令；命令在 Windows 环境运行，避免 ls 等 Unix 专属命令；执行前会弹框确认）",
-  "- todo_write（记录并更新任务清单：复杂任务开始前先列出任务，任务状态变化时更新整表；无需确认，因为它只改会话内的任务列表，不碰文件）",
+  "- bash（执行 shell 命令；命令在 Windows 环境的 PowerShell 中运行，避免 ls 等 Unix 专属命令；执行前会弹框确认）",
+  "- todo_write（记录并更新任务清单：复杂任务开始前先列出任务，任务状态变化时更新整表；无需确认，因为它只改会话内的任务列表，不碰文件）。注意：任务全部完成时，必须再调用一次 todo_write 把整张表的所有条目标记为 completed——不要留着 in_progress 的尾巴（用户看到的就是这张表，最后一项显示'进行中'意味着任务没做完）",
   "- ask_user_question（向用户提问并等待回答：仅当你需要用户提供信息、做决定或澄清需求时才调用；问题要具体，一次只问一个）。注意：用户可能「跳过」（返回文案会明确说明，此时直接继续你手头的任务，不要追问、不要解释原因）。这不是错误，直接进入下一步，绝不反复问同一问题。",
   "- 只有用户明确要求「列出 / 读取 / 写入 / 修改 / 删除 / 搜索 / 执行命令」时才调用工具；概念原理类问题直接回答，不要硬套工具。",
   "- 一次只调用当前步骤真正需要的工具；拿到工具结果后必须基于真实结果回答，绝不编造文件内容。",
@@ -106,7 +107,10 @@ type StreamFrame =
   // todo_write 更新任务清单（旁路帧，Phase 5）：工具 → 落盘会话 → 这里 → 前端面板
   | { type: "tool_todo"; todos: TodoItem[] }
   // ask_user_question 提问（旁路帧，A4）：模型 → 这里 → 前端逐题作答等用户回答
-  | { type: "ask_user_request"; toolCallId: string; questions: AskQuestion[] };
+  | { type: "ask_user_request"; toolCallId: string; questions: AskQuestion[] }
+  // 上下文压缩开始（B2）：调模型生成摘要期间推此帧，前端显示"正在压缩上下文"，
+  // 避免用户以为卡住（压缩是耗时的后台动作，可观测性边界）
+  | { type: "compacting"; tokensBefore: number };
 
 // --- POST /api/chat ---
 export async function POST(req: NextRequest) {
@@ -244,6 +248,8 @@ export async function POST(req: NextRequest) {
           tools: toolRegistry.definitions(),
           model,
           toolRegistry,
+          // 循环最大轮次（防无限循环护栏）：来自 lib/config.ts，env 可覆盖
+          maxTurns: config.agent.maxTurns,
           // 审批需要 send（推确认帧给前端）和 recorder.runId，所以用闭包包一层
           beforeToolCall: (call) => handleToolApproval(call, send),
           // run 级取消：中止模型请求 + 传给 bash 杀命令
@@ -262,13 +268,37 @@ export async function POST(req: NextRequest) {
         for (const message of result.newMessages) {
           await store.appendMessage(message);
         }
-        // 2c) 上下文超窗口时压缩旧消息为摘要，防止上下文无限膨胀。
-        //     阈值按 provider 的上下文窗口算（config.provider.contextWindow
-        //     - reserveTokens），DeepSeek V4 是 1M 窗口，几十上百轮才触发。
-        await store.compactIfNeeded(
+        // 2c) 上下文超窗口时压缩旧消息为摘要（B2 ③：LLM 结构化摘要）。
+        //     三步走，对齐 pi 的 prepareCompaction → compact → 落盘：
+        //     ① 纯计算准备（切点/待压消息/旧摘要，不碰模型）
+        //     ② 调模型生成结构化摘要（MOCK 或失败 → 降级拼贴，保信息）
+        //     ③ 落盘 compaction entry（成为新叶子）
+        //     阈值按 provider 的上下文窗口算（DeepSeek V4 是 1M 窗口，
+        //     几十上百轮才触发）；经济性检查（Reasonix D6）：要压的区域
+        //     太小（低于 config 阈值）就不压——省下的 token 不够抵消一次
+        //     摘要 API 调用的成本。
+        const prep = store.prepareCompaction(
           config.provider.contextWindow - config.provider.reserveTokens,
           compactKeepRecent(),
         );
+        if (prep && prep.tokensToSummarize >= config.agent.minCompactTokens) {
+          // 压缩开始：先推 compacting 帧，让前端知道"后端在忙压缩"，不是卡死。
+          // 压缩（尤其调模型生成摘要）耗时几秒~几十秒，这段时间 SSE 无其他帧。
+          send({ type: "compacting", tokensBefore: prep.tokensBefore });
+          let summary: string;
+          if (config.modelSecrets.mockMode) {
+            // 离线教学：不调模型，拼贴降级（信息还在，只是不省 token）
+            summary = summarizeEntries(prep.messagesToSummarize);
+          } else {
+            // 真实模型：结构化摘要；失败降级拼贴（压缩是"防爆窗"，失败不能拖垮对话）
+            summary =
+              (await generateSummary(model, prep.messagesToSummarize, {
+                previousSummary: prep.previousSummary,
+                signal: abortController.signal,
+              })) ?? summarizeEntries(prep.messagesToSummarize);
+          }
+          await store.commitCompaction(prep, summary);
+        }
 
         // 3) 全部结束后，推送最终权威结果。
         //    messages 带「全量会话历史」（buildContext 从叶子回溯），
