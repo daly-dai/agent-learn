@@ -41,10 +41,14 @@
   --pen-signal-ink: #8a5a12; /* 同一支笔的文字版，保证对比度 */
   --pen-error: #a32d1f; /* 错误 */
 
-  --font-mono: var(--font-mono-latin), ui-monospace, SFMono-Regular, Menlo,
-    Consolas, monospace;
-  --font-sans: var(--font-sans-latin), -apple-system, BlinkMacSystemFont,
-    "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  /* 字体栈：全系统字体（2026-08-26 起）。
+     原先是 next/font/google 注入的 var(--font-mono-latin) 优先 + 系统回退；
+     但 next/font/google 编译期要访问 Google Fonts，国内网络编译失败
+     （删 .next 冷启动必现），故去掉 Google 字体、直接用系统栈。
+     中文本就由系统字体接管（PingFang SC / 微软雅黑），视觉退化很小。 */
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
 
   /* 小圆角：机加工面板的感觉，不是气泡 */
   --r: 3px;
