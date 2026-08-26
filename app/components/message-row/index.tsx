@@ -152,7 +152,12 @@ function CompactionCard({ message }: { message: CompactionSummaryMessage }) {
         </span>
       </button>
       {expanded && (
-        <pre className={styles.compactionBody}>{message.summary}</pre>
+        <div className={styles.compactionBody}>
+          {/* 摘要是结构化 Markdown（## Goal / ## Progress…），用 Markdown 渲染
+              （对齐 pi 的 compaction-summary-message.ts）：标题/列表正常显示，
+              而不是 <pre> 里把 "##" 当字面文本。 */}
+          <Markdown>{message.summary}</Markdown>
+        </div>
       )}
     </div>
   );

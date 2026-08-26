@@ -162,14 +162,12 @@
   margin: 0;
   padding: 9px 12px;
   border-top: 1px solid var(--line-soft);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-word;
   color: var(--ink-mid);
   max-height: 240px;
   overflow: auto;
+  /* 摘要用 Markdown 渲染（对齐 pi）：标题/列表正常排版，不套等宽/pre-wrap */
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 /* ---- 工具调用行（一台小装置的开头） ---- */

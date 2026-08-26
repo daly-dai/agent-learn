@@ -65,6 +65,8 @@ export function useAgentRun(sessionId: string) {
   const [toolOutputs, setToolOutputs] = useState<Record<string, string>>({});
   // 任务清单（Phase 5）：来源 = GET 历史 todos（初始）+ tool_todo 帧（run 中）+ done 帧（最终）
   const [todos, setTodos] = useState<TodoItem[]>([]);
+  // 上下文压缩进行中（B2）：收到 compacting 帧置 true，done/error 复位
+  const [compacting, setCompacting] = useState(false);
 
   // 清空本地状态（不含服务端）：切会话 / 清空记录共用同一份。
   // 从历史恢复 effect 和 reset() 里抽出来的公共逻辑——
@@ -80,6 +82,7 @@ export function useAgentRun(sessionId: string) {
     setPendingAsk(null);
     setToolOutputs({});
     setTodos([]);
+    setCompacting(false);
   }, []);
 
   // 会话历史：挂载时 / sessionId 变化时触发。
@@ -152,9 +155,12 @@ export function useAgentRun(sessionId: string) {
         setPendingAsk(null);
         // 任务清单权威值（Phase 5）：tool_todo 帧只是过程更新，done 是最终
         setTodos(frame.todos);
+        // 压缩已结束（done 是最后一个帧），复位 compacting 状态
+        setCompacting(false);
         break;
       case "error":
         setError(frame.message);
+        setCompacting(false); // 出错也复位，避免状态卡住
         break;
       case "tool_permission_request":
         // 写/改/删工具需要人工确认：交给页面弹框
@@ -181,6 +187,10 @@ export function useAgentRun(sessionId: string) {
           toolCallId: frame.toolCallId,
           questions: frame.questions,
         });
+        break;
+      case "compacting":
+        // 上下文压缩开始（B2）：后端调模型生成摘要，前端显示"正在压缩上下文"
+        setCompacting(true);
         break;
       default:
         // StreamFrame 新增类型时，TS 会在这里提示漏了分支
@@ -294,5 +304,6 @@ export function useAgentRun(sessionId: string) {
     toolOutputs,
     todos,
     stop,
+    compacting,
   };
 }

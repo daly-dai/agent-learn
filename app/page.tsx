@@ -92,6 +92,7 @@ export default function Home() {
     toolOutputs,
     todos,
     stop,
+    compacting,
   } = useAgentRun(currentId);
 
   const [input, setInput] = useState("列出工作区文件"); // 输入框内容（表单状态留在页面，不进 hook）
@@ -187,6 +188,14 @@ export default function Home() {
                     toolOutputs={toolOutputs}
                   />
                 ))
+              )}
+              {/* 上下文压缩进行中（B2）：后端在调模型生成摘要，给用户明确反馈，
+                  而不是让 transcript 停在原地像卡住 */}
+              {compacting && (
+                <div className={styles.compacting} role="status">
+                  <span className={styles.compactingLabel}>上下文超出上限</span>
+                  <span>正在压缩上下文，请稍候…</span>
+                </div>
               )}
             </div>
           </div>

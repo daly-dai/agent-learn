@@ -43,7 +43,9 @@ export type StreamFrame =
   // todo_write 更新任务清单（旁路帧，Phase 5）：前端面板实时更新
   | { type: "tool_todo"; todos: TodoItem[] }
   // ask_user_question 提问（旁路帧，A4）：前端逐题作答等用户回答
-  | { type: "ask_user_request"; toolCallId: string; questions: AskQuestion[] };
+  | { type: "ask_user_request"; toolCallId: string; questions: AskQuestion[] }
+  // 上下文压缩开始（B2）：后端在调模型生成摘要前推此帧，前端显示"正在压缩上下文"
+  | { type: "compacting"; tokensBefore: number };
 
 /** 事件 + 前端观测到它的时刻（协议不动，时间戳加在这一层） */
 export type ObservedEvent = { seq: number; at: number; event: AgentEvent };

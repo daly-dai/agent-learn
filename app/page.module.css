@@ -41,6 +41,23 @@
   margin: 0 auto;
 }
 
+/* ---- 上下文压缩提示（B2） ---- */
+/* 后端在压缩（调模型生成摘要）时给用户的反馈条，跟消息同列宽，视觉轻量 */
+.compacting {
+  max-width: 830px;
+  margin: 8px auto 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.compactingLabel {
+  color: var(--pen-signal);
+}
+
 /* ---- 任务面板容器（Phase 5） ---- */
 /* 与指令台同列：外层左右 padding，面板内部 830 居中，与输入框 x 范围对齐 */
 .todoBar {
