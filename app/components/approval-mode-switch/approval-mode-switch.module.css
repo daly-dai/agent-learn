@@ -1,0 +1,56 @@
+/* ============================================================
+   approval-mode-switch.module.css —— 审批模式切换（B1-②）
+   归属组件：app/components/approval-mode-switch/index.tsx
+   三档信任档位：当前档实心（语义色），其他描边。
+     建议 = 墨色（默认态）、YOLO = 琥珀（放行信号）、禁止 = 红（错误信号）
+   ============================================================ */
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  margin-right: 2px;
+}
+
+.btn {
+  padding: 3px 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  border-radius: var(--r);
+  cursor: pointer;
+  color: var(--ink-mid);
+  background: transparent;
+  border: 1px solid var(--line);
+}
+
+.btn:hover {
+  border-color: var(--ink-faint);
+  color: var(--ink);
+}
+
+/* —— 当前档实心（语义色） —— */
+
+.btn.active.suggest {
+  color: var(--plate);
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.btn.active.bypass {
+  color: var(--plate);
+  background: var(--pen-signal);
+  border-color: var(--pen-signal);
+}
+
+.btn.active.never {
+  color: var(--plate);
+  background: var(--pen-error);
+  border-color: var(--pen-error);
+}

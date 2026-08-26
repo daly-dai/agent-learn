@@ -42,6 +42,16 @@ import { toolApprovals } from "@/lib/toolApproval";
 import { userAnswers, makeAskKey, clearRun } from "@/lib/userAnswers";
 import { runControllers } from "@/lib/runControl";
 import { config, shouldCompact, compactKeepRecent } from "@/lib/config";
+import { getApprovalMode } from "@/lib/approvalMode";
+import { isReadOnlyBash } from "@/lib/permission/readonly";
+import {
+  appendApprovalReceipt,
+  type ApprovalOutcome,
+} from "@/lib/permission/approval-log";
+import {
+  isPersistApproved,
+  isSessionApproved,
+} from "@/lib/permission/approval-memory";
 
 // 显式声明 Node runtime：本路由（以及它的工具）会用 node:fs / node:path，
 // 后面 Phase 4 还要用 node:child_process 跑终端。
@@ -251,7 +261,7 @@ export async function POST(req: NextRequest) {
           // 循环最大轮次（防无限循环护栏）：来自 lib/config.ts，env 可覆盖
           maxTurns: config.agent.maxTurns,
           // 审批需要 send（推确认帧给前端）和 recorder.runId，所以用闭包包一层
-          beforeToolCall: (call) => handleToolApproval(call, send),
+          beforeToolCall: (call) => handleToolApproval(call, send, sessionId),
           // run 级取消：中止模型请求 + 传给 bash 杀命令
           signal: abortController.signal,
           // bash 流式输出：旁路直达前端（不进事件流/trace）
@@ -459,6 +469,7 @@ const APPROVAL_TIMEOUT_MS = config.approval.timeoutMs;
 async function handleToolApproval(
   call: ToolCallContent,
   send: (frame: StreamFrame) => void,
+  sessionId: string,
 ): Promise<ToolDecision> {
   // --- 硬性策略：secret/秘密 永不弹框，直接拦 ---
   if (call.name === "write_note" || call.name === "write_file") {
@@ -479,12 +490,83 @@ async function handleToolApproval(
     }
   }
 
-  // --- 人工确认：推帧给前端弹框，await 用户决定 ---
-  if ((TOOLS_NEEDING_CONFIRM as readonly string[]).includes(call.name)) {
-    const allow = await askUserApproval(call, send);
-    return allow
-      ? { action: "allow" }
-      : { action: "block", reason: "用户拒绝了本次工具调用。" };
+  // --- B1-② 分级模式（抄 pi defaultProjectTrust / CodeWhale approval_mode；
+  //      运行时可通过 /api/chat/approval-mode 切换，参考项目都有此入口）---
+  const needsConfirm = (TOOLS_NEEDING_CONFIRM as readonly string[]).includes(
+    call.name,
+  );
+  const approvalMode = getApprovalMode();
+  if (approvalMode === "bypass") {
+    // YOLO：除硬性策略外全部放行（没有"人机确认"过程，不记日志）
+    return { action: "allow" };
+  }
+  if (approvalMode === "never" && needsConfirm) {
+    return {
+      action: "block",
+      reason: "当前审批模式为 never：需人工确认的工具直接拒绝。",
+    };
+  }
+
+  // --- 人工确认（suggest 默认）---
+  if (needsConfirm) {
+    // ★ B1-① 只读命令放行：bash 静态分析证明只读 → 不弹框直接执行。
+    //   原理：只读表 = "已证明无副作用的行为"；含走私语法（管道/重定向/
+    //   替换）或写参数 → fail-closed 弹框（宁可多弹框，不可漏放行）。
+    if (call.name === "bash") {
+      const command =
+        typeof call.arguments.command === "string"
+          ? call.arguments.command
+          : "";
+      if (isReadOnlyBash(command)) {
+        return { action: "allow" };
+      }
+    }
+
+    // ★ B1-④ 记忆放行：一直允许（磁盘规则）→ 本会话允许（内存记忆）。
+    //   判定顺序 = 信任强度从高到低：持久 > 会话 > 弹框。
+    if (await isPersistApproved(sessionDir, call.name)) {
+      return { action: "allow" };
+    }
+    if (isSessionApproved(sessionId, call.name)) {
+      return { action: "allow" };
+    }
+
+    // ★ B1-③ 审批日志：弹框前记 asked（审计：问了什么）
+    await appendApprovalReceipt(sessionDir, sessionId, {
+      phase: "asked",
+      approvalId: call.id,
+      toolCallId: call.id,
+      toolName: call.name,
+      createdAt: new Date().toISOString(),
+    });
+
+    const outcome = await askUserApproval(call, send);
+
+    // ★ B1-③ 审批日志：决定后记 decided（审计：怎么答的）
+    await appendApprovalReceipt(sessionDir, sessionId, {
+      phase: "decided",
+      approvalId: call.id,
+      toolCallId: call.id,
+      toolName: call.name,
+      outcome,
+      createdAt: new Date().toISOString(),
+    });
+
+    // B1-④：单次/本会话/一直允许 都是"允许"（记忆在 approve 接口里写）
+    if (
+      outcome === "approved" ||
+      outcome === "approved-session" ||
+      outcome === "approved-persist"
+    ) {
+      return { action: "allow" };
+    }
+    return {
+      action: "block",
+      reason:
+        outcome === "timeout"
+          ? "审批超时未回应，自动拒绝。"
+          : "用户拒绝了本次工具调用。",
+    };
   }
 
   // list_files 没有 path 参数时补齐默认值
@@ -503,7 +585,7 @@ async function handleToolApproval(
 function askUserApproval(
   call: ToolCallContent,
   send: (frame: StreamFrame) => void,
-): Promise<boolean> {
+): Promise<ApprovalOutcome> {
   return new Promise((resolve) => {
     send({
       type: "tool_permission_request",
@@ -512,17 +594,18 @@ function askUserApproval(
       args: call.arguments,
     });
 
-    // 超时兜底：5 小时不回应自动拒绝（block），run 不会被挂死（前端不展示时间）
+    // 超时兜底：5 小时不回应自动拒绝（timeout），run 不会被挂死（前端不展示时间）
     const timer = setTimeout(() => {
       toolApprovals.delete(call.id);
-      resolve(false);
+      resolve("timeout");
     }, APPROVAL_TIMEOUT_MS);
 
     toolApprovals.set(call.id, {
-      resolve: (allow: boolean) => {
+      toolName: call.name,
+      resolve: (outcome: ApprovalOutcome) => {
         clearTimeout(timer);
         toolApprovals.delete(call.id);
-        resolve(allow);
+        resolve(outcome);
       },
       timer,
     });

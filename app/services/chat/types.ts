@@ -16,11 +16,29 @@ export type ChatHistoryResult = {
   todos: TodoItem[];
 };
 
-/** POST /api/chat/approve 参数：回传用户对挂起确认的决定 */
-export type ApproveParams = { toolCallId: string; allow: boolean };
+/** POST /api/chat/approve 参数：回传用户对挂起确认的决定（B1-④ 三档信任） */
+export type ApproveParams = {
+  toolCallId: string;
+  allow: boolean;
+  /** 本会话允许：该工具本会话内不再询问（内存记忆） */
+  session?: boolean;
+  /** 一直允许：该工具跨会话不再询问（持久化规则） */
+  persist?: boolean;
+  /** 写"本会话允许"记忆时按哪个会话记 */
+  sessionId?: string;
+};
 
 /** POST /api/chat/approve → 成功返回 */
 export type ApproveResult = { ok: true; allow: boolean };
+
+/** 审批模式（B1-②）：suggest 默认（只读放行+弹框）/ bypass 全放 / never 全拒 */
+export type ApprovalMode = "suggest" | "bypass" | "never";
+
+/** GET /api/chat/approval-mode → 当前审批模式 */
+export type ApprovalModeInfo = { mode: ApprovalMode };
+
+/** POST /api/chat/approval-mode → 切换成功 */
+export type ApprovalModeResult = { ok: true; mode: ApprovalMode };
 
 /** POST /api/chat/stop 参数 */
 export type StopRunParams = { runId: string };

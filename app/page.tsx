@@ -41,7 +41,7 @@
 //                   人工确认弹框（允许/拒绝），配合 pendingApproval/approve
 // ============================================================
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./page.module.css";
 import { Nameplate, type Phase } from "./components/nameplate";
 import { Overture } from "./components/overture";
@@ -49,12 +49,15 @@ import { MessageRow } from "./components/message-row";
 import { TraceRail } from "./components/trace-rail";
 import { SessionList } from "./components/session-list";
 import { ApprovalDialog } from "./components/approval-dialog";
+import { ApprovalModeSwitch } from "./components/approval-mode-switch";
 import { TaskPanel } from "./components/task-panel";
 import { AskUserCard } from "./components/ask-user-card";
 import { useAgentRun } from "./lib/use-agent-run";
 import { useSessions } from "./lib/use-sessions";
 import { foldEvents } from "./lib/trace-fold";
 import type { ObservedEvent } from "./lib/sse";
+import type { ApprovalMode } from "./services/chat/types";
+import { getApprovalMode, setApprovalMode } from "./services/chat";
 
 export default function Home() {
   // 会话栏（Phase 2）：列表 + 当前会话 id。currentId 传给 useAgentRun，
@@ -96,14 +99,36 @@ export default function Home() {
   } = useAgentRun(currentId);
 
   const [input, setInput] = useState("列出工作区文件"); // 输入框内容（表单状态留在页面，不进 hook）
+
+  // 审批模式（B1-②）：页面挂载时读服务端当前值；切换调接口（运行时生效，
+  // 重启恢复 config 默认）。参考项目都有此入口（pi /settings、DSH /permission）
+  const [approvalMode, setApprovalModeState] = useState<ApprovalMode>("suggest");
+
+  useEffect(() => {
+    getApprovalMode()
+      .then((r) => setApprovalModeState(r.mode))
+      .catch(() => {
+        /* 接口失败保持默认 suggest */
+      });
+  }, []);
+
+  const switchApprovalMode = useCallback((mode: ApprovalMode) => {
+    setApprovalMode(mode)
+      .then(() => setApprovalModeState(mode))
+      .catch(() => {
+        /* 切换失败保持原状 */
+      });
+  }, []);
   const transcriptRef = useRef<HTMLDivElement>(null); // 转录稿容器，新消息到达时滚到底
   const traceRef = useRef<HTMLDivElement>(null); // 轨迹容器，新事件到达时滚到底
   const inputRef = useRef<HTMLTextAreaElement>(null); // 输入框，聚焦/自适应高度用
 
   // 两个滚动效果：messages / observed 更新时把对应面板滚到底部
+  // pendingApproval 变化也要滚：确认卡片出现在消息流末尾时能看到它，
+  // 否则卡片停在视口底部（紧贴输入框），看起来像"浮在输入框上"
   useEffect(() => {
     scrollToEnd(transcriptRef.current);
-  }, [messages]);
+  }, [messages, pendingApproval]);
 
   useEffect(() => {
     scrollToEnd(traceRef.current);
@@ -197,7 +222,19 @@ export default function Home() {
                   <span>正在压缩上下文，请稍候…</span>
                 </div>
               )}
+              {/* 待确认卡片（B1-④，抄 Reasonix）：嵌在消息流末尾，不打断——
+                  像一条"需要盖章"的待办，用户决定后卡片消失 */}
+              <ApprovalDialog request={pendingApproval} onApprove={approve} />
             </div>
+          </div>
+
+          {/* 审批模式切换（B1-②）：运行时切信任档位（建议/YOLO/禁止），
+              参考项目都有此入口；默认 suggest 不动它即可 */}
+          <div className={styles.modeBar}>
+            <ApprovalModeSwitch
+              mode={approvalMode}
+              onChange={switchApprovalMode}
+            />
           </div>
 
           {/* 任务面板（Phase 5）：钉在输入台上方，与输入框同列宽（830 居中）。
@@ -281,9 +318,6 @@ export default function Home() {
             stats 是会话级累计统计（读数盘，服务端算出） */}
         <TraceRail rows={rows} observed={observed} stats={stats} reelRef={traceRef} />
       </div>
-
-      {/* 写/改/删工具的人工确认弹框（Phase 3）：pendingApproval 非空时弹出 */}
-      <ApprovalDialog request={pendingApproval} onApprove={approve} />
     </div>
   );
 }

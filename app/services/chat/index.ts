@@ -17,6 +17,9 @@ import type {
   ChatHistoryResult,
   ApproveParams,
   ApproveResult,
+  ApprovalMode,
+  ApprovalModeInfo,
+  ApprovalModeResult,
   StopRunParams,
   StopRunResult,
   ClearHistoryResult,
@@ -43,6 +46,18 @@ export function clearHistory(sessionId: string): Promise<ClearHistoryResult> {
 /** POST /api/chat/approve —— 回传工具确认的用户决定 */
 export function approveTool(params: ApproveParams): Promise<ApproveResult> {
   return api("/api/chat/approve", { method: "POST", body: params });
+}
+
+/** GET /api/chat/approval-mode —— 当前审批模式（页面挂载时读） */
+export function getApprovalMode(): Promise<ApprovalModeInfo> {
+  return api("/api/chat/approval-mode");
+}
+
+/** POST /api/chat/approval-mode —— 运行时切换审批模式（B1-②） */
+export function setApprovalMode(
+  mode: ApprovalMode,
+): Promise<ApprovalModeResult> {
+  return api("/api/chat/approval-mode", { method: "POST", body: { mode } });
 }
 
 /** POST /api/chat/ask-user —— 回传模型提问的用户逐题回答（A4，多问题版） */

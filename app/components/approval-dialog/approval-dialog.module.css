@@ -1,90 +1,138 @@
 /* ============================================================
-   approval-dialog.module.css —— 审批弹框（Phase 3 人工确认）
+   approval-dialog.module.css —— 审批卡片（Phase 3 + B1-④）
    归属组件：app/components/approval-dialog/index.tsx
-   双类组合（approval-btn + approval-allow/block）：JSX 用
-   styles.approvalBtn + styles.approvalAllow 拼，两个都 scope
+   布局抄 Reasonix 确认卡片：内嵌消息流的卡片（不打断），
+   header（警告图标+标题）→ subject（工具+参数代码块）→
+   actions（按钮带快捷键徽标）。融合本项目纸墨语言。
    ============================================================ */
 
-.approvalMask {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: grid;
-  place-items: center;
-  background: rgba(29, 33, 39, 0.35);
-}
-
-.approvalPanel {
-  width: min(420px, calc(100vw - 48px));
-  padding: 16px 18px 14px;
+.approvalCard {
+  margin: 6px 0 10px;
+  padding: 12px 14px 10px;
   background: var(--plate);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
-  box-shadow: 0 10px 30px rgba(29, 33, 39, 0.25);
+}
+
+/* header：警告图标（琥珀信号色）+ 标题（正文加粗） */
+.approvalHeader {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 8px;
+}
+
+.approvalIcon {
+  width: 16px;
+  height: 16px;
+  color: var(--pen-signal);
 }
 
 .approvalTitle {
-  font-family: var(--font-mono);
+  font-weight: 600;
   font-size: 13px;
-  letter-spacing: 0.06em;
   color: var(--ink);
 }
 
-.approvalTool {
-  margin-top: 10px;
-  font-family: var(--font-mono);
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--pen-tool);
+/* subject：工具名（紫红等宽加粗）+ 参数（记录纸代码块） */
+.approvalSubject {
+  padding: 7px 10px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  margin-bottom: 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow-y: auto;
 }
 
-.approvalArgs {
-  margin-top: 8px;
-  max-height: 180px;
-  overflow: auto;
-  padding: 8px 10px;
+.approvalTool {
+  display: block;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pen-tool);
+  margin-bottom: 4px;
+}
+
+/* 非 bash 工具：参数 JSON（小代码块） */
+.approvalArgs {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
   line-height: 1.5;
   color: var(--ink-mid);
-  background: var(--paper);
-  border-radius: var(--r);
   white-space: pre-wrap;
   word-break: break-all;
 }
 
+/* bash 工具：命令从 JSON 壳里提取出来，大字单独渲染（要执行的动作） */
+.approvalCommand {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* actions：每个按钮独占一行（纵向全宽，像操作台的大档位） */
 .approvalActions {
   display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 12px;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .approvalBtn {
-  padding: 5px 16px;
-  font-family: var(--font-mono);
-  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
   border-radius: var(--r);
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
-}
-
-.approvalAllow {
-  color: var(--plate);
-  background: var(--pen-model);
-  border: 1px solid var(--pen-model);
-}
-
-.approvalAllow:hover {
-  filter: brightness(1.08);
-}
-
-.approvalBlock {
-  color: var(--ink);
-  background: var(--paper);
   border: 1px solid var(--line);
 }
 
-.approvalBlock:hover {
-  border-color: var(--pen-error);
+/* 快捷键徽标：小方块刻字（Reasonix 同款） */
+.approvalKey {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--ink-faint);
+  background: var(--plate);
+}
+
+/* 允许系（Y/A/P）：主色浅底 + 主色字 + 主色描边（信任是用户给的） */
+.approvalAllow {
+  background: rgba(47, 75, 153, 0.08);
+  color: var(--pen-user);
+  border-color: var(--pen-user);
+}
+
+.approvalAllow:hover {
+  background: rgba(47, 75, 153, 0.16);
+}
+
+/* 拒绝（N）：灰底灰字，hover 变错误红 */
+.approvalDeny {
+  background: var(--paper);
+  color: var(--ink-mid);
+}
+
+.approvalDeny:hover {
+  background: var(--plate);
   color: var(--pen-error);
+  border-color: var(--pen-error);
 }

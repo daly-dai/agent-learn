@@ -198,21 +198,26 @@ export function useAgentRun(sessionId: string) {
     }
   }, []);
 
-  // 回传用户对挂起确认的决定（允许/拒绝）。接口 404 = 已超时/已处理。
+  // 回传用户对挂起确认的决定（B1-④：允许一次 / 本会话允许 / 一直允许 / 拒绝）。
+  // 接口 404 = 已超时/已处理。
   // 注意：fetch 移出 setState updater（updater 理论上可能被调用两次，
   // 副作用不该放里面——React 反模式，Phase 3 遗留下来的）
   const approve = useCallback(
-    async (allow: boolean) => {
+    async (decision: {
+      allow: boolean;
+      session?: boolean;
+      persist?: boolean;
+    }) => {
       if (!pendingApproval) return;
       const { toolCallId } = pendingApproval;
       setPendingApproval(null); // 立即关掉弹框；服务端那边 resolve 后引擎继续
       try {
-        await approveTool({ toolCallId, allow });
+        await approveTool({ toolCallId, ...decision, sessionId });
       } catch {
         // 404 = 已超时/已处理，无需处理
       }
     },
-    [pendingApproval],
+    [pendingApproval, sessionId],
   );
 
   // 回传用户对模型提问的回答（A4，多问题版）。空数组 = 全部跳过，服务端给"未回答"降级。

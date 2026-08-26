@@ -64,6 +64,14 @@
   padding: 0 26px;
 }
 
+/* ---- 审批模式切换条（B1-②） ---- */
+/* 与 todoBar 同列宽，右对齐（输入台区域的操作控件靠右） */
+.modeBar {
+  padding: 0 26px 4px;
+  display: flex;
+  justify-content: flex-end;
+}
+
 /* ---- 模型提问卡片容器（A4） ---- */
 /* 与 todoBar/console 同列：外层 26px padding，卡片内部 830 居中，与输入框对齐 */
 .askBar {
