@@ -119,6 +119,12 @@ export const config = {
   approval: {
     /** 超时兜底：默认 5 小时（前端不展示时间，用户不该有催促感） */
     timeoutMs: num("APPROVAL_TIMEOUT_MS", 5 * 60 * 60 * 1000),
+    /** 审批模式（B1-② 分级，抄 CodeWhale approval_mode）：
+     *  suggest 默认——只读命令静态分析放行 + 写操作弹框
+     *  bypass（YOLO）——除硬性策略外全部放行（调试/教学演示）
+     *  never——需确认的工具直接拒绝（演示安全边界）
+     *  APPROVAL_MODE 环境变量覆盖 */
+    mode: env("APPROVAL_MODE", "suggest"),
   },
 
   /** bash 命令执行 */
