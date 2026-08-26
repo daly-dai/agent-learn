@@ -220,7 +220,7 @@ todo 是会话事件（非独立存储）；`todo_write` 整表替换幂等；�
 
 | # | 做什么 | 参考 | 长在哪 | 状态 |
 |---|---|---|---|---|
-| B1 | **审批升级三步**：① 只读命令放行（Reasonix `bash_readonly.go`）② 分级模式（CodeWhale `approval_mode.rs`）③ 审批日志（CodeWhale `approval_log.rs`） | Reasonix / CodeWhale | `app/api/chat/route.ts` 的 `TOOLS_NEEDING_CONFIRM` 判定处 + `lib/tools/bash.ts` | ⏳ 最快见效，先做 |
+| B1 | **审批升级四步**：① 只读命令放行（Reasonix `bash_readonly.go` + `shellsafe/*.go`）② 分级模式（CodeWhale `approval_mode.rs`，suggest/bypass/never + 运行时切换）③ 审批日志（CodeWhale `approval_log.rs`，JSONL 成对校验）④ 前端面板 + 记忆（Reasonix 内嵌卡片布局 + 本会话/一直允许） | Reasonix / CodeWhale / pi | `lib/permission/`（readonly / approval-log / approval-memory）+ `lib/approvalMode.ts` + `app/api/chat/route.ts` + approve/approval-mode 接口 + `app/components/approval-dialog` + `approval-mode-switch` | ✅（详案 `doc/plan/b1-approval.md`） |
 | B2 | **真摘要压缩**：拼贴 → 调模型生成结构化摘要（pi 六段 + DSH Files/Errors 两段；增量 previousSummary；经济性检查；MOCK 降级拼贴） | pi compaction + DSH + Reasonix | `lib/session/store.ts` + `lib/summarize.ts` | ✅（详案 `doc/plan/b2-compaction.md`） |
 | B3 | **UI 原语库**：`app/components/ui/`（dialog/collapse/select/stepper…） | DSH `dsh-client-ui-primitives` | `app/components/ui/` | ⏳ 排队 |
 | B4 | **文件 diff 预览**：edit/write 前生成 diff（红绿视图） | Cline / DSH DiffBlock | `lib/tools/edit.ts` + `app/components/ui/diff/` | ⏳ 排队 |
