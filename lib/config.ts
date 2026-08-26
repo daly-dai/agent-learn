@@ -63,14 +63,17 @@ export type ProviderConfig = {
 const PROVIDERS: Record<string, ProviderConfig> = {
   // DeepSeek V4：官方 1M 上下文窗口（2026-08 确认）。
   // 触发阈值 = 窗口 - 预留：预留 16K 给摘要，约 984K 才压——几十上百轮才触发。
+  // 【测试口子】窗口/预留支持 env 覆盖（CONTEXT_WINDOW / RESERVE_TOKENS）：
+  // 想快速触发压缩，设 CONTEXT_WINDOW=3000 之类的小值即可（改 .env.local 后重启 dev）。
   deepseek: {
     label: "deepseek",
     baseUrl: "https://api.deepseek.com",
     model: "deepseek-v4-flash",
-    contextWindow: 1_000_000,
-    reserveTokens: 16_384,
+    contextWindow: num("CONTEXT_WINDOW", 1_000_000),
+    reserveTokens: num("RESERVE_TOKENS", 16_384),
     keepRecentTokens: 20_000,
-    keepRecentMessages: 8,
+    // 保留最近 N 条消息（测试口子：KEEP_RECENT_MESSAGES 可覆盖）
+    keepRecentMessages: num("KEEP_RECENT_MESSAGES", 8),
   },
   // 占位：将来加 Anthropic / OpenAI / 本地 ollama……
   // anthropic: { label: "anthropic", baseUrl: "...", model: "...", contextWindow: 200_000, ... },
@@ -101,6 +104,15 @@ export const config = {
   agent: {
     /** 调试：轨迹/SSE 打印请求概览 */
     debugDeepSeek: env("DEBUG_DEEPSEEK", "") === "true",
+    /**
+     * 压缩经济性检查（Reasonix D6，doc/02）：待压区域低于该 token 数就不压——
+     * 省下的 token 不够抵消一次摘要 API 调用的成本/延迟。
+     */
+    minCompactTokens: num("MIN_COMPACT_TOKENS", 400),
+    /** Agent 循环最大轮次（防无限循环的护栏；route.ts 传入 runAgentLoop） */
+    // 默认 16（原 6 太紧：长任务常常一轮工具调用就多轮，6 轮容易误触护栏；
+    // 16 是实测日常够用的值。MAX_TURNS 可覆盖，测试时可调小观察护栏行为）
+    maxTurns: num("MAX_TURNS", 16),
   },
 
   /** 人工确认（写/改/删弹框） */

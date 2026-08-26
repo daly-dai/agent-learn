@@ -182,8 +182,8 @@ export async function runAgentLoop(options: RunAgentLoopOptions): Promise<{
   const context = [...options.messages];
   // 本轮新增的消息（最终 return 给调用方）
   const newMessages: AgentMessage[] = [];
-  // 最大轮数，默认 6，防止无限循环
-  const maxTurns = options.maxTurns ?? 6;
+  // 最大轮数，默认 16（与 config.agent.maxTurns 一致；防无限循环）
+  const maxTurns = options.maxTurns ?? 16;
 
   emit({ type: "agent_start" });
 
