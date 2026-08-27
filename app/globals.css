@@ -39,7 +39,7 @@
   --line: #dcdcdc;
   --line-soft: #ececec;
 
-  /* 笔色 = 通道色。每支笔只代表一类事件 */
+  /* 通道色：每支颜色只代表一类事件 */
   --pen-user: #2f4b99; /* 用户指令 */
   --pen-model: #0b6857; /* 模型输出 */
   --pen-tool: #9c2b6e; /* 工具执行 */
@@ -286,7 +286,7 @@ pre,
   margin: 1.4em 0;
 }
 
-/* 代码高亮：把 highlight.js 的默认色换成本页的笔色。
+/* 代码高亮：把 highlight.js 的默认色换成本页的通道色。
    选择器带 .markdown-body pre 前缀，特异性高于 github.css 的 .hljs-*，
    所以不用 !important 也能覆盖。 */
 .markdown-body pre .hljs-comment,

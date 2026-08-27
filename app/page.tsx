@@ -26,7 +26,7 @@
 //                    见 nameplate 头注释）
 //   foldEvents()    app/lib/trace-fold.ts（纯函数）
 //                   把原始 AgentEvent 流折叠成记录条行：连续 message_update
-//                   收成一笔墨迹、工具 start/end 配成一段跨度（105 条事件
+//                   收成一条墨线、工具 start/end 配成一段跨度（105 条事件
 //                   实测塌成 2 行），结果喂给 <TraceRail> 渲染。
 //   derivePhase()   本文件底部（纯函数）—— 根据最近一条事件推断状态灯相位
 //   currentTurn()   本文件底部（纯函数）—— 从 turn_start 事件数出当前轮次
@@ -37,7 +37,7 @@
 //   <Overture>      app/components/overture/ —— 空态引导 + 例句按钮
 //   <MessageRow>    app/components/message-row/ —— 转录稿单条消息
 //                   （用户/Agent 文本/工具调用行/工具结果卡片）
-//   <TraceRail>     app/components/trace-rail/ —— 右侧走纸记录条
+//   <TraceRail>     app/components/trace-rail/ —— 右侧时间轴记录条
 //                   （时间轴 + 底部轮次/工具/token 统计）
 //   <ApprovalDialog> app/components/approval-dialog/ —— 写/改/删工具的
 //                   人工确认弹框（允许/拒绝），配合 pendingApproval/approve

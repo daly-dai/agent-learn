@@ -7,9 +7,9 @@
 // "Question 1/3"、返回上题、每道题可选选项点选 或 自定义补充 或 跳过。
 // 渲染在输入框位置（替换输入台，Reasonix composer-decision-host 同款）。
 //
-// 设计语言（走纸记录仪）：
-//   - 问题用 model 绿（--pen-model）= "模型那支笔在说"
-//   - 选项/提交用 user 蓝（--pen-user）= "该你回笔了"
+// 设计语言（中性壳）：
+//   - 问题用 model 绿（--pen-model）= 模型通道在说
+//   - 选项/提交用 user 蓝（--pen-user）= 该你作答了
 //   - 等待信号点用 signal 琥珀 + lamp 脉冲（全局动画）
 //   - 进度 "1/3" 用等宽读数（序号带信息，不是装饰）
 //
@@ -71,7 +71,7 @@ export function AskUserCard({ ask, onAnswer }: AskUserCardProps) {
         <span className={styles.hint}>点选项或输入 · 返回上一题可改</span>
       </div>
 
-      {/* 当前问题：model 绿 + 等宽——"模型那支笔在说" */}
+      {/* 当前问题：model 绿 + 等宽——模型通道在说 */}
       <p className={styles.question}>{question.question}</p>
 
       {/* 有选项 → 渲染成可点选项行；否则直接是自由输入框 */}

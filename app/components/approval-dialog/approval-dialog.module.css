@@ -3,7 +3,7 @@
    归属组件：app/components/approval-dialog/index.tsx
    布局抄 Reasonix 确认卡片：
    header（警告图标+标题）→ subject（工具+参数代码块）→
-   actions（按钮带快捷键徽标）。融合本项目纸墨语言。
+   actions（按钮带快捷键徽标）。融合本项目视觉语言。
    V2（2026-08-26）：从"消息流内嵌"挪到"底部决策区"（用户要求像
    askUser 悬浮在输入框位置）——见 page.tsx decisionBar。
    ============================================================ */
@@ -40,7 +40,7 @@
   color: var(--ink);
 }
 
-/* subject：工具名（紫红等宽加粗）+ 参数（记录纸代码块） */
+/* subject：工具名（紫红等宽加粗）+ 参数（代码块） */
 .approvalSubject {
   padding: 9px 12px; /* V2：7px 10px → 9px 12px */
   background: var(--paper);

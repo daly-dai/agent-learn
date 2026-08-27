@@ -1,7 +1,7 @@
 "use client";
 
 // ============================================================
-// 轨迹区（走纸记录条）—— 把折叠好的行画成时间轴 + 底部统计
+// 轨迹区（时间轴记录条）—— 把折叠好的行画成时间轴 + 底部统计
 // 折叠逻辑在 ../../lib/trace-fold.ts（纯函数），这里只负责渲染
 // ============================================================
 
@@ -56,7 +56,7 @@ export function TraceRail({ rows, observed, stats, reelRef }: TraceRailProps) {
   );
 }
 
-/** 空态里放读法说明：与其写「暂无事件」，不如先教会怎么看这张纸 */
+/** 空态里放读法说明：与其写「暂无事件」，不如先教会怎么看这张图 */
 function TraceLegend() {
   const keys = [
     { tone: "turn", text: "轮次分节 T1 / T2" },
@@ -84,7 +84,7 @@ function TraceLegend() {
 }
 
 function TraceRowView({ row }: { row: TraceRow }) {
-  // pen-* 是动态笔色，保持全局字符串（见 module.css 注释）
+  // pen-* 是动态通道色，保持全局字符串（见 module.css 注释）
   const cls = `${styles.traceRow} pen-${row.pen}`;
 
   if (row.kind === "band") {

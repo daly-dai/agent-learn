@@ -15,7 +15,7 @@ export function textLength(
   );
 }
 
-/** 墨迹宽度：随字数增长，封顶 96px */
+/** 线条宽度：随字数增长，封顶 96px */
 export function inkWidth(chars = 0): string {
   return `${Math.min(96, 8 + chars / 6)}px`;
 }

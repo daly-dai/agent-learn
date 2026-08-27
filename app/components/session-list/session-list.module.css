@@ -150,7 +150,7 @@
 
 /* 行内删除确认条（2026-08-28，替代居中 ConfirmDialog）：
    复用行内重命名的"状态替换行内容"模式，样式按 34px 命中区（V2 口径）。
-   危险操作（删除）用 error 红笔，取消按钮纸底静默——与审批卡同语言 */
+   危险操作（删除）用 error 红，取消按钮浅底静默——与审批卡同语言 */
 .sessionConfirm {
   display: flex;
   flex-direction: column;

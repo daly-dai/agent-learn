@@ -1,9 +1,9 @@
 /* ============================================================
-   trace-rail.module.css —— 轨迹区（走纸记录条 + 读数盘）
+   trace-rail.module.css —— 轨迹区（时间轴记录条 + 读数盘）
    归属组件：app/components/trace-rail/index.tsx
    ============================================================
    动态类（全部 :global 标注，JSX 拼字符串）：
-   - pen-${row.pen}（笔色：turn/user/model/tool/signal/error）
+   - pen-${row.pen}（通道色：turn/user/model/tool/signal/error）
    - is-band / is-live / is-running（状态）
    - legend-${tone}（图例通道）
    @keyframes lamp 是跨组件共享动画，留在全局 globals.css
@@ -103,7 +103,7 @@
   box-shadow: 0 0 0 3px var(--recorder);
 }
 
-/* 笔色动态类故意全局：JSX 拼 pen-${row.pen} */
+/* 通道色动态类故意全局：JSX 拼 pen-${row.pen} */
 .traceRow:global(.pen-turn)::before {
   background: var(--ink);
   border-radius: 1px;
@@ -161,7 +161,7 @@
   background: var(--line);
 }
 
-/* 模型输出：一笔连续的墨迹，长度随字数增长 */
+/* 模型输出：一条连续的墨线，长度随字数增长 */
 .stroke {
   display: flex;
   align-items: center;
@@ -270,7 +270,7 @@
   color: var(--pen-error);
 }
 
-/* 空态：与其放一句「暂无事件」，不如把这张纸的读法讲清楚 */
+/* 空态：与其放一句「暂无事件」，不如把这张图的读法讲清楚 */
 .traceEmpty {
   padding: 4px 2px;
 }

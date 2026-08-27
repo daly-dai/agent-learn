@@ -1,10 +1,10 @@
 // ============================================================
-// 事件折叠 —— 把原始 AgentEvent 流折叠成「走纸记录条」的行（纯函数）
+// 事件折叠 —— 把原始 AgentEvent 流折叠成「时间轴记录条」的行（纯函数）
 // ============================================================
 //
 // 轨迹区不是日志列表，它做了三件聚合（都在 foldEvents 里）：
 //   1. turn_start                  → 开一条轮次带 T1 / T2
-//   2. 连续的 message_update        → 收成一笔墨迹（长度随字数增长）
+//   2. 连续的 message_update        → 收成一条墨线（长度随字数增长）
 //   3. tool_execution_start/end    → 配成一段跨度（条长 = 真实耗时）
 //
 // 实测一次「列出工作区文件」的真实 run：105 条 message_update + 12 条
@@ -77,7 +77,7 @@ function signal(label: string, note?: string): TraceRow {
   return { pen: "signal", kind: "signal", label, note };
 }
 
-/** 用户消息进轨迹（模型消息交给墨迹行，工具结果交给跨度行） */
+/** 用户消息进轨迹（模型消息交给墨线行，工具结果交给跨度行） */
 function foldMessageStart(rows: TraceRow[], item: ObservedEvent): void {
   if (item.event.type !== "message_start") return;
   const message = item.event.message;
