@@ -371,7 +371,9 @@ export async function GET(req: NextRequest) {
 }
 
 // --- DELETE /api/chat?sessionId=xxx ---
-// 清空会话（与前端「清空记录」按钮配套：只清本地状态的话，刷新后历史会复活）。
+// 清空会话消息（保留会话本身）。2026-08-26：前端「清空记录」按钮已删，
+// 本路由保留为服务端能力（未来斜杠命令 /clear 等可复用）。
+// 为什么要有服务端清空：只清前端本地状态的话，刷新后历史会从文件复活。
 export async function DELETE(req: NextRequest) {
   const sessionId = req.nextUrl.searchParams.get("sessionId") || "default";
   if (!isValidSessionId(sessionId)) {

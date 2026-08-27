@@ -19,9 +19,11 @@
 //                   页面把 currentId 传给 useAgentRun —— 切换会话 = 换 id。
 //   useAgentRun()   app/lib/use-agent-run.ts
 //                   run 的全部状态 + 行为。内部封装了 fetch POST /api/chat、
-//                   readStream 逐帧消费、会话历史 GET 恢复、DELETE 清空。
+//                   readStream 逐帧消费、会话历史 GET 恢复。
 //                   返回 { messages, observed, loading, error, runId, model,
-//                          send(text), reset(), stats }。
+//                          send(text), stats }。
+//                   （2026-08-26：reset 已删——清空会话功能移除，
+//                    见 nameplate 头注释）
 //   foldEvents()    app/lib/trace-fold.ts（纯函数）
 //                   把原始 AgentEvent 流折叠成记录条行：连续 message_update
 //                   收成一笔墨迹、工具 start/end 配成一段跨度（105 条事件
@@ -54,6 +56,7 @@ import { TaskPanel } from "./components/task-panel";
 import { AskUserCard } from "./components/ask-user-card";
 import { useAgentRun } from "./lib/use-agent-run";
 import { useSessions } from "./lib/use-sessions";
+import { useStickyScroll } from "./lib/use-sticky-scroll";
 import { foldEvents } from "./lib/trace-fold";
 import type { ObservedEvent } from "./lib/sse";
 import type { ApprovalMode } from "./services/chat/types";
@@ -62,7 +65,9 @@ import { getApprovalMode, setApprovalMode } from "./services/chat";
 export default function Home() {
   // 会话栏（Phase 2）：列表 + 当前会话 id。currentId 传给 useAgentRun，
   // 切换会话 = 换 currentId，聊天区随之清空并加载对应历史。
-  const { sessions, currentId, select, create, rename, remove } = useSessions();
+  // refresh 额外用于"run 结束后列表保鲜"（见下方 loading 跳变 effect）
+  const { sessions, currentId, select, create, rename, remove, refresh } =
+    useSessions();
 
   // hook：一次 run 的观测状态和行为。页面从这里拿数据，不再自己发 fetch。
   //   messages  转录稿消息（当前会话历史 + 本次 run 新增）
@@ -72,12 +77,12 @@ export default function Home() {
   //   runId     本次 run 的唯一 id（铭牌展示，来自 run 帧）
   //   model     本次用的模型名（铭牌展示）
   //   send(text)  发送一次 run：fetch → readStream 逐帧消费 → applyFrame
-  //   reset()     清空当前会话：先 DELETE /api/chat（清服务端 JSONL），再清本地
   //   stats       会话级累计统计（轮次/工具/token）：服务端从会话文件算出，
   //               切换会话/run 结束时更新，读数盘直接展示
   //   pendingApproval  挂起的工具确认（写/改/删弹框用）；approve(allow) 回传决定
   //   toolOutputs  bash 命令的实时输出（toolCallId → 文本）；stop(runId) 停止当前 run
   //   todos        任务清单（Phase 5）：模型 todo_write 更新，前端只读展示
+  //   （2026-08-26：reset 已删——清空会话功能移除，见 nameplate 头注释）
   const {
     messages,
     observed,
@@ -86,7 +91,6 @@ export default function Home() {
     runId,
     model,
     send,
-    reset,
     stats,
     pendingApproval,
     approve,
@@ -123,16 +127,22 @@ export default function Home() {
   const traceRef = useRef<HTMLDivElement>(null); // 轨迹容器，新事件到达时滚到底
   const inputRef = useRef<HTMLTextAreaElement>(null); // 输入框，聚焦/自适应高度用
 
-  // 两个滚动效果：messages / observed 更新时把对应面板滚到底部
-  // pendingApproval 变化也要滚：确认卡片出现在消息流末尾时能看到它，
-  // 否则卡片停在视口底部（紧贴输入框），看起来像"浮在输入框上"
-  useEffect(() => {
-    scrollToEnd(transcriptRef.current);
-  }, [messages, pendingApproval]);
+  // ---- 滚动跟随（吸底）----
+  // 2026-08-26 修：原来每次 messages/observed 更新都强制 scrollToEnd——
+  // 流式每来一个 delta 就把滚动轴拽到底，用户想翻上面的历史做不到。
+  // 现在用 useStickyScroll 判定"用户是否停靠底部"：停靠才自动滚，
+  // 用户滚上去看历史就停止跟随，滚回底部自动恢复（标准聊天 UX）。
+  // 判定逻辑封装在 hook（阈值 48px 也在里面），这里只剩两行组装。
+  const followTranscript = useStickyScroll(transcriptRef);
+  const followTrace = useStickyScroll(traceRef);
 
   useEffect(() => {
-    scrollToEnd(traceRef.current);
-  }, [observed]);
+    if (followTranscript) scrollToEnd(transcriptRef.current);
+  }, [messages, followTranscript]);
+
+  useEffect(() => {
+    if (followTrace) scrollToEnd(traceRef.current);
+  }, [observed, followTrace]);
 
   // 输入框随内容长高（上限由 CSS 的 max-height 兜住）
   useEffect(() => {
@@ -141,6 +151,18 @@ export default function Home() {
     box.style.height = "auto";
     box.style.height = `${box.scrollHeight}px`;
   }, [input]);
+
+  // 列表保鲜（2026-08-26 修）：run 结束（loading true→false）后刷新会话列表。
+  // 会话列表只在 挂载/新建/重命名/删除 时刷新，聊天后不刷 → 停在旧快照：
+  // 新建会话聊完仍是"未命名会话 0 条"（消息数/预览/排序都不更新）。
+  // 用 loading 跳变（而非 done 帧）判断：也覆盖出错/停止导致 run 结束的情况。
+  const prevLoadingRef = useRef(loading);
+  useEffect(() => {
+    if (prevLoadingRef.current && !loading) {
+      refresh();
+    }
+    prevLoadingRef.current = loading;
+  }, [loading, refresh]);
 
   // 发送入口（表单提交 / 回车都走这里）：
   // 页面负责「校验非空 + 清空输入框」，真正的请求交给 hook 的 send(text)
@@ -167,19 +189,12 @@ export default function Home() {
 
   return (
     <div className="app">
-      {/* 页头：runId / 模型名 / 状态灯 / 清空按钮。canReset 在非加载且有内容时可点。
+      {/* 页头：runId / 模型名 / 状态灯（清空按钮已删，见 nameplate 头注释）。
           停止按钮不在这：它在输入框旁（run 进行中发送按钮变身），见 console 区 */}
-      <Nameplate
-        runId={runId}
-        model={model}
-        phase={phase}
-        turn={turn}
-        onReset={reset}
-        canReset={!loading && (messages.length > 0 || observed.length > 0)}
-      />
+      <Nameplate runId={runId} model={model} phase={phase} turn={turn} />
 
       <div className="deck">
-        {/* 左侧会话栏（Phase 2）：点击切换 / ＋新建 / ✎重命名 / ×删除 */}
+        {/* 左侧会话栏（Phase 2）：点击切换 / ＋新建 / ⋯ 重命名·删除 */}
         <SessionList
           sessions={sessions}
           currentId={currentId}
@@ -222,9 +237,8 @@ export default function Home() {
                   <span>正在压缩上下文，请稍候…</span>
                 </div>
               )}
-              {/* 待确认卡片（B1-④，抄 Reasonix）：嵌在消息流末尾，不打断——
-                  像一条"需要盖章"的待办，用户决定后卡片消失 */}
-              <ApprovalDialog request={pendingApproval} onApprove={approve} />
+              {/* 待确认卡片（B1-④）已从消息流移到底部决策区（2026-08-26，
+                  用户要求"像 askUser 悬浮在输入框位置"）——见下方 decisionBar */}
             </div>
           </div>
 
@@ -252,11 +266,19 @@ export default function Home() {
             </div>
           )}
 
-          {/* 底部决策区二选一（Reasonix 式）：
-              模型提问时（pendingAsk）输入框隐藏，提问卡占据输入框的位置；
-              否则显示输入控制台。二者共用 .askBar/.console 的列宽（26px padding + 830 居中） */}
-          {pendingAsk ? (
-            <div className={styles.askBar}>
+          {/* 底部决策区三选一（Reasonix 式）：
+              pendingApproval → 工具审批卡（用户决定允许/拒绝）
+              pendingAsk      → 模型提问卡（用户逐题作答）
+              否则 → 输入控制台
+              "模型需要你"时，输入框隐藏，对应卡片占据输入框的位置——
+              钉在底部永远可见，不用滚动去找（2026-08-26：审批卡从消息流
+              挪到这里，与 askUser 同款）。共用 .decisionBar/.console 列宽 */}
+          {pendingApproval ? (
+            <div className={styles.decisionBar}>
+              <ApprovalDialog request={pendingApproval} onApprove={approve} />
+            </div>
+          ) : pendingAsk ? (
+            <div className={styles.decisionBar}>
               <AskUserCard ask={pendingAsk} onAnswer={answerAsk} />
             </div>
           ) : (

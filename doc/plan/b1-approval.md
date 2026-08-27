@@ -110,6 +110,7 @@
 3. **outcome 扩展**：`"approved" | "approved-session" | "approved-persist" | "denied" | "timeout"`——日志里能区分用户选了三档里的哪一档（审计信息量）
 4. **记忆实现**：session = globalThis 内存 Map（`Map<sessionId, Set<toolName>>`，跨 worker 可见）；persist = `.sessions/approval-rules.json`（`{ tools: [...] }` 排序数组）。**存储位置 = 信任有效期**（内存=本会话，磁盘=跨会话）
 5. **判定顺序**（信任成本从便宜到贵）：一直允许（磁盘）→ 本会话允许（内存）→ 只读静态分析（fail-closed）→ 弹框
+6. **面板位置再改（2026-08-26，用户要求"像 askUser 悬浮在输入框位置"）**：审批卡从"消息流内嵌"挪到**底部决策区**（与 askUser 卡共用 `decisionBar` 容器，输入框隐藏、卡片占据其位置，钉在底部永远可见）。触发原因：内嵌在消息流里要滚动才能看到；askUser 卡钉在输入区不用找。连带：`scrollToEnd` 依赖去掉 pendingApproval（卡不在消息流里了）、`.askBar` 更名 `.decisionBar`（提问卡/审批卡共用）。**保留了原设计的非模态与快捷键 Y/A/P/N**——只是位置变了
 
 ### 踩过的坑（下次别踩）
 

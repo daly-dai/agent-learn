@@ -36,7 +36,9 @@ export function fetchHistory(
   });
 }
 
-/** DELETE /api/chat?sessionId= —— 清空当前会话消息（「清空记录」按钮） */
+/** DELETE /api/chat?sessionId= —— 清空当前会话消息。
+ *  2026-08-26：UI 入口（清空记录）已删——多会话下被「新建/删除」覆盖。
+ *  接口保留（与服务端路由一一对应），未来斜杠命令（/clear 等）可复用。 */
 export function clearHistory(sessionId: string): Promise<ClearHistoryResult> {
   return api(`/api/chat?sessionId=${encodeURIComponent(sessionId)}`, {
     method: "DELETE",

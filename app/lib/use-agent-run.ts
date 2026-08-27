@@ -5,7 +5,7 @@
 // ============================================================
 //
 // 把「消息、事件、loading、runId、模型名」这些状态，和它们的行为
-// （send / reset / applyFrame）收进一个 Hook。页面组件（page.tsx）
+// （send / applyFrame）收进一个 Hook。页面组件（page.tsx）
 // 只管组合，不再关心请求怎么发、帧怎么消费、历史怎么恢复。
 //
 // 注意：
@@ -14,7 +14,10 @@
 //   - Phase 2 多会话：hook 接收 sessionId（来自 useSessions 的 currentId）。
 //     sessionId 变化 = 切换会话：清空本地状态 → 拉新会话历史。
 //   - 请求全部走 app/services 接口层，本文件不再直接 fetch：
-//     fetchHistory / clearHistory / approveTool / stopRun / sendMessage
+//     fetchHistory / approveTool / stopRun / sendMessage
+//   - 2026-08-26：reset（清空当前会话）已删——多会话下被「新建/删除」覆盖，
+//     且它连确认弹框都没有（静默抹历史）。resetLocal 保留（切会话共用）。
+//     服务端 DELETE /api/chat 与 services.clearHistory 保留，供未来斜杠命令复用。
 // ============================================================
 
 import { useCallback, useEffect, useState } from "react";
@@ -24,7 +27,6 @@ import { appendDelta, replaceLast } from "./messages";
 import { readStream, type ObservedEvent, type StreamFrame } from "./sse";
 import {
   fetchHistory,
-  clearHistory,
   approveTool,
   answerUserQuestion,
   stopRun,
@@ -68,9 +70,9 @@ export function useAgentRun(sessionId: string) {
   // 上下文压缩进行中（B2）：收到 compacting 帧置 true，done/error 复位
   const [compacting, setCompacting] = useState(false);
 
-  // 清空本地状态（不含服务端）：切会话 / 清空记录共用同一份。
-  // 从历史恢复 effect 和 reset() 里抽出来的公共逻辑——
-  // 原来两处各写一遍，且 reset 漏了清 toolOutputs，统一后行为一致
+  // 清空本地状态（不含服务端）：切会话共用同一份。
+  // 从历史恢复 effect 里抽出来的公共逻辑——
+  // 原来 reset() 也用它，reset 删除后它只服务切会话（行为一致）
   const resetLocal = useCallback(() => {
     setMessages([]);
     setObserved([]);
@@ -280,18 +282,6 @@ export function useAgentRun(sessionId: string) {
     [sessionId, loading, applyFrame],
   );
 
-  // 清空当前会话：先清服务端，再清本地——只清本地的话，刷新后历史会复活
-  const reset = useCallback(async () => {
-    if (sessionId) {
-      try {
-        await clearHistory(sessionId);
-      } catch {
-        // 网络失败也继续清本地，不阻塞用户
-      }
-    }
-    resetLocal();
-  }, [sessionId, resetLocal]);
-
   return {
     messages,
     observed,
@@ -300,7 +290,6 @@ export function useAgentRun(sessionId: string) {
     runId,
     model,
     send,
-    reset,
     stats,
     pendingApproval,
     approve,
