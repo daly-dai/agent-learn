@@ -136,4 +136,6 @@ PLAN 九节写着"漂亮动画 / 复杂 UI"暂缓。这次只做了排版与信�
 1. **验收口径核查**：10.5 说"等宽标签最小 12px"，但全站仍有 18 处 <12px（approvalKey 10.5px、message-row 元信息 10-11px、sessionMeta 11px 等）——需逐一判断"标签 vs 装饰"后决定是否上提
 2. **B3-⑤ 精读 DSH packages/client/AGENTS.md**（约束 AI 写前端的教材，建议放周五回顾 Phase 2）
 3. **注释纸感词汇标注**：trace-rail 已标"删除"历史，approval/ask-user/message-row/task-panel 的"走纸记录仪"注释还没标退役
+**重构：SessionRow 抽取（2026-08-28，code-review 气味落地）**：`session-list/index.tsx` 的 map 回调拆出 `session-row.tsx`（同行目录）——SessionList 只剩"列表容器 + 行内状态持有者"（215→83 行），SessionRow 只回答"一行有几种形态"（正常/重命名/删除确认/⋯菜单）。关键取舍：**editingId/draft/pendingDelete 单值状态保持提在父级**（有意的互斥设计：同一时刻只有一行编辑/删除），SessionRow 只收 props 转发回调，唯一例外是确认条取消按钮的 ref+聚焦（纯行内视觉行为）。行为等价核对 5 项交互全部一一对应。
+
 
