@@ -222,11 +222,12 @@ todo 是会话事件（非独立存储）；`todo_write` 整表替换幂等；�
 |---|---|---|---|---|
 | B1 | **审批升级四步**：① 只读命令放行（Reasonix `bash_readonly.go` + `shellsafe/*.go`）② 分级模式（CodeWhale `approval_mode.rs`，suggest/bypass/never + 运行时切换）③ 审批日志（CodeWhale `approval_log.rs`，JSONL 成对校验）④ 前端面板 + 记忆（Reasonix 内嵌卡片布局 + 本会话/一直允许） | Reasonix / CodeWhale / pi | `lib/permission/`（readonly / approval-log / approval-memory）+ `lib/approvalMode.ts` + `app/api/chat/route.ts` + approve/approval-mode 接口 + `app/components/approval-dialog` + `approval-mode-switch` | ✅（详案 `doc/plan/b1-approval.md`） |
 | B2 | **真摘要压缩**：拼贴 → 调模型生成结构化摘要（pi 六段 + DSH Files/Errors 两段；增量 previousSummary；经济性检查；MOCK 降级拼贴） | pi compaction + DSH + Reasonix | `lib/session/store.ts` + `lib/summarize.ts` | ✅（详案 `doc/plan/b2-compaction.md`） |
-| B3 | **UI 原语库**：`app/components/ui/`（dialog/collapse/select/stepper…） | DSH `dsh-client-ui-primitives` | `app/components/ui/` | ⏳ 排队 |
+| B3 | **UI V2：尺度升级 + 原语库**（2026-08-26 用户 UI 反馈触发：按钮太小、小家子气、溢出操作进 dropdown）：① 全面板尺度升级（按钮 ≥34px 命中区、字号上提、留白加大）② 第一个原语 = **下拉菜单 Menu**（溢出操作归集：顶栏「⋯」、会话行「⋯」、面板头部）③ 面板 chrome 统一（头部 = 标题 + 读数 + 操作区）④ dialog/collapse/select/stepper… 后续按需 ⑤ **精读 DSH `packages/client/AGENTS.md`**（约束 AI 写前端的教材；约束纪律见 `doc/plan/ui-design.md` §10.6） | DSH `dsh-client-ui-primitives` + Reasonix 面板族（走读 18） | `app/components/ui/`（新）+ 全部组件样式升级 | ⏳ 进行中（①②已落地，详案补记 `doc/plan/ui-design.md` §10.5-10.6） |
 | B4 | **文件 diff 预览**：edit/write 前生成 diff（红绿视图） | Cline / DSH DiffBlock | `lib/tools/edit.ts` + `app/components/ui/diff/` | ⏳ 排队 |
 | B5 | **hooks 注册表**：beforeToolCall 泛化成 onBeforeTool/onAfterTool | CodeWhale / DSH hooks | `lib/hooks.ts` + `lib/agent.ts` 透传 | ⏳ 排队 |
 | B6 | **记忆分层**：会话 + 摘要已有，补"主动回忆/新鲜度" | Reasonix memory | `lib/session/store.ts` + 未来记忆工具 | ⏳ 排队 |
 | B7 | **终端加固**：bash 输出全量落盘 + shell 危险分析（重定向/嵌套检测） | Reasonix shellsafe | `lib/tools/bash-runner.ts` | ⏳ 排队 |
+| B8 | **前端单元测试**（**非核心**，2026-08-26 用户标注"这个倒不是核心"）：① 纯函数层先行（`app/lib/`：trace-fold/messages/format——不随 UI 变，随时可做）② 组件/hooks 层（RTL：Menu/MessageRow/use-sessions）等"冻结信号"：全局令牌与骨架连续 2 轮迭代不改、组件 API 冻结 | vitest + Testing Library（参考 DSH test-support） | `app/lib/*.test.ts` + `app/components/**/*.test.tsx` | ⏳ 排队 |
 
 **阶段 C：功能丰富（远期，按需）**
 
