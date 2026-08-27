@@ -1,6 +1,6 @@
 # 知识点-04：精读 DSH `packages/client/AGENTS.md` 对照表
 
-> 2026-08-28（周五）· B3-⑤ 精读任务产出
+> 2026-08-27（周四）· B3-⑤ 精读任务产出
 > 精读对象：`E:\agents-read\deepseek-harness\packages\client\AGENTS.md`（"Web client stack"，150 行）
 > 背景：2026-08-26 用户问"参考项目是怎么约束 AI 对页面的开发的，总不能想一出是一出"——查证发现 DSH 为 Web client 专门写了一份 AGENTS.md，**约束 AI 写前端是显式工程实践**。§10.6 已把它归纳为五层约束；本表逐区精读，回答"我们缺什么"。
 
@@ -25,7 +25,7 @@
 | 7 | **Build-time env** | `DSH_CLIENT_*` 构建期环境变量 | 无此需求 | 不适用 |
 | 8 | **Shared modules & module graph** | 动态插件模块表 + 请求供应验证 | 单包项目 | 不适用 |
 | 9 | **Conversation Node discipline** | 一个业务 feature 一个 node；match/update 纯函数、可回放 | `lib/trace-fold.ts` 折叠纯函数（同思想！） | ✅ 已一致（已抄） |
-| 10 | **Directory regime** | 一 feature 一目录；域间不互相 import；单点组装 | `app/components/<组件>/` + 08-28 SessionRow 抽取 | ✅ 已一致（有雏形） |
+| 10 | **Directory regime** | 一 feature 一目录；域间不互相 import；单点组装 | `app/components/<组件>/` + 08-27 SessionRow 抽取 | ✅ 已一致（有雏形） |
 | 11 | **Styling** | `--dsw-*` 令牌 + CSS Modules；无字面色值/组件库/Tailwind；产品中文、注释英文 | `--plate/--pen-*` + CSS Modules + 无第三方库；注释中文（主动差异） | ✅ 已一致（注释语言是教学项目拍板差异） |
 | 12 | **Testing and coverage** | 三层测试；**组件测试断言用户可见行为，不断言 class name/hook 内部**；jsdom per-file pragma；覆盖率门 | A2 vitest node 层（22 文件 173 用例）；B8 组件层排队等冻结 | 🔺 **可借（最有价值）** |
 | 13 | **Before you push** | 检查阶梯：秒级内环 → snapshot 回放 → 提交前精选；`test:gui` "run it as freely as a typecheck" | tsc 每步 + `pnpm test` 全量 | 🔺 可借（显式化最窄优先） |
@@ -64,7 +64,7 @@ slot 系统、module graph、dependency declaration、build-time env、plugin pa
 
 ## 附：DSH 约束 AI 写前端的完整脉络（八道闸）
 
-> 2026-08-28 追加。对照表回答"他有哪些纪律"，本节回答"这些纪律怎么串成一条链"。核心思路一句话：**把每个决策点都变成"已定的"，让 AI 没有自由发挥的余地。**
+> 2026-08-27 追加。对照表回答"他有哪些纪律"，本节回答"这些纪律怎么串成一条链"。核心思路一句话：**把每个决策点都变成"已定的"，让 AI 没有自由发挥的余地。**
 
 ### 八道闸逐层收紧
 
@@ -79,7 +79,7 @@ slot 系统、module graph、dependency declaration、build-time env、plugin pa
 | 7 | **测试** | "行为必须对" | 三层测试；**断言用户可见行为，不断言实现**；jsdom per-file pragma |
 | 8 | **提交阶梯 + checklist** | "怎么交付/新东西怎么进" | test:gui 秒级内环 → snapshot 回放 → 精选检查；新组件 6 步 checklist；**非平凡改动必带 Agent Note** |
 
-### 为什么这样写（动机分析，08-28 我的理解，欢迎质疑）
+### 为什么这样写（动机分析，08-27 我的理解，欢迎质疑）
 
 **最深的动机：AI 写的代码是"一次性协作产物"，不是"团队长期维护"。**
 传统团队靠文化/默契/老带新约束风格；AI 没有这些——**只能靠显式规则 + 代码强制**。这就是"他为什么要写这么细"的答案：不是过度设计，是"没有文化兜底，就要用规则把文化钉死"。
@@ -104,5 +104,5 @@ slot 系统、module graph、dependency declaration、build-time env、plugin pa
 
 **一句话收尾**：DSH 的每个"为什么"都能落回同一句话——**"在 AI 会自由发挥的地方，把自由换成模板和报错"**。模板给方向，报错给边界。
 
-> 这份"为什么"是我 08-28 精读时的理解，不是 DSH 官方声明。学到深处若发现不对，请回来改这里——这就是它存在的意义（活文档）。
+> 这份"为什么"是我 08-27 精读时的理解，不是 DSH 官方声明。学到深处若发现不对，请回来改这里——这就是它存在的意义（活文档）。
 
