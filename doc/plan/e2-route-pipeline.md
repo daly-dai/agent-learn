@@ -111,6 +111,32 @@ lib/model-select.ts            → selectModel（可选，与 model.ts 二选一
 
 ---
 
+## E2 完成记录（2026-08-27，commit 7f8728a）
+
+**结果**：route.ts 614 → 287 行（-53%），`_pipeline/` 10 个文件（frames/prompt/context/tools/model/approval/compact/ask-user/index + approval.test）。
+
+**步骤回顾**：
+1. frames/prompt 纯移动（7557c5d）
+2. approval 纯决策 + 15 单测（e05f0e7）
+3. model/context/tools/compact/ask-user 工厂内聚（7c425f0）
+4. runPipeline 编排 + route 薄壳 + hooks 统一（7f8728a）
+
+**过程中用户补充的关键决策**：
+1. **hooks 统一内部绑定**：createPipelineTools 两个 hooks（todo/askUser）一处定义，route 只传原料（曾拆两处被用户指出可读性差）
+2. **runPipeline 死参数清除**：双轴 review 发现 modelLabel/sessionId/sessionDir 签名撒谎 → 删（接口即契约）
+3. **handleToolApproval/askUserApproval 留 route 壳**（用户问"为啥没拆"→ 答案：决策已拆 approval.ts，副作用（碰 send/日志）该留壳，单使用端不抽——纯函数与副作用分离的正确落点）
+
+**验收**：tsc + 188 单测全绿 + 冒烟（对话流/GET/审批闭环文件写入）+ 双轴 code-review 每步通过 + 红线 lib/agent.ts 全程未动。
+
+**落点地图（未来扩展，验收参考）**：
+- 加功能（C13 斜杠/C14 @注入）→ `_pipeline/` 新文件 + index.ts 按序插行，route 壳不动
+- 加工具（C9 python）→ `lib/tools/` 新文件 + index.ts 两行（import + 注册），引擎/编排/路由全不动
+- 加 hooks 工具 → `lib/tools/` 新文件 + ToolHooks 加字段 + `_pipeline/tools.ts` 绑定新闭包
+- 加 SSE 帧 → frames.ts 加类型 + index.ts 对应阶段 send
+
+
+---
+
 ## 用户决策记录（2026-08-27 拍板）
 
 | # | 问题 | 决策 |
