@@ -193,7 +193,7 @@
 
 .alarmTag {
   font-family: var(--font-mono);
-  font-size: 11.5px; /* V2：11 → 11.5 */
+  font-size: 12px; /* V2：11.5 → 12（§10.5 口径） */
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--pen-error);

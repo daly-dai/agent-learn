@@ -54,7 +54,7 @@
 
 .rowTime {
   font-family: var(--font-mono);
-  font-size: 11px; /* V2：10 → 11 */
+  font-size: 12px; /* V2：11 → 12（§10.5 口径） */
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
 }
@@ -137,7 +137,7 @@
 
 .compactionTag {
   font-family: var(--font-mono);
-  font-size: 10px; /* V2：9 → 10 */
+  font-size: 12px; /* V2：10 → 12（§10.5 口径） */
   font-weight: 600;
   letter-spacing: 0.16em;
   color: var(--pen-signal-ink);
@@ -187,7 +187,7 @@
 
 .callTag {
   font-family: var(--font-mono);
-  font-size: 10px; /* V2：9 → 10 */
+  font-size: 12px; /* V2：10 → 12（§10.5 口径） */
   font-weight: 600;
   letter-spacing: 0.16em;
   color: var(--pen-tool);
@@ -269,7 +269,7 @@
 .apparatusMeta {
   margin-left: auto;
   font-family: var(--font-mono);
-  font-size: 11.5px; /* V2：10.5 → 11.5 */
+  font-size: 12px; /* V2：11.5 → 12（§10.5 口径） */
   color: var(--ink-mid);
   font-variant-numeric: tabular-nums;
 }
