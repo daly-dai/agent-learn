@@ -140,4 +140,23 @@ PLAN 九节写着"漂亮动画 / 复杂 UI"暂缓。这次只做了排版与信�
 3. **注释纸感词汇标注**：trace-rail 已标"删除"历史，approval/ask-user/message-row/task-panel 的"走纸记录仪"注释还没标退役
 **重构：SessionRow 抽取（2026-08-28，code-review 气味落地）**：`session-list/index.tsx` 的 map 回调拆出 `session-row.tsx`（同行目录）——SessionList 只剩"列表容器 + 行内状态持有者"（215→83 行），SessionRow 只回答"一行有几种形态"（正常/重命名/删除确认/⋯菜单）。关键取舍：**editingId/draft/pendingDelete 单值状态保持提在父级**（有意的互斥设计：同一时刻只有一行编辑/删除），SessionRow 只收 props 转发回调，唯一例外是确认条取消按钮的 ref+聚焦（纯行内视觉行为）。行为等价核对 5 项交互全部一一对应。
 
+---
+
+## 10.9 V2 补记（2026-08-28）：新组件 checklist（借 DSH `packages/client/AGENTS.md`）
+
+> 触发：精读 DSH "Web client stack" AGENTS.md（B3-⑤），对照表见 `doc/知识点-04-DSH-client-AGENTS-对照.md`。DSH 有"New component checklist"（6 步），我们只有"组合>发明"硬规则（§10.6），缺显式清单——SessionRow 抽取就是靠 review 事后提醒的，应该事前有清单。
+
+**我们的新组件 checklist（改写 DSH 版，去掉 slot/register 机制，保留约束骨架）**：
+
+1. **组合 > 发明（第一道闸）**：先说明"为什么现有原语库 / 既有组件不够"（§10.6 硬规则），经确认后才新建——DSH 同款（"No other composition route exists"）。
+2. **放对位置**：`app/components/<组件>/` 一目录（index.tsx + <组件>.module.css）；域内聚，不跨组件 import 兄弟内部。
+3. **令牌约束**：只用 `--plate/--pen-*/--hit` 等令牌；无字面色值/自创圆角/自创字号；等宽标签 ≥12px、命中区 ≥34px（§10.5 口径）。
+4. **props 收数据**：组件收 props 与回调，不碰全局/服务（DSH "ctx discipline" 简化版）；行内状态互斥时提父级（SessionRow 教训）。
+5. **测试**：纯函数/工具逻辑抽到 `app/lib/` 写单测（B8 ①）；组件层测试等冻结信号（B8 ②），到时**断言用户可见行为，不断言 class name/hook 内部**（DSH 同款）。
+6. **验收**：`tsc --noEmit` + `pnpm test` 绿；code-review 双轴（11.5 ⑦）。
+7. **沉淀**：ui-design.md 补记 + PLAN 7.3 状态 + 过程日志（commit 时带 hash）。
+
+> 与 DSH 版的差异：DSH 有"非平凡改动必须带 Agent Note 进同 PR"——我们已有等价物（过程日志，AGENTS.md 11.5 ⑧），故合入第 7 步；DSH 的"Component tests feed props directly"我们留到 B8 落地。
+
+
 
