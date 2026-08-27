@@ -16,57 +16,61 @@
 .sidebarHead {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 14px;
+  gap: 10px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--line-soft);
 }
 
 .sidebarTitle {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px; /* V2：12 → 13 */
   letter-spacing: 0.08em;
   color: var(--ink);
 }
 
 .sidebarCount {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--ink-faint);
 }
 
+/* V2：新建从 3px 8px 的迷你按钮 → 34px 命中区的实心主按钮
+   （新建会话是侧栏最高频操作，值得一个像样的按钮） */
 .sidebarNew {
   margin-left: auto;
+  min-height: var(--hit);
+  padding: 0 14px;
   font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--pen-model);
-  background: transparent;
-  border: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--plate);
+  background: var(--ink);
+  border: 1px solid var(--ink);
   border-radius: var(--r);
-  padding: 3px 8px;
   cursor: pointer;
 }
 
 .sidebarNew:hover {
-  border-color: var(--pen-model);
+  background: var(--ink-hover);
+  border-color: var(--ink-hover);
 }
 
 .sessionList {
   overflow-y: auto;
   min-height: 0;
-  padding: 8px;
+  padding: 10px;
 }
 
 .sessionEmpty {
-  padding: 12px 6px;
+  padding: 14px 8px;
   font-family: var(--font-sans);
-  font-size: 12px;
+  font-size: 13px;
   color: var(--ink-faint);
 }
 
 .sessionItem {
   position: relative;
-  margin-bottom: 4px;
-  padding: 8px 10px;
+  margin-bottom: 6px;
+  padding: 12px 14px;
   border: 1px solid transparent;
   border-radius: var(--r);
   cursor: pointer;
@@ -84,17 +88,19 @@
 
 .sessionTitle {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13.5px; /* V2：12 → 13.5 */
   color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* 给右上角 ⋯ 按钮留位，标题不会被它盖住 */
+  padding-right: 32px;
 }
 
 .sessionPreview {
-  margin-top: 2px;
+  margin-top: 3px;
   font-family: var(--font-sans);
-  font-size: 11px;
+  font-size: 12.5px; /* V2：11 → 12.5 */
   color: var(--ink-mid);
   white-space: nowrap;
   overflow: hidden;
@@ -103,48 +109,38 @@
 
 .sessionMeta {
   display: flex;
-  gap: 8px;
-  margin-top: 3px;
+  gap: 10px;
+  margin-top: 4px;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px; /* V2：10 → 11 */
   color: var(--ink-faint);
 }
 
-/* 操作按钮只在悬停时出现：默认路径是「看」，干预才需要动手 */
-.sessionActions {
+/* ⋯ 菜单的定位锚：贴会话行右上角，菜单右对齐展开。
+   选择器带 .sessionItem 前缀抬高特异性：CSS Modules 的加载顺序不可控，
+   必须保证这里能覆盖 menu.module.css 的 .wrap{position:relative} */
+.sessionItem .sessionMenu {
   position: absolute;
-  top: 6px;
-  right: 8px;
-  display: none;
-  gap: 2px;
+  top: 10px;
+  right: 10px;
+  /* V2 二次调整（抄 DSH 会话列表）：平时隐藏，鼠标移上/键盘聚焦到行内才显示。
+     不占布局（absolute），opacity + pointer-events 保证隐藏时点不到 */
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
 }
 
-.sessionItem:hover .sessionActions {
-  display: flex;
-}
-
-.sessionAction {
-  padding: 2px 5px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  line-height: 1;
-  color: var(--ink-mid);
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: var(--r);
-  cursor: pointer;
-}
-
-.sessionAction:hover {
-  color: var(--ink);
-  border-color: var(--ink-faint);
+.sessionItem:hover .sessionMenu,
+.sessionItem:focus-within .sessionMenu {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .sessionRenameInput {
   width: 100%;
-  padding: 3px 6px;
+  padding: 6px 10px;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px;
   color: var(--ink);
   background: var(--plate);
   border: 1px solid var(--pen-model);
@@ -153,9 +149,9 @@
 }
 
 .sidebarFoot {
-  padding: 8px 14px;
+  padding: 10px 16px;
   border-top: 1px solid var(--line-soft);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--ink-faint);
 }

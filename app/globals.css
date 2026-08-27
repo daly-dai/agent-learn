@@ -5,7 +5,7 @@
      1. 设计令牌（:root CSS 变量，全项目共享）
      2. 元素重置（body / 表单 / 字体 / 焦点）
      3. 骨架（.app / .deck 整页外壳）
-     4. 跨组件共享类（.btn 按钮）与共享动画（@keyframes）
+     4. 共享动画（@keyframes）
      5. Markdown 渲染层（.markdown-body 全套 + 代码高亮）
 
    组件专属样式已拆分到各组件：
@@ -21,17 +21,23 @@
 
 /* ============ 设计令牌 ============ */
 :root {
-  /* 纸与墨 */
-  --plate: #fbfbf8;
-  --paper: #e9eae4;
-  --recorder: #e0e1d9;
+  /* 表面色。
+     V2 第三次调整（2026-08-26，用户拍板"为啥一定要纸感"）：**纸感退役**。
+     走纸记录仪是之前会话继承的设计决定，不是用户需求——暖米色底已否，
+     点阵纸背景也删（见 trace-rail）。现在走"中性壳"：中间纯白阅读面 +
+     两侧明确灰面板（Linear/Notion/DSH 同构）。五支笔色保留：它们是功能
+     语义色（消息角色），不是纸的装饰。 */
+  --plate: #ffffff; /* 最亮：顶栏 / 浮层 / 卡片 */
+  --paper: #f8f8f8; /* 阅读面：转录稿底色（视觉上即白色） */
+  --recorder: #e4e4e4; /* 侧栏 / 轨迹：明确的灰，与阅读面拉开落差 */
 
   --ink: #1d2127;
+  --ink-hover: #2c323c; /* 墨色实心按钮的 hover 加深（2026-08-26：原来 #2c323c 硬编码 3 处） */
   --ink-mid: #4a505c; /* 小字可读的最浅一档（对比度 ≥ 6:1） */
   --ink-faint: #8d9299; /* 仅用于装饰与禁用态，不承载信息 */
 
-  --line: #cbcdc3;
-  --line-soft: #dcded4;
+  --line: #dcdcdc;
+  --line-soft: #ececec;
 
   /* 笔色 = 通道色。每支笔只代表一类事件 */
   --pen-user: #2f4b99; /* 用户指令 */
@@ -50,11 +56,16 @@
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Microsoft YaHei", sans-serif;
 
-  /* 小圆角：机加工面板的感觉，不是气泡 */
-  --r: 3px;
-  --r-lg: 5px;
+  /* 圆角：机加工面板的感觉，不是气泡。
+     V2（2026-08-26）：3/5 → 6/10，随尺度整体上提，仍克制不圆润 */
+  --r: 6px;
+  --r-lg: 10px;
 
-  --gutter: 74px; /* 转录稿左侧「元信息栏」宽度 */
+  /* 舒适命中区：V2 起所有可点控件的最小高度（34px）。
+     比 Apple HIG 的 44px 略小，保持"工具感"不臃肿 */
+  --hit: 34px;
+
+  --gutter: 84px; /* 转录稿左侧「元信息栏」宽度 */
 }
 
 /* ============ 元素重置 ============ */
@@ -70,7 +81,7 @@ body {
 body {
   margin: 0;
   font-family: var(--font-sans);
-  font-size: 14px;
+  font-size: 15px; /* V2：14 → 15，正文阅读面上提一档 */
   color: var(--ink);
   background: var(--paper);
   -webkit-font-smoothing: antialiased;
@@ -116,33 +127,17 @@ pre,
 
 .deck {
   display: grid;
-  /* Phase 2：会话侧栏（240px） + 对话面 + 轨迹（348px） */
-  grid-template-columns: 240px minmax(0, 1fr) 348px;
+  /* V2：侧栏 240 → 264、轨迹 348 → 384，三栏都更透气 */
+  grid-template-columns: 264px minmax(0, 1fr) 384px;
   grid-template-rows: minmax(0, 1fr);
   min-height: 0;
 }
 
 /* ============ 跨组件共享类 ============ */
-.btn {
-  border: 1px solid var(--line);
-  background: transparent;
-  border-radius: var(--r);
-  padding: 6px 11px;
-  font-size: 12px;
-  color: var(--ink-mid);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.btn:hover:not(:disabled) {
-  background: var(--paper);
-  color: var(--ink);
-}
-
-.btn:disabled {
-  color: var(--ink-faint);
-  cursor: default;
-}
+/* V2（2026-08-26）注：曾经有全局 .btn/.iconBtn，V2 后 nameplate 不再用
+   .btn（清空记录进 Menu），两个共享类成了死代码已删除。
+   现在的按钮配方在 Menu 触发器（menu.module.css：34px 命中区 + 13px 字），
+   各面板按钮按同一配方自持样式；B3 后续原语需要时再提升共享类。 */
 
 /* 共享动画：多个组件模块用 animation: lamp/caret 引用（Modules 不 scope 动画名） */
 @keyframes lamp {
@@ -166,7 +161,7 @@ pre,
    message-row 的 said/reply 里，所以这层样式故意保持全局，
    message-row.module.css 里用 :global(.markdown-body) 引用它做微调。 */
 .markdown-body {
-  font-size: 14.5px;
+  font-size: 15px; /* V2：14.5 → 15，与正文同档 */
   line-height: 1.75;
   word-break: break-word;
 }
@@ -234,7 +229,7 @@ pre,
   background: var(--plate);
   border: 1px solid var(--line);
   border-radius: var(--r);
-  padding: 12px 13px;
+  padding: 14px 15px; /* V2：12px 13px → 14px 15px */
   overflow-x: auto;
   margin: 0.8em 0;
   line-height: 1.6;
@@ -245,7 +240,7 @@ pre,
 .markdown-body pre code {
   background: none;
   padding: 0;
-  font-size: 11.8px;
+  font-size: 12.5px; /* V2：11.8 → 12.5 */
 }
 
 .markdown-body blockquote {
@@ -267,20 +262,20 @@ pre,
   width: 100%;
   display: block;
   overflow-x: auto;
-  font-size: 13.5px;
+  font-size: 14px; /* V2：13.5 → 14 */
 }
 
 .markdown-body th,
 .markdown-body td {
   border: 1px solid var(--line);
-  padding: 6px 10px;
+  padding: 7px 11px; /* V2：6px 10px → 7px 11px */
   text-align: left;
 }
 
 .markdown-body th {
   background: rgba(29, 33, 39, 0.04);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 11.5px; /* V2：11 → 11.5 */
   font-weight: 600;
   letter-spacing: 0.04em;
 }
@@ -330,14 +325,14 @@ pre,
 
 .code-copy {
   position: absolute;
-  top: 7px;
-  right: 7px;
-  padding: 2px 7px;
+  top: 8px;
+  right: 8px;
+  padding: 3px 9px; /* V2：2px 7px → 3px 9px */
   border: 1px solid var(--line);
-  border-radius: 2px;
+  border-radius: var(--r);
   background: var(--plate);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px; /* V2：10 → 11 */
   color: var(--ink-mid);
   cursor: pointer;
   opacity: 0;

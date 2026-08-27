@@ -17,8 +17,8 @@
 }
 
 .panel {
-  width: min(400px, calc(100vw - 48px));
-  padding: 16px 18px 14px;
+  width: min(420px, calc(100vw - 48px)); /* V2：400 → 420 */
+  padding: 20px 22px 18px; /* V2：16px 18px 14px → 20px 22px 18px */
   background: var(--plate);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
@@ -28,15 +28,15 @@
 
 .title {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 14px; /* V2：13 → 14 */
   letter-spacing: 0.06em;
   color: var(--ink);
 }
 
 .message {
-  margin: 10px 0 0;
-  font-size: 13px;
-  line-height: 1.6;
+  margin: 12px 0 0;
+  font-size: 14px; /* V2：13 → 14 */
+  line-height: 1.65;
   color: var(--ink-mid);
   word-break: break-word;
 }
@@ -44,14 +44,16 @@
 .actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 16px;
+  gap: 10px;
+  margin-top: 18px;
 }
 
+/* V2：5px 16px → 36px 命中区 */
 .cancelBtn {
-  padding: 5px 16px;
+  min-height: 36px;
+  padding: 0 18px;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px; /* V2：12 → 13 */
   color: var(--ink);
   background: var(--paper);
   border: 1px solid var(--line);
@@ -64,9 +66,10 @@
 }
 
 .confirmBtn {
-  padding: 5px 16px;
+  min-height: 36px;
+  padding: 0 18px;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px;
   color: var(--plate);
   background: var(--pen-error);
   border: 1px solid var(--pen-error);

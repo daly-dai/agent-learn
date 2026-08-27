@@ -18,6 +18,7 @@ import { useState } from "react";
 import type { SessionSummary } from "../../lib/use-sessions";
 import { formatClock } from "../../lib/format";
 import { ConfirmDialog } from "../confirm-dialog";
+import { Menu } from "../ui/menu";
 import styles from "./session-list.module.css";
 
 type SessionListProps = {
@@ -46,8 +47,9 @@ export function SessionList({
   );
 
   function startRename(session: SessionSummary) {
+    // 草稿只回填已有标题；没标题就让用户从空输入开始（不预填文件 id）
     setEditingId(session.id);
-    setDraft(session.title ?? session.id);
+    setDraft(session.title ?? "");
   }
 
   function cancelRename() {
@@ -96,6 +98,7 @@ export function SessionList({
                   <input
                     className={styles.sessionRenameInput}
                     value={draft}
+                    placeholder="会话名称"
                     autoFocus
                     onChange={(e) => setDraft(e.target.value)}
                     onKeyDown={(e) => {
@@ -107,10 +110,14 @@ export function SessionList({
                   />
                 ) : (
                   <>
+                    {/* V2 二次调整（2026-08-26，抄 DSH 会话列表）：
+                        不再显示 session 文件 id。没标题时回退到首条消息
+                        （preview），再没有才显示「未命名会话」——原始 id
+                        （s_2026-08-26T..._xxx）是存储细节，不是给人看的名字 */}
                     <div className={styles.sessionTitle}>
-                      {session.title ?? session.id}
+                      {session.title ?? session.preview ?? "未命名会话"}
                     </div>
-                    {session.preview && (
+                    {session.title && session.preview && (
                       <div className={styles.sessionPreview}>
                         {session.preview}
                       </div>
@@ -123,29 +130,32 @@ export function SessionList({
                 )}
 
                 {!editing && (
-                  <div className={styles.sessionActions}>
-                    <button
-                      className={styles.sessionAction}
-                      title="重命名"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        startRename(session);
-                      }}
-                    >
-                      ✎
-                    </button>
-                    <button
-                      className={styles.sessionAction}
-                      title="删除"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        // 不直接删：先弹项目自己的确认框，用户确认后才调 onDelete
-                        setPendingDelete(session);
-                      }}
-                    >
-                      ×
-                    </button>
-                  </div>
+                  /* V2（2026-08-26）：⋯ 菜单（重命名/删除，34px 命中区）。
+                     二次调整：从"常驻显示"改回"鼠标移上去才显示"（抄 DSH
+                     会话列表的 hover 操作模式）——行平时干净，干预才动手。
+                     键盘可达：焦点进到行内（focus-within）时同样显示 */
+                  <Menu
+                    label={`会话操作：${
+                      session.title ?? session.preview ?? "未命名会话"
+                    }`}
+                    /* V2 微调（2026-08-26，用户要求"偏右，别挡会话列表"）：
+                       side = 弹框贴 ⋯ 右侧水平展开，浮到转录稿上方，
+                       不再往下盖住下面会话行的标题/预览 */
+                    align="side"
+                    className={styles.sessionMenu}
+                    items={[
+                      {
+                        label: "重命名",
+                        onSelect: () => startRename(session),
+                      },
+                      {
+                        label: "删除",
+                        hint: "不可恢复",
+                        danger: true,
+                        onSelect: () => setPendingDelete(session),
+                      },
+                    ]}
+                  />
                 )}
               </div>
             );
@@ -154,7 +164,7 @@ export function SessionList({
       </div>
 
       <div className={styles.sidebarFoot}>
-        <p>点击切换会话 · ✎ 重命名 · × 删除</p>
+        <p>点击切换会话 · 悬停 ⋯ 重命名 / 删除</p>
       </div>
 
       {/* 删除确认弹框：替换浏览器 confirm，走纸记录仪语言（危险操作 error 红） */}

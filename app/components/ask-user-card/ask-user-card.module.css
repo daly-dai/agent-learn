@@ -10,9 +10,9 @@
 
 .card {
   width: 100%;
-  max-width: 830px; /* 与输入框/todo 面板同列（外层 .askBar 已给 26px padding） */
+  max-width: 880px; /* V2：830 → 880，与输入框新列宽对齐 */
   margin: 0 auto;
-  padding: 10px 12px 12px;
+  padding: 14px 16px 16px; /* V2：10px 12px 12px → 14px 16px 16px */
   background: var(--plate);
   border: 1px solid var(--line);
   border-top: 2px solid var(--pen-signal);
@@ -25,12 +25,12 @@
 .titleRow {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .signal {
-  width: 7px;
-  height: 7px;
+  width: 8px; /* V2：7 → 8 */
+  height: 8px;
   border-radius: 999px;
   background: var(--pen-signal);
   animation: lamp 1.6s ease-in-out infinite;
@@ -39,7 +39,7 @@
 
 .title {
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 12px; /* V2：10.5 → 12 */
   font-weight: 600;
   letter-spacing: 0.19em;
   text-transform: uppercase;
@@ -49,7 +49,7 @@
 /* 进度读数：等宽，序号是信息不是装饰 */
 .progress {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px; /* V2：11 → 12 */
   font-variant-numeric: tabular-nums;
   color: var(--pen-user);
 }
@@ -57,16 +57,16 @@
 .hint {
   margin-left: auto;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11.5px; /* V2：10 → 11.5 */
   color: var(--ink-faint);
 }
 
 /* ---- 问题（model 绿，等宽） ---- */
 .question {
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   font-family: var(--font-mono);
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: 14px; /* V2：13 → 14 */
+  line-height: 1.65;
   color: var(--pen-model);
   word-break: break-word;
 }
@@ -74,16 +74,17 @@
 /* ---- 选项行（Reasonix 全宽行：点选即前进） ---- */
 .optionList {
   display: grid;
-  gap: 6px;
-  margin-top: 8px;
+  gap: 8px; /* V2：6 → 8 */
+  margin-top: 10px;
 }
 
 .option {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
-  padding: 7px 10px;
+  min-height: 42px; /* V2：整行命中区加大 */
+  padding: 9px 12px;
   text-align: left;
   background: var(--paper);
   border: 1px solid var(--line-soft);
@@ -101,48 +102,48 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 22px; /* V2：18 → 22 */
+  height: 22px;
   border-radius: var(--r);
   border: 1px solid var(--line);
   background: var(--plate);
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 11.5px; /* V2：10.5 → 11.5 */
   color: var(--ink-mid);
 }
 
 .optionLabel {
   font-family: var(--font-mono);
-  font-size: 12.5px;
+  font-size: 13.5px; /* V2：12.5 → 13.5 */
   color: var(--ink);
 }
 
 .optionDesc {
   margin-left: auto;
-  font-size: 11px;
+  font-size: 12px; /* V2：11 → 12 */
   color: var(--ink-faint);
 }
 
 /* ---- 自定义补充 ---- */
 .customHint {
-  margin: 10px 0 0;
-  font-size: 11px;
+  margin: 12px 0 0;
+  font-size: 12px; /* V2：11 → 12 */
   color: var(--ink-faint);
 }
 
 .input {
   width: 100%;
-  margin-top: 6px;
-  padding: 7px 9px;
+  margin-top: 8px;
+  padding: 9px 11px; /* V2：7px 9px → 9px 11px */
   font-family: var(--font-sans);
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 14px; /* V2：13 → 14 */
+  line-height: 1.55;
   color: var(--ink);
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: var(--r);
   resize: vertical;
-  min-height: 36px;
+  min-height: 42px; /* V2：36 → 42 */
 }
 
 .input:focus {
@@ -159,17 +160,19 @@
 .confirmBar {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 10px;
-  padding-top: 10px;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid var(--line-soft);
 }
 
+/* V2：5px 14px → 36px 命中区 */
 .backBtn,
 .skipBtn {
-  padding: 5px 14px;
+  min-height: 36px;
+  padding: 0 16px;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px; /* V2：12 → 13 */
   color: var(--ink-mid);
   background: transparent;
   border: 1px solid var(--line);
@@ -184,9 +187,10 @@
 }
 
 .submitBtn {
-  padding: 5px 14px;
+  min-height: 36px;
+  padding: 0 16px;
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px;
   color: var(--plate);
   background: var(--pen-user);
   border: 1px solid var(--pen-user);

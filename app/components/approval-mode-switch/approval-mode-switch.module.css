@@ -8,21 +8,23 @@
 .switch {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px; /* V2：4 → 6 */
 }
 
 .label {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px; /* V2：11 → 12 */
   letter-spacing: 0.08em;
   color: var(--ink-faint);
   margin-right: 2px;
 }
 
+/* V2：3px 10px 的迷你按钮 → 34px 命中区的分段控件（对齐 --hit 令牌） */
 .btn {
-  padding: 3px 10px;
+  min-height: var(--hit);
+  padding: 0 14px;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12.5px; /* V2：11 → 12.5 */
   border-radius: var(--r);
   cursor: pointer;
   color: var(--ink-mid);

@@ -15,31 +15,31 @@
 .row {
   display: grid;
   grid-template-columns: var(--gutter) minmax(0, 1fr);
-  gap: 0 18px;
+  gap: 0 20px; /* V2：18 → 20 */
 }
 
 .row + .row {
-  margin-top: 22px;
+  margin-top: 26px; /* V2：22 → 26，消息间距更松 */
 }
 
 /* 工具结果紧跟在发起它的模型消息之后：靠间距和连接符表达从属关系 */
 .row + .row:global(.is-attached) {
-  margin-top: 8px;
+  margin-top: 10px;
 }
 
 .rowGutter {
   text-align: right;
-  padding-top: 2px;
+  padding-top: 3px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 3px;
+  gap: 4px;
   min-width: 0;
 }
 
 .rowRole {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px; /* V2：11 → 12 */
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -54,16 +54,16 @@
 
 .rowTime {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px; /* V2：10 → 11 */
   color: var(--ink-faint);
   font-variant-numeric: tabular-nums;
 }
 
 .rowLink {
   font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px; /* V2：12 → 13 */
   color: var(--ink-faint);
-  padding-top: 2px;
+  padding-top: 3px;
 }
 
 .rowBody {
@@ -75,11 +75,11 @@
   background: rgba(47, 75, 153, 0.07);
   border-left: 2px solid var(--pen-user);
   border-radius: 0 var(--r) var(--r) 0;
-  padding: 11px 14px;
+  padding: 14px 16px; /* V2：11px 14px → 14px 16px */
 }
 
 .said :global(.markdown-body) {
-  font-size: 14px;
+  font-size: 14.5px; /* V2：14 → 14.5 */
 }
 
 /* 模型回答：直接印在纸上，不加边框，让它成为最主要的阅读面 */
@@ -102,7 +102,7 @@
 .pondering {
   display: inline-block;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px; /* V2：11 → 12 */
   letter-spacing: 0.1em;
   color: var(--pen-signal-ink);
   animation: lamp 1.15s ease-in-out infinite;
@@ -121,9 +121,10 @@
 .compactionHead {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
   width: 100%;
-  padding: 7px 11px;
+  min-height: 40px; /* V2：整行可点区加大 */
+  padding: 8px 14px;
   border: none;
   background: none;
   cursor: pointer;
@@ -136,7 +137,7 @@
 
 .compactionTag {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px; /* V2：9 → 10 */
   font-weight: 600;
   letter-spacing: 0.16em;
   color: var(--pen-signal-ink);
@@ -145,38 +146,39 @@
 
 .compactionLabel {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px; /* V2：11 → 12 */
   color: var(--ink-mid);
 }
 
 .compactionToggle {
   margin-left: auto;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px; /* V2：11 → 12 */
   color: var(--ink-mid);
   text-decoration: underline;
   text-underline-offset: 3px;
+  padding: 4px 6px; /* V2：加命中区 */
 }
 
 .compactionBody {
   margin: 0;
-  padding: 9px 12px;
+  padding: 12px 14px; /* V2：9px 12px → 12px 14px */
   border-top: 1px solid var(--line-soft);
   color: var(--ink-mid);
   max-height: 240px;
   overflow: auto;
   /* 摘要用 Markdown 渲染（对齐 pi）：标题/列表正常排版，不套等宽/pre-wrap */
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: 13px; /* V2：12 → 13 */
+  line-height: 1.65;
 }
 
 /* ---- 工具调用行（一台小装置的开头） ---- */
 .call {
   display: flex;
   align-items: baseline;
-  gap: 9px;
-  margin: 9px 0 0;
-  padding: 7px 10px;
+  gap: 10px;
+  margin: 10px 0 0;
+  padding: 9px 12px; /* V2：7px 10px → 9px 12px */
   background: rgba(156, 43, 110, 0.055);
   border: 1px solid rgba(156, 43, 110, 0.22);
   border-radius: var(--r);
@@ -185,7 +187,7 @@
 
 .callTag {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px; /* V2：9 → 10 */
   font-weight: 600;
   letter-spacing: 0.16em;
   color: var(--pen-tool);
@@ -194,7 +196,7 @@
 
 .callName {
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: 13px; /* V2：11.5 → 13 */
   font-weight: 600;
   color: var(--ink);
   flex: none;
@@ -202,7 +204,7 @@
 
 .callArgs {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px; /* V2：11 → 12 */
   color: var(--ink-mid);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -211,11 +213,11 @@
 
 /* bash 命令实时输出（Phase 4）：像真终端的黑底块 */
 .toolOutputLive {
-  margin-top: 6px;
-  padding: 8px 10px;
+  margin-top: 8px;
+  padding: 10px 12px; /* V2：8px 10px → 10px 12px */
   font-family: var(--font-mono);
-  font-size: 11px;
-  line-height: 1.55;
+  font-size: 12px; /* V2：11 → 12 */
+  line-height: 1.6;
   color: var(--ink);
   background: var(--recorder);
   border: 1px solid var(--line-soft);
@@ -237,22 +239,22 @@
 .apparatusHead {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 6px 9px 6px 11px;
+  gap: 10px;
+  padding: 9px 12px 9px 14px; /* V2：6px 9px 6px 11px → 9px 12px 9px 14px */
   border-bottom: 1px solid var(--line-soft);
   background: rgba(29, 33, 39, 0.025);
 }
 
 .apparatusName {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12.5px; /* V2：11 → 12.5 */
   font-weight: 600;
   color: var(--ink);
 }
 
 .apparatusVerdict {
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: 13px; /* V2：11.5 → 13 */
   color: var(--pen-model);
 }
 
@@ -267,17 +269,19 @@
 .apparatusMeta {
   margin-left: auto;
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 11.5px; /* V2：10.5 → 11.5 */
   color: var(--ink-mid);
   font-variant-numeric: tabular-nums;
 }
 
+/* V2：展开/收起从纯文字链接 → 带命中区的按钮（12.5px、内边距） */
 .apparatusToggle {
   border: none;
   background: none;
-  padding: 2px 0;
+  padding: 5px 8px;
+  border-radius: var(--r);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12.5px; /* V2：11 → 12.5 */
   letter-spacing: 0.02em;
   color: var(--ink-mid);
   cursor: pointer;
@@ -287,6 +291,7 @@
 
 .apparatusToggle:hover {
   color: var(--ink);
+  background: var(--paper);
 }
 
 .apparatusBody {
@@ -316,10 +321,10 @@
 
 .toolOutput {
   margin: 0;
-  padding: 9px 12px;
+  padding: 11px 14px; /* V2：9px 12px → 11px 14px */
   font-family: var(--font-mono);
-  font-size: 11.5px;
-  line-height: 1.62;
+  font-size: 12.5px; /* V2：11.5 → 12.5 */
+  line-height: 1.65;
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--ink-mid);

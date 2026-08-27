@@ -21,14 +21,14 @@
 .traceHead {
   display: flex;
   align-items: baseline;
-  gap: 9px;
-  padding: 13px 14px 11px;
+  gap: 10px;
+  padding: 16px 18px 14px; /* V2：13px 14px 11px → 16px 18px 14px */
   border-bottom: 1px solid var(--line);
 }
 
 .traceTitle {
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 12px; /* V2：10.5 → 12 */
   font-weight: 600;
   letter-spacing: 0.19em;
   text-transform: uppercase;
@@ -36,30 +36,24 @@
 }
 
 .traceSub {
-  font-size: 11.5px;
+  font-size: 13px; /* V2：11.5 → 13 */
   color: var(--ink-mid);
 }
 
 .traceClock {
   margin-left: auto;
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 12px; /* V2：10.5 → 12 */
   color: var(--ink-mid);
   font-variant-numeric: tabular-nums;
 }
 
-/* 点阵纸：background-attachment:local 让纸随内容滚动，像走纸被拉过笔尖 */
+/* 轨迹卷筒：纯色面板（2026-08-26 删掉点阵纸背景——"纸感"退役，
+   用户拍板走中性壳；轨迹区与侧栏同为 --recorder 灰） */
 .traceReel {
   overflow-y: auto;
   min-height: 0;
-  padding: 13px 14px 18px;
-  background-image: radial-gradient(
-    circle,
-    rgba(29, 33, 39, 0.11) 0.7px,
-    transparent 0.8px
-  );
-  background-size: 13px 13px;
-  background-attachment: local;
+  padding: 16px 18px 20px;
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
 }
@@ -92,7 +86,7 @@
 
 .traceRow {
   position: relative;
-  padding: 3px 0;
+  padding: 5px 0; /* V2：3px → 5px，行距更松 */
   min-width: 0;
 }
 
@@ -101,9 +95,9 @@
   content: "";
   position: absolute;
   left: -18px;
-  top: 7px;
-  width: 7px;
-  height: 7px;
+  top: 9px;
+  width: 8px; /* V2：7 → 8 */
+  height: 8px;
   border-radius: 50%;
   background: var(--ink-faint);
   box-shadow: 0 0 0 3px var(--recorder);
@@ -142,9 +136,9 @@
 .traceRow:global(.is-band) {
   display: flex;
   align-items: center;
-  gap: 9px;
-  margin-top: 13px;
-  padding-top: 4px;
+  gap: 10px;
+  margin-top: 16px; /* V2：13 → 16 */
+  padding-top: 5px;
 }
 
 .traceRow:global(.is-band):first-child {
@@ -153,7 +147,7 @@
 
 .bandLabel {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11.5px; /* V2：10 → 11.5 */
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -171,12 +165,12 @@
 .stroke {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .strokeLabel {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12.5px; /* V2：11 → 12.5 */
   color: var(--pen-model);
   flex: none;
 }
@@ -195,7 +189,7 @@
 
 .strokeNote {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11.5px; /* V2：10 → 11.5 */
   color: var(--ink-mid);
   font-variant-numeric: tabular-nums;
   margin-left: auto;
@@ -206,13 +200,13 @@
 .span {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
 }
 
 .spanName {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12.5px; /* V2：11 → 12.5 */
   font-weight: 500;
   color: var(--pen-tool);
   white-space: nowrap;
@@ -234,7 +228,7 @@
 
 .spanNote {
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 11.5px; /* V2：10.5 → 11.5 */
   color: var(--ink-mid);
   font-variant-numeric: tabular-nums;
   margin-left: auto;
@@ -244,7 +238,7 @@
 .spanOk,
 .spanBad {
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 11.5px;
   flex: none;
 }
 
@@ -260,10 +254,10 @@
 .signal {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  gap: 10px;
   font-family: var(--font-mono);
-  font-size: 11px;
-  line-height: 1.55;
+  font-size: 12.5px; /* V2：11 → 12.5 */
+  line-height: 1.6;
   color: var(--ink-mid);
   word-break: break-word;
 }
@@ -282,29 +276,29 @@
 }
 
 .traceEmpty p {
-  margin: 0 0 14px;
-  font-size: 12px;
+  margin: 0 0 16px;
+  font-size: 13px; /* V2：12 → 13 */
   line-height: 1.7;
   color: var(--ink-mid);
 }
 
 .legend {
   display: grid;
-  gap: 7px;
+  gap: 9px; /* V2：7 → 9 */
 }
 
 .legendRow {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px; /* V2：11 → 12 */
   color: var(--ink-mid);
 }
 
 .legendKey {
-  width: 7px;
-  height: 7px;
+  width: 8px; /* V2：7 → 8 */
+  height: 8px;
   flex: none;
   border-radius: 50%;
   background: var(--ink-faint);
@@ -334,21 +328,21 @@
 .traceFoot {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  padding: 11px 14px 12px;
+  gap: 12px;
+  padding: 14px 18px 16px; /* V2：11px 14px 12px → 14px 18px 16px */
   border-top: 1px solid var(--line);
 }
 
 .gauge {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
 }
 
 .gaugeValue {
   font-family: var(--font-mono);
-  font-size: 15px;
+  font-size: 18px; /* V2：15 → 18 */
   font-weight: 600;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
@@ -357,7 +351,7 @@
 
 .gaugeLabel {
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 12px; /* V2：10.5 → 12 */
   letter-spacing: 0.05em;
   color: var(--ink-mid);
 }

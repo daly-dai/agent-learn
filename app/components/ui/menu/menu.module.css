@@ -1,0 +1,113 @@
+/* ============================================================
+   menu.module.css —— 下拉菜单原语（B3 第一个原语）
+   归属组件：app/components/ui/menu/index.tsx
+   ============================================================
+   触发器复用全局 .iconBtn 的配方（34px 命中区），但样式独立
+   在这里——Menu 必须能脱离 .iconBtn 单独存在（可自定义触发器）。
+   面板：纸底 + 细边 + 投影，与页面上其它浮层（确认弹框）同语言。
+   ============================================================ */
+
+.wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+/* 触发器：默认「⋯」图标按钮形态。调用方可传 children 换内容，
+   但命中区与样式仍由这里统一（全站菜单长得一样）。
+   V2 微调（2026-08-26）：去边框 → 幽灵按钮（用户要求"不要边框"）。
+   点击面积不变（min-width/height 34px + padding 0 12px），
+   可点性靠 hover/聚焦的纸色底表达，不再靠描边。 */
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--hit);
+  min-height: var(--hit);
+  padding: 0 12px;
+  background: transparent;
+  border: none;
+  border-radius: var(--r);
+  font-size: 15px;
+  line-height: 1;
+  color: var(--ink-mid);
+  cursor: pointer;
+}
+
+.trigger:hover:not(:disabled) {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* 浮层：紧贴触发器下方，纸底浮起（投影 + 上边阴影明确层级） */
+.panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  z-index: 60;
+  min-width: 168px;
+  padding: 6px;
+  display: grid;
+  gap: 2px;
+  background: var(--plate);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: 0 12px 32px rgba(29, 33, 39, 0.18), 0 2px 8px rgba(29, 33, 39, 0.1);
+}
+
+.panel[data-align="end"] {
+  right: 0;
+}
+
+/* 侧开（side）：位置由 JS 量取后以 position:fixed 内联指定——
+   会话行 ⋯ 用它时，弹框要浮出滚动容器（.sessionList 是 overflow-y:auto，
+   absolute 会被裁剪），所以必须 fixed 到视口坐标，避开裁剪。
+   详见 index.tsx 的 sideRect/toggleOpen。 */
+
+/* 菜单项：整行可点，13px 字，hover/聚焦给纸色底 */
+.item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 10px;
+  text-align: left;
+  font-size: 13px;
+  color: var(--ink);
+  background: none;
+  border: none;
+  border-radius: var(--r);
+  cursor: pointer;
+}
+
+.item:hover:not(:disabled),
+.item:focus-visible {
+  background: var(--paper);
+}
+
+.item:disabled {
+  color: var(--ink-faint);
+  cursor: default;
+}
+
+/* 危险项：错误红，hover 给极浅红底——「刹车」直觉 */
+.danger {
+  color: var(--pen-error);
+}
+
+.danger:hover:not(:disabled),
+.danger:focus-visible {
+  background: rgba(163, 45, 31, 0.07);
+}
+
+.itemLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemHint {
+  font-size: 11px;
+  color: var(--ink-faint);
+}
