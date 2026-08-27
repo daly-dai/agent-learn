@@ -11,6 +11,10 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["lib/**/*.test.ts", "app/lib/**/*.test.ts"], // B8 ①：app/lib 纯函数层随时可做
+    include: [
+      "lib/**/*.test.ts",
+      "app/lib/**/*.test.ts", // B8 ①：app/lib 纯函数层随时可做
+      "app/api/**/*.test.ts", // E2：_pipeline 纯函数测试（approval 决策等）
+    ],
   },
 });

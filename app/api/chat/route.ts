@@ -40,6 +40,7 @@ import { generateSummary } from "@/lib/summarize";
 import { isValidSessionId } from "@/lib/session";
 import type { StreamFrame } from "./_pipeline/frames";
 import { systemPrompt } from "./_pipeline/prompt";
+import { decideToolCall } from "./_pipeline/approval";
 import { toolApprovals } from "@/lib/toolApproval";
 import { userAnswers, makeAskKey, clearRun } from "@/lib/userAnswers";
 import { runControllers } from "@/lib/runControl";
@@ -401,14 +402,7 @@ function selectModel(): { model: TeachingModel; label: string } {
 // 只读工具（list/read/grep/find）默认放行。
 // 超时兜底：用户 5 小时不回应自动拒绝（block），避免挂起（前端不展示时间）。
 
-/** 需要人工确认的工具：全部写/改/删操作 + bash（已确认：全量弹框） */
-const TOOLS_NEEDING_CONFIRM = [
-  "write_note",
-  "write_file",
-  "edit_file",
-  "delete_file",
-  "bash",
-] as const;
+// TOOLS_NEEDING_CONFIRM 已移入 _pipeline/approval.ts（E2 步骤 2）
 
 // 人工确认超时：默认 5 小时（用户要长时间思考/离开也不该被打断；是"兜底防挂死"，
 // 不是"催促"——前端已不展示任何时间提示）。可用 APPROVAL_TIMEOUT_MS 环境变量覆盖。
@@ -419,114 +413,55 @@ async function handleToolApproval(
   send: (frame: StreamFrame) => void,
   sessionId: string,
 ): Promise<ToolDecision> {
-  // --- 硬性策略：secret/秘密 永不弹框，直接拦 ---
-  if (call.name === "write_note" || call.name === "write_file") {
-    // 取要检查的路径：write_note 用 fileName，write_file 用 path。
-    // 不用嵌套三元——两层 ? : 叠在一起难读，if/else 直白。
-    let target = "";
-    if (typeof call.arguments.fileName === "string") {
-      target = call.arguments.fileName;
-    } else if (typeof call.arguments.path === "string") {
-      target = call.arguments.path;
-    }
+  // 决策交给纯函数 decideToolCall（_pipeline/approval.ts，已单测覆盖）：
+  //   - allow / block / rewrite → 直接用决策
+  //   - request → 需要人工确认：这里执行副作用（日志 + 挂起弹框）
+  const decision = await decideToolCall(call, {
+    sessionId,
+    sessionDir,
+    getApprovalMode,
+    isReadOnlyBash,
+    isPersistApproved,
+    isSessionApproved,
+  });
+  if (decision.action !== "request") return decision;
 
-    if (/secret|秘密/i.test(target)) {
-      return {
-        action: "block",
-        reason: "教学版权限策略：不允许写入包含 secret/秘密 的文件。",
-      };
-    }
-  }
+  // ★ B1-③ 审批日志：弹框前记 asked（审计：问了什么）
+  await appendApprovalReceipt(sessionDir, sessionId, {
+    phase: "asked",
+    approvalId: call.id,
+    toolCallId: call.id,
+    toolName: call.name,
+    createdAt: new Date().toISOString(),
+  });
 
-  // --- B1-② 分级模式（抄 pi defaultProjectTrust / CodeWhale approval_mode；
-  //      运行时可通过 /api/chat/approval-mode 切换，参考项目都有此入口）---
-  const needsConfirm = (TOOLS_NEEDING_CONFIRM as readonly string[]).includes(
-    call.name,
-  );
-  const approvalMode = getApprovalMode();
-  if (approvalMode === "bypass") {
-    // YOLO：除硬性策略外全部放行（没有"人机确认"过程，不记日志）
+  const outcome = await askUserApproval(call, send);
+
+  // ★ B1-③ 审批日志：决定后记 decided（审计：怎么答的）
+  await appendApprovalReceipt(sessionDir, sessionId, {
+    phase: "decided",
+    approvalId: call.id,
+    toolCallId: call.id,
+    toolName: call.name,
+    outcome,
+    createdAt: new Date().toISOString(),
+  });
+
+  // B1-④：单次/本会话/一直允许 都是"允许"（记忆在 approve 接口里写）
+  if (
+    outcome === "approved" ||
+    outcome === "approved-session" ||
+    outcome === "approved-persist"
+  ) {
     return { action: "allow" };
   }
-  if (approvalMode === "never" && needsConfirm) {
-    return {
-      action: "block",
-      reason: "当前审批模式为 never：需人工确认的工具直接拒绝。",
-    };
-  }
-
-  // --- 人工确认（suggest 默认）---
-  if (needsConfirm) {
-    // ★ B1-① 只读命令放行：bash 静态分析证明只读 → 不弹框直接执行。
-    //   原理：只读表 = "已证明无副作用的行为"；含走私语法（管道/重定向/
-    //   替换）或写参数 → fail-closed 弹框（宁可多弹框，不可漏放行）。
-    if (call.name === "bash") {
-      const command =
-        typeof call.arguments.command === "string"
-          ? call.arguments.command
-          : "";
-      if (isReadOnlyBash(command)) {
-        return { action: "allow" };
-      }
-    }
-
-    // ★ B1-④ 记忆放行：一直允许（磁盘规则）→ 本会话允许（内存记忆）。
-    //   判定顺序 = 信任强度从高到低：持久 > 会话 > 弹框。
-    if (await isPersistApproved(sessionDir, call.name)) {
-      return { action: "allow" };
-    }
-    if (isSessionApproved(sessionId, call.name)) {
-      return { action: "allow" };
-    }
-
-    // ★ B1-③ 审批日志：弹框前记 asked（审计：问了什么）
-    await appendApprovalReceipt(sessionDir, sessionId, {
-      phase: "asked",
-      approvalId: call.id,
-      toolCallId: call.id,
-      toolName: call.name,
-      createdAt: new Date().toISOString(),
-    });
-
-    const outcome = await askUserApproval(call, send);
-
-    // ★ B1-③ 审批日志：决定后记 decided（审计：怎么答的）
-    await appendApprovalReceipt(sessionDir, sessionId, {
-      phase: "decided",
-      approvalId: call.id,
-      toolCallId: call.id,
-      toolName: call.name,
-      outcome,
-      createdAt: new Date().toISOString(),
-    });
-
-    // B1-④：单次/本会话/一直允许 都是"允许"（记忆在 approve 接口里写）
-    if (
-      outcome === "approved" ||
-      outcome === "approved-session" ||
-      outcome === "approved-persist"
-    ) {
-      return { action: "allow" };
-    }
-    return {
-      action: "block",
-      reason:
-        outcome === "timeout"
-          ? "审批超时未回应，自动拒绝。"
-          : "用户拒绝了本次工具调用。",
-    };
-  }
-
-  // list_files 没有 path 参数时补齐默认值
-  if (call.name === "list_files" && typeof call.arguments.path !== "string") {
-    return {
-      action: "rewrite",
-      args: { ...call.arguments, path: "." },
-      reason: "补齐默认目录参数。",
-    };
-  }
-
-  return { action: "allow" };
+  return {
+    action: "block",
+    reason:
+      outcome === "timeout"
+        ? "审批超时未回应，自动拒绝。"
+        : "用户拒绝了本次工具调用。",
+  };
 }
 
 /** 挂起一次人工确认：推帧 → 注册 pending → 返回 Promise（approve 接口或超时来 resolve） */
