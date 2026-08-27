@@ -273,7 +273,7 @@ todo 是会话事件（非独立存储）；`todo_write` 整表替换幂等；�
 | # | 问题 | 严重度 | 处理 | 状态 |
 |---|---|---|---|---|
 | E1 | ~~审批正则 bug~~ **误报（2026-08-27 核实）**：评估称 `/[secret|秘密]/i` 字符类导致写英文文件被拦；但 `git log -S` 证实字符类版**从未存在于历史**，`/secret|秘密/i` 正确版自 6d0efa3（08-19）引入、line 487 现码即正确版 | ~~🔴 高~~ → ✅ 已核实无需修 | 教训：外部评估也可能误报，修 bug 前必须先验证现场（不信评估文档直接动手） | ✅ 误报 |
-| E2 | **route.ts 615 行"上帝组装器"不可测**：审批策略 + 模型选择 + 压缩 + SSE + 挂起提问挤一个文件；bug E1 正是"组装层不可测"的代价 | 🟠 中（架构） | 至少把 `handleToolApproval` 抽到 `lib/permission/policy.ts` 补测试；更大拆解与 B5 hooks 注册表联动 | ⏳ 排队 |
+| E2 | **route.ts 615 行"上帝组装器"不可测**：审批策略 + 模型选择 + 压缩 + SSE + 挂起提问挤一个文件；bug E1 正是"组装层不可测"的代价 | 🟠 中（架构） | **阶段管线重构**（详案 `doc/plan/e2-route-pipeline.md`，**决策已拍板 08-27**）：route.ts 614→~100 行纯路由壳，`app/api/chat/_pipeline/` 7 阶段文件（下划线防路由扫描），approval 纯决策补单测，5 步 5 commit，双方手动冒烟 | ⏳ 排队 |
 | E3 | **死代码残留**：`lib/deepseekModel.ts` 72-81 行被注释的旧三目分支没删；`lib/session/store.ts` 219/234、`app/api/chat/route.ts` 219 行空注释 | 🟡 低（整洁） | 顺手清理 | ✅ 完成（08-27） |
 | E4 | **`messageText` 重复实现**：`lib/message.ts` 与 `lib/session/manager.ts` 各一份，行为不一致风险 | 🟡 低（重复） | 收敛到一处（DRY） | ✅ 完成（08-27：职责合并进 message.ts 版，manager 引用 + preview 压空格；教训：不是简单删一份，manager 版有独立职责——compactionSummary 处理） |
 | E5 | **审批策略硬编码**（`TOOLS_NEEDING_CONFIRM` 数组 + 写死分支）→ per-tool 策略需重构 | 🟠 中（可拓展） | B5 hooks 注册表是正确方向（未做），评估确认方向对 | 📌 归入 B5 |

@@ -38,6 +38,8 @@ import { TraceRecorder } from "@/lib/trace";
 import { JsonlSessionStore, summarizeEntries } from "@/lib/session";
 import { generateSummary } from "@/lib/summarize";
 import { isValidSessionId } from "@/lib/session";
+import type { StreamFrame } from "./_pipeline/frames";
+import { systemPrompt } from "./_pipeline/prompt";
 import { toolApprovals } from "@/lib/toolApproval";
 import { userAnswers, makeAskKey, clearRun } from "@/lib/userAnswers";
 import { runControllers } from "@/lib/runControl";
@@ -63,64 +65,9 @@ const { workspace: workspaceRoot, traces: traceDir, sessions: sessionDir } = con
 // 工具注册表【不在这里建单例】（贴 pi create-harness）：
 // 它在每次 POST 请求内组装，业务 hooks 闭包捕获当次的 store/send。
 
-const systemPrompt = [
-  "你是 Teaching Agent，一个帮助初学者理解 AI Agent 核心机制的教学助手。",
-  "你运行在一个安全工作区（workspace/）内，只能通过工具与文件交互，不能直接改动文件系统。",
-  "",
-  "## 工具使用原则",
-  "你可以调用这些工具：",
-  "- list_files（列文件）、read_file（读文件）",
-  "- write_file（写任意文件）、edit_file（精确替换文件内容）",
-  "- delete_file（删除文件；写/改/删都会弹框请你确认）",
-  "- grep（按正则搜内容）、find（按文件名找文件）",
-  "- write_note（写工作区笔记）",
-  "- bash（执行 shell 命令；命令在 Windows 环境的 PowerShell 中运行，避免 ls 等 Unix 专属命令；执行前会弹框确认）",
-  "- todo_write（记录并更新任务清单：复杂任务开始前先列出任务，任务状态变化时更新整表；无需确认，因为它只改会话内的任务列表，不碰文件）。注意：任务全部完成时，必须再调用一次 todo_write 把整张表的所有条目标记为 completed——不要留着 in_progress 的尾巴（用户看到的就是这张表，最后一项显示'进行中'意味着任务没做完）",
-  "- ask_user_question（向用户提问并等待回答：仅当你需要用户提供信息、做决定或澄清需求时才调用；问题要具体，一次只问一个）。注意：用户可能「跳过」（返回文案会明确说明，此时直接继续你手头的任务，不要追问、不要解释原因）。这不是错误，直接进入下一步，绝不反复问同一问题。",
-  "- 只有用户明确要求「列出 / 读取 / 写入 / 修改 / 删除 / 搜索 / 执行命令」时才调用工具；概念原理类问题直接回答，不要硬套工具。",
-  "- 一次只调用当前步骤真正需要的工具；拿到工具结果后必须基于真实结果回答，绝不编造文件内容。",
-  "- 工具失败或读不到内容时，如实说明，不要假装成功。",
-  "- 写/改/删文件时，引擎会弹框请用户确认；被拒绝时工具结果会报错，如实向用户说明，不要反复重试同一操作。",
-  "",
-  "## 输出要求",
-  "- 始终用中文回答。",
-  "- 用 Markdown 排版：善用标题、列表、表格；代码示例用带语言标注的代码块。",
-  "- **任务优先于教学**：用户让你执行/验证/操作时，先直接给出结果（成功/失败/数据），不要借题发挥展开教学。",
-  "- 工具失败时：如实复述错误和退出码，一句话说明失败原因即可；只有用户明确追问机制时才展开讲解。",
-  "- 解释概念时：先一句话结论 → 再展开讲机制 → 最后给一个最小示例或类比。",
-].join("\n");
+// systemPrompt 常量已拆到 _pipeline/prompt.ts（E2 阶段管线重构）
 
-// SSE 帧的联合类型（前端 sse.ts 用同名类型来消费）
-type StreamFrame =
-  | { type: "run"; runId: string; model: string }
-  | { type: "event"; event: AgentEvent }
-  | {
-      type: "done";
-      messages: AgentMessage[];
-      tools: ToolDefinition[];
-      runId: string;
-      // 会话级累计统计（读数盘）：done 时点由 store 从会话文件算出
-      stats: SessionStats;
-      // 任务清单（Phase 5）：叶子回溯取最新 todo 条目，前端面板权威恢复值
-      todos: TodoItem[];
-    }
-  | { type: "error"; message: string }
-  // 写/改/删工具需要人工确认：推给前端弹框，用户决定后回传 /api/chat/approve
-  | {
-      type: "tool_permission_request";
-      toolCallId: string;
-      toolName: string;
-      args: Record<string, unknown>;
-    }
-  // bash 命令的流式输出（旁路帧，不是 AgentEvent）：工具 → 这里 → SSE → 前端
-  | { type: "tool_output"; toolCallId: string; text: string }
-  // todo_write 更新任务清单（旁路帧，Phase 5）：工具 → 落盘会话 → 这里 → 前端面板
-  | { type: "tool_todo"; todos: TodoItem[] }
-  // ask_user_question 提问（旁路帧，A4）：模型 → 这里 → 前端逐题作答等用户回答
-  | { type: "ask_user_request"; toolCallId: string; questions: AskQuestion[] }
-  // 上下文压缩开始（B2）：调模型生成摘要期间推此帧，前端显示"正在压缩上下文"，
-  // 避免用户以为卡住（压缩是耗时的后台动作，可观测性边界）
-  | { type: "compacting"; tokensBefore: number };
+// StreamFrame 协议已拆到 _pipeline/frames.ts（E2 阶段管线重构）
 
 // --- POST /api/chat ---
 export async function POST(req: NextRequest) {
