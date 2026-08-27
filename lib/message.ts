@@ -4,6 +4,7 @@
 // ============================================================
 
 import type {
+  AgentMessage,
   AssistantMessage,
   CompactionSummaryMessage,
   TextContent,
@@ -51,13 +52,18 @@ export function createCompactionSummaryMessage(
   return { role: "compactionSummary", summary, tokensBefore, timestamp };
 }
 
-/** 从消息内容中提取纯文本（用于 MockModel 关键词匹配等） */
-export function messageText(message: {
-  content: Array<TextContent | ToolCallContent>;
-}): string {
+/** 从消息中提取纯文本（用于 MockModel 关键词匹配、摘要、会话预览等） */
+export function messageText(message: AgentMessage): string {
+  // compactionSummary 没有 content 数组（只有 summary 文本）——单独处理
+  if (message.role === "compactionSummary") {
+    return `（旧上下文压缩摘要）${message.summary}`;
+  }
+  // 注意：不用 filter(isTextContent)——message.content 在 AgentMessage
+  // 联合类型下是「两种数组的联合」，类型守卫在联合数组上收窄不稳；
+  // flatMap + 内联窄化（block.type === "text"）对两种数组都成立。
+  // （2026-08-27：从 manager.ts 私有版收敛至此，统一分隔符与摘要处理）
   return message.content
-    .filter(isTextContent)
-    .map((block) => block.text)
+    .flatMap((block) => (block.type === "text" ? [block.text] : []))
     .join("\n");
 }
 

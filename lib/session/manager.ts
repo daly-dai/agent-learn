@@ -14,6 +14,7 @@
 import { readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { AgentMessage, SessionEntry } from "../types";
+import { messageText } from "../message";
 import { JsonlSessionStore } from "./store";
 
 export type SessionSummary = {
@@ -139,7 +140,9 @@ async function summarizeSessionFile(
       } else if (entry.type === "message") {
         messageCount += 1;
         if (preview === undefined && entry.message.role === "user") {
-          preview = truncate(messageText(entry.message), 60);
+          // 预览是单行展示：messageText 保留结构（模型/摘要用），
+          // 这里把换行压成空格再截断，避免会话列表出现换行。
+          preview = truncate(messageText(entry.message).replace(/\n/g, " "), 60);
         }
       }
     }
@@ -154,19 +157,6 @@ async function summarizeSessionFile(
   } catch {
     return null;
   }
-}
-
-function messageText(message: AgentMessage): string {
-  // compactionSummary 没有 content 数组（它只有 summary 文本）——单独处理
-  if (message.role === "compactionSummary") {
-    return `（旧上下文压缩摘要）${message.summary}`;
-  }
-  // 注意：不要用 filter(isTextContent) —— message.content 在 AgentMessage
-  // 联合类型下是「两种数组的联合」，类型守卫在联合数组上收窄不稳。
-  // flatMap + 内联窄化（block.type === "text"）对两种数组都成立。
-  return message.content
-    .flatMap((block) => (block.type === "text" ? [block.text] : []))
-    .join(" ");
 }
 
 function truncate(input: string, max: number): string {

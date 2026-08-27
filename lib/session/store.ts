@@ -231,7 +231,6 @@ export class JsonlSessionStore {
     if (!firstKeptEntryId) return undefined;
 
     return {
-      // 
       messagesToSummarize: summarized.map((entry) => entry.message),
       tokensBefore,
       // 经济性检查用（Reasonix D6，判断在 route.ts）：要压的区域多大

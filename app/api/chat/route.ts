@@ -216,7 +216,6 @@ export async function POST(req: NextRequest) {
           message: userMessage,
         };
 
-        // 
         const userEnd: AgentEvent = {
           type: "message_end",
           message: userMessage,

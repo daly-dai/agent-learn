@@ -69,16 +69,11 @@ export class DeepSeekModel implements TeachingModel {
     // 临时调试日志：DEBUG_DEEPSEEK=true 时，打印这次请求的完整 messages + tools
     debugLog(this.options.model ?? DEFAULT_MODEL, url, messages, tools);
 
-    if(input.onDelta) {
+    if (input.onDelta) {
       return this.completeStreaming(url, input, messages, tools);
     }
 
-
     return this.completeNonStreaming(url, input, messages, tools);
-    // // 有 onDelta 回调就走真·流式，否则走非流式
-    // return input.onDelta
-    //   ? this.completeStreaming(url, input, messages, tools)
-    //   : this.completeNonStreaming(url, input, messages, tools);
   }
 
   // ----------------------------------------------------------
