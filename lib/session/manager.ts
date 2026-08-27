@@ -47,6 +47,12 @@ export class SessionManager {
     for (const file of files) {
       if (!file.isFile() || !file.name.endsWith(".jsonl")) continue;
       const id = file.name.slice(0, -".jsonl".length);
+      // 2026-08-26 修（幽灵会话）：会话目录只认「合法会话 id」的文件。
+      // B1 审批日志（<id>.approval.jsonl，带点）和手动副本（带空格）也是
+      // .jsonl，以前会被当成 0 条消息的会话列出来，但 delete() 的
+      // isValidSessionId 拒绝它们 → 「列得出、删不掉」。
+      // 过滤标准与路由层同一把尺（isValidSessionId），进出对称。
+      if (!isValidSessionId(id)) continue;
       const summary = await summarizeSessionFile(this.sessionPath(id), id);
       if (summary) summaries.push(summary);
     }

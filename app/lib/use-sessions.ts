@@ -112,7 +112,10 @@ export function useSessions() {
           return list[0]?.id ?? "";
         });
         return true;
-      } catch {
+      } catch (e) {
+        // 2026-08-26：原来静默吞错 → 「点了删除没反应」。留警告便于排查
+        // （幽灵会话 bug 就是靠它暴露的：审批日志/副本 id 非法 → 400 → 吞掉）
+        console.warn("删除会话失败", (e as Error).message, id);
         return false;
       }
     },
