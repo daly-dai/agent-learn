@@ -28,23 +28,22 @@ import type {
   ToolDefinition,
 } from "@/lib/types";
 import { createUserMessage } from "@/lib/message";
-import { MockModel } from "@/lib/mockModel";
-import { DeepSeekModel } from "@/lib/deepseekModel";
 import type { TeachingModel } from "@/lib/model";
-import { createToolRegistry } from "@/lib/tools";
-import type { AskQuestion } from "@/lib/tools/ask-user";
 import { runAgentLoop, type ToolDecision } from "@/lib/agent";
-import { TraceRecorder } from "@/lib/trace";
-import { JsonlSessionStore, summarizeEntries } from "@/lib/session";
-import { generateSummary } from "@/lib/summarize";
+import { JsonlSessionStore } from "@/lib/session";
 import { isValidSessionId } from "@/lib/session";
 import type { StreamFrame } from "./_pipeline/frames";
 import { systemPrompt } from "./_pipeline/prompt";
 import { decideToolCall } from "./_pipeline/approval";
+import { selectModel } from "./_pipeline/model";
+import { createRequestContext } from "./_pipeline/context";
+import { createPipelineTools } from "./_pipeline/tools";
+import { maybeCompact } from "./_pipeline/compact";
+import { askUserAnswer } from "./_pipeline/ask-user";
 import { toolApprovals } from "@/lib/toolApproval";
-import { userAnswers, makeAskKey, clearRun } from "@/lib/userAnswers";
+import { clearRun } from "@/lib/userAnswers";
 import { runControllers } from "@/lib/runControl";
-import { config, shouldCompact, compactKeepRecent } from "@/lib/config";
+import { config } from "@/lib/config";
 import { getApprovalMode } from "@/lib/approvalMode";
 import { isReadOnlyBash } from "@/lib/permission/readonly";
 import {
@@ -114,19 +113,13 @@ export async function POST(req: NextRequest) {
 
   const userMessage = createUserMessage(text.trim());
 
-  // 会话存储：每次请求新建实例并从磁盘读全量。
-  // 为什么不在模块级复用单例：多进程（dev server 多 worker / 未来部署）下
-  // 内存态可能落后于磁盘，新建实例能保证「内存 = 磁盘」；会话文件小，读全量可接受。
-  const store = new JsonlSessionStore(
-    join(sessionDir, `${sessionId}.jsonl`),
-    workspaceRoot,
+  const { store, recorder } = await createRequestContext({
     sessionId,
-  );
-
-  // 本次 run 的黑匣子：每次请求一个独立 runId，落到 .traces/<runId>.jsonl
-  const recorder = TraceRecorder.create(traceDir, modelLabel);
-
-  await recorder.init();
+    sessionDir,
+    workspaceRoot,
+    traceDir,
+    modelLabel,
+  });
 
   const encoder = new TextEncoder();
 
@@ -181,19 +174,15 @@ export async function POST(req: NextRequest) {
         await store.appendMessage(userMessage);
         const context = store.buildContext();
 
-        // 1c) 每请求组装工具注册表（贴 pi create-harness：每次会话组装）。
+        // 1c) 每请求组装工具注册表（_pipeline/tools.ts，E2 步骤 3）：
         //     业务 hooks 闭包捕获「这次请求」的 store/send——工具不用引擎透传。
-        //     signal/onChunk 仍是运行时参（引擎执行时注入），这里只烙业务。
-        const toolRegistry = createToolRegistry(workspaceRoot, {
-          // todo_write：先落盘会话（todo 是会话事件），再推 SSE 帧让前端面板实时更新。
-          // await 保证工具结果返回时已入库。
-          onTodoWrite: async (todos) => {
-            await store.appendTodo(todos);
-            send({ type: "tool_todo", todos });
-          },
-          // ask_user_question（A4）：推提问帧 → 挂起等用户逐题回答（不超时，用户可跳过，
-          // 返回未回答，run 不挂死）→ 回答回传工具结果给模型继续。
-          onAskUser: (questions) => askUserAnswer(questions, recorder.runId, send),
+        const toolRegistry = createPipelineTools({
+          workspaceRoot,
+          store,
+          send,
+          // 提问闭包在这里绑定 runId/send（_pipeline/ask-user.ts）
+          onAskUser: (questions) =>
+            askUserAnswer(questions, recorder.runId, send),
         });
 
         // 2) 运行 Agent Loop。onEvent 同时做两件事：
@@ -225,37 +214,15 @@ export async function POST(req: NextRequest) {
         for (const message of result.newMessages) {
           await store.appendMessage(message);
         }
-        // 2c) 上下文超窗口时压缩旧消息为摘要（B2 ③：LLM 结构化摘要）。
-        //     三步走，对齐 pi 的 prepareCompaction → compact → 落盘：
-        //     ① 纯计算准备（切点/待压消息/旧摘要，不碰模型）
-        //     ② 调模型生成结构化摘要（MOCK 或失败 → 降级拼贴，保信息）
-        //     ③ 落盘 compaction entry（成为新叶子）
-        //     阈值按 provider 的上下文窗口算（DeepSeek V4 是 1M 窗口，
-        //     几十上百轮才触发）；经济性检查（Reasonix D6）：要压的区域
-        //     太小（低于 config 阈值）就不压——省下的 token 不够抵消一次
-        //     摘要 API 调用的成本。
-        const prep = store.prepareCompaction(
-          config.provider.contextWindow - config.provider.reserveTokens,
-          compactKeepRecent(),
-        );
-        if (prep && prep.tokensToSummarize >= config.agent.minCompactTokens) {
-          // 压缩开始：先推 compacting 帧，让前端知道"后端在忙压缩"，不是卡死。
-          // 压缩（尤其调模型生成摘要）耗时几秒~几十秒，这段时间 SSE 无其他帧。
-          send({ type: "compacting", tokensBefore: prep.tokensBefore });
-          let summary: string;
-          if (config.modelSecrets.mockMode) {
-            // 离线教学：不调模型，拼贴降级（信息还在，只是不省 token）
-            summary = summarizeEntries(prep.messagesToSummarize);
-          } else {
-            // 真实模型：结构化摘要；失败降级拼贴（压缩是"防爆窗"，失败不能拖垮对话）
-            summary =
-              (await generateSummary(model, prep.messagesToSummarize, {
-                previousSummary: prep.previousSummary,
-                signal: abortController.signal,
-              })) ?? summarizeEntries(prep.messagesToSummarize);
-          }
-          await store.commitCompaction(prep, summary);
-        }
+        // 2c) 上下文超窗口时压缩旧消息为摘要（_pipeline/compact.ts，E2 步骤 3）：
+        //     行为与原内联一致（含 MOCK 降级拼贴），触发逻辑收进阶段文件。
+        await maybeCompact({
+          store,
+          model,
+          signal: abortController.signal,
+          onCompacting: (tokensBefore) =>
+            send({ type: "compacting", tokensBefore }),
+        });
 
         // 3) 全部结束后，推送最终权威结果。
         //    messages 带「全量会话历史」（buildContext 从叶子回溯），
@@ -335,65 +302,6 @@ export async function DELETE(req: NextRequest) {
   return NextResponse.json({ ok: true, sessionId });
 }
 
-// --- 模型提问（A4，多问题）：挂起一次提问 → 推帧（带全部 questions）→ 等逐题回答 ---
-// 与 askUserApproval 同模式，但语义是「回答问题列表」不是「允许/拒绝」：
-// 推 ask_user_request 帧（附 questions）给前端逐题作答 → 用户答完走
-// POST /api/chat/ask-user 回传 answers[] → resolve 交回 await 中的 onAskUser
-// → 工具结果回模型继续。
-// 【用户要求 2026-08-24】不设超时——模型无限等用户，用户想跳过就点「跳过」
-// （回传空数组 → 工具返回 SKIPPED_TEXT），不会被强制打断。
-// 但 run 结束（正常/被 stop/断连）时由 finally 里的 clearRun 清掉挂起，
-// 防止 Promise 残留（关浏览器/切会话的兜底）。
-function askUserAnswer(
-  questions: AskQuestion[],
-  runId: string,
-  send: (frame: StreamFrame) => void,
-): Promise<string[]> {
-  return new Promise((resolve) => {
-    // key 带 runId 前缀，run 结束时 clearRun(runId) 能按前缀精确清理
-    const key = makeAskKey(runId);
-
-    send({ type: "ask_user_request", toolCallId: key, questions });
-
-    userAnswers.set(key, {
-      resolve: (answers: string[]) => {
-        userAnswers.delete(key);
-        resolve(answers);
-      },
-    });
-  });
-}
-
-// --- POST /api/chat/ask-user ---（独立路由文件 app/api/chat/ask-user/route.ts）
-
-// --- 模型选择（config.provider → 具体实现）---
-// 这个函数是"适配层"的入口：上层 runAgentLoop 只依赖 TeachingModel 接口，
-// 用哪个实现，在这里决定，引擎完全无感。
-// provider 可扩展：config.provider 指向当前厂商（默认 deepseek），
-// 换厂商 = 换 AI_PROVIDER + 在下面加分支（见 lib/config.ts PROVIDERS）。
-
-function selectModel(): { model: TeachingModel; label: string } {
-  if (config.modelSecrets.mockMode) {
-    return { model: new MockModel(), label: "mock" };
-  }
-
-  const apiKey = config.modelSecrets.apiKey;
-
-  if (!apiKey || apiKey === "sk-your-key-here") {
-    throw new Error(
-      "未配置 DEEPSEEK_API_KEY。请在 .env.local 填入真实 key 并把 MOCK_MODE 改为 false，或保持 MOCK_MODE=true 使用离线教学模式。",
-    );
-  }
-
-  const model = new DeepSeekModel({
-    apiKey,
-    baseUrl: config.provider.baseUrl,
-    model: config.provider.model,
-  });
-
-  return { model, label: config.provider.label };
-}
-
 // --- 工具审批：硬性策略 + 人工确认 ---
 // 引擎每次想调工具都会先来这里（beforeToolCall 钩子）。
 // 两层把关：
@@ -401,8 +309,6 @@ function selectModel(): { model: TeachingModel; label: string } {
 //   2. 人工确认：写/改/删工具推确认帧给前端弹框，用户当场允许/拒绝
 // 只读工具（list/read/grep/find）默认放行。
 // 超时兜底：用户 5 小时不回应自动拒绝（block），避免挂起（前端不展示时间）。
-
-// TOOLS_NEEDING_CONFIRM 已移入 _pipeline/approval.ts（E2 步骤 2）
 
 // 人工确认超时：默认 5 小时（用户要长时间思考/离开也不该被打断；是"兜底防挂死"，
 // 不是"催促"——前端已不展示任何时间提示）。可用 APPROVAL_TIMEOUT_MS 环境变量覆盖。
