@@ -19,17 +19,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { join } from "node:path";
-import type {
-  AgentEvent,
-  AgentMessage,
-  SessionStats,
-  TodoItem,
-  ToolCallContent,
-  ToolDefinition,
-} from "@/lib/types";
+import type { ToolCallContent } from "@/lib/types";
 import { createUserMessage } from "@/lib/message";
 import type { TeachingModel } from "@/lib/model";
-import { runAgentLoop, type ToolDecision } from "@/lib/agent";
+import type { ToolDecision } from "@/lib/agent";
 import { JsonlSessionStore } from "@/lib/session";
 import { isValidSessionId } from "@/lib/session";
 import type { StreamFrame } from "./_pipeline/frames";
@@ -37,9 +30,7 @@ import { systemPrompt } from "./_pipeline/prompt";
 import { decideToolCall } from "./_pipeline/approval";
 import { selectModel } from "./_pipeline/model";
 import { createRequestContext } from "./_pipeline/context";
-import { createPipelineTools } from "./_pipeline/tools";
-import { maybeCompact } from "./_pipeline/compact";
-import { askUserAnswer } from "./_pipeline/ask-user";
+import { runPipeline } from "./_pipeline/index";
 import { toolApprovals } from "@/lib/toolApproval";
 import { clearRun } from "@/lib/userAnswers";
 import { runControllers } from "@/lib/runControl";
@@ -111,8 +102,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // 创建用户消息
   const userMessage = createUserMessage(text.trim());
 
+  // 创建会话存储和记录器
   const { store, recorder } = await createRequestContext({
     sessionId,
     sessionDir,
@@ -121,10 +114,13 @@ export async function POST(req: NextRequest) {
     modelLabel,
   });
 
+  // 创建文本编码器
   const encoder = new TextEncoder();
 
+  // 创建可读流
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      // 创建发送函数
       const send = (frame: StreamFrame) => {
         // 每个 frame 前加 data: 开头，后加两个换行符，模拟 SSE 流
         controller.enqueue(
@@ -138,9 +134,11 @@ export async function POST(req: NextRequest) {
       let runFinalized = false;
       const finalizeRun = () => {
         if (runFinalized) return;
+
         runFinalized = true;
         clearRun(recorder.runId);
       };
+      // 客户端断开感知：标签页/浏览器关闭时，Next.js 会 abort 请求信号。
       req.signal.addEventListener("abort", finalizeRun);
 
       try {
@@ -151,90 +149,19 @@ export async function POST(req: NextRequest) {
         // 0) 先推 run 元信息（runId + 模型名），前端据此展示"本次是哪个 run"
         send({ type: "run", runId: recorder.runId, model: modelLabel });
 
-        // 1) 用户消息生命周期事件：既进 SSE（前端画气泡），也进轨迹（黑匣子）
-        const userStart: AgentEvent = {
-          type: "message_start",
-          message: userMessage,
-        };
-
-        const userEnd: AgentEvent = {
-          type: "message_end",
-          message: userMessage,
-        };
-
-        recorder.record(userStart);
-
-        send({ type: "event", event: userStart });
-        
-        recorder.record(userEnd);
-        send({ type: "event", event: userEnd });
-
-        // 1b) 多轮记忆的核心：先把用户消息落盘，再从叶子回溯出完整上下文。
-        //     上一轮的 assistant/toolResult 都在上下文里，模型这一轮才能"记得"。
-        await store.appendMessage(userMessage);
-        const context = store.buildContext();
-
-        // 1c) 每请求组装工具注册表（_pipeline/tools.ts，E2 步骤 3）：
-        //     业务 hooks 闭包捕获「这次请求」的 store/send——工具不用引擎透传。
-        const toolRegistry = createPipelineTools({
-          workspaceRoot,
-          store,
-          send,
-          // 提问闭包在这里绑定 runId/send（_pipeline/ask-user.ts）
-          onAskUser: (questions) =>
-            askUserAnswer(questions, recorder.runId, send),
-        });
-
-        // 2) 运行 Agent Loop。onEvent 同时做两件事：
-        //    - recorder.record(event)  → 落盘成轨迹（黑匣子）
-        //    - send({type:"event"})    → 推给浏览器（实时仪表盘）
-        const result = await runAgentLoop({
+        // 1-3) 编排交给 _pipeline/index.ts 的 runPipeline（E2 步骤 4）：
+        //     落盘/工具组装/loop/压缩/done 都收进编排层；这里只保留
+        //     SSE 管道（send/abort/finally）——Next.js 请求生命周期。
+        await runPipeline({
           systemPrompt,
-          messages: context,
-          tools: toolRegistry.definitions(),
           model,
-          toolRegistry,
-          // 循环最大轮次（防无限循环护栏）：来自 lib/config.ts，env 可覆盖
-          maxTurns: config.agent.maxTurns,
-          // 审批需要 send（推确认帧给前端）和 recorder.runId，所以用闭包包一层
-          beforeToolCall: (call) => handleToolApproval(call, send, sessionId),
-          // run 级取消：中止模型请求 + 传给 bash 杀命令
-          signal: abortController.signal,
-          // bash 流式输出：旁路直达前端（不进事件流/trace）
-          onToolOutput: (toolCallId, text) => {
-            send({ type: "tool_output", toolCallId, text });
-          },
-          onEvent: (event) => {
-            recorder.record(event);
-            send({ type: "event", event });
-          },
-        });
-
-        // 2b) 本轮新增的 assistant/toolResult 逐条落盘，成为下一轮的"记忆"
-        for (const message of result.newMessages) {
-          await store.appendMessage(message);
-        }
-        // 2c) 上下文超窗口时压缩旧消息为摘要（_pipeline/compact.ts，E2 步骤 3）：
-        //     行为与原内联一致（含 MOCK 降级拼贴），触发逻辑收进阶段文件。
-        await maybeCompact({
+          userMessage,
           store,
-          model,
+          recorder,
+          send,
           signal: abortController.signal,
-          onCompacting: (tokensBefore) =>
-            send({ type: "compacting", tokensBefore }),
-        });
-
-        // 3) 全部结束后，推送最终权威结果。
-        //    messages 带「全量会话历史」（buildContext 从叶子回溯），
-        //    前端直接整体替换渲染——多轮对话因此能完整显示。
-        //    stats 是会话级累计统计（含本轮新增），前端读数盘直接展示。
-        send({
-          type: "done",
-          messages: store.buildContext(),
-          tools: toolRegistry.definitions(),
-          runId: recorder.runId,
-          stats: store.stats(),
-          todos: store.getLatestTodos() ?? [],
+          workspaceRoot,
+          beforeToolCall: (call) => handleToolApproval(call, send, sessionId),
         });
       } catch (e) {
         send({ type: "error", message: (e as Error).message });
