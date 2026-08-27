@@ -21,6 +21,7 @@
 // ============================================================
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { isPlainKey } from "../../../lib/keys";
 import styles from "./menu.module.css";
 
 export type MenuItem = {
@@ -132,6 +133,9 @@ export function Menu({
   }
 
   function onMenuKey(e: React.KeyboardEvent) {
+    // 修饰键组合让路（app/lib/keys.ts）：Ctrl/Cmd/Alt+方向键是系统/浏览器
+    // 快捷键，不该触发菜单导航——approval-dialog 同款前置判定
+    if (!isPlainKey(e)) return;
     if (e.key === "Escape") {
       e.preventDefault();
       setOpen(false);

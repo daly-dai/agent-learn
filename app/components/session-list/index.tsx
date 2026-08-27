@@ -11,13 +11,12 @@
 //   ＋新建      → 新建空会话并切过去
 //   ✎（悬停）  → 行内重命名：Enter 保存 / Esc 或失焦取消
 //                 （失焦不保存，避免和 Enter 触发两次提交）
-//   ×（悬停）  → 删除（项目自己的确认弹框，不用浏览器 confirm）
+//   ⋯→删除    → 行内确认条（"删除后不可恢复"红字就地确认，不弹框不遮罩）
 // ============================================================
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { SessionSummary } from "../../lib/use-sessions";
 import { formatClock } from "../../lib/format";
-import { ConfirmDialog } from "../confirm-dialog";
 import { Menu } from "../ui/menu";
 import styles from "./session-list.module.css";
 
@@ -41,10 +40,16 @@ export function SessionList({
   // 行内重命名的编辑态：editingId 是正在编辑的会话，draft 是输入框草稿
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
-  // 待删除的会话（非 null 时弹确认框）——替换浏览器 window.confirm
+  // 待删除的会话：非 null 时该行替换成行内确认条（就地确认，不弹框）
   const [pendingDelete, setPendingDelete] = useState<SessionSummary | null>(
     null,
   );
+  // 取消按钮 ref：确认条出现时聚焦它（安全侧——回车=取消，不误删，
+  // 与退役的 ConfirmDialog 默认聚焦取消同款；同时让 Esc 有落点）
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (pendingDelete) cancelRef.current?.focus();
+  }, [pendingDelete]);
 
   function startRename(session: SessionSummary) {
     // 草稿只回填已有标题；没标题就让用户从空输入开始（不预填文件 id）
@@ -92,9 +97,48 @@ export function SessionList({
                 className={`${styles.sessionItem}${
                   current ? " is-current" : ""
                 }`}
-                onClick={() => !editing && onSelect(session.id)}
+                onClick={() =>
+                  !editing && pendingDelete?.id !== session.id && onSelect(session.id)
+                }
               >
-                {editing ? (
+                {pendingDelete?.id === session.id ? (
+                  /* 行内删除确认（2026-08-28，替代居中 ConfirmDialog 弹框）：
+                     复用行内重命名的"状态替换行内容"模式——点 ⋯→删除后，
+                     该行原地变成确认条，不遮罩、不打断阅读、操作就近。
+                     全站从此零模态弹框（审批/提问本就钉底部，删除就地确认）。 */
+                  <div
+                    className={styles.sessionConfirm}
+                    role="alert"
+                    onClick={(e) => e.stopPropagation()}
+                    /* Esc 取消：与重命名模式对齐（重命名有 Esc/失焦取消）。
+                       焦点在确认条内（默认在取消按钮），Esc 冒泡到容器 */
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") setPendingDelete(null);
+                    }}
+                  >
+                    <span className={styles.confirmText}>删除后不可恢复</span>
+                    <div className={styles.confirmActions}>
+                      <button
+                        ref={cancelRef}
+                        type="button"
+                        className={styles.confirmCancel}
+                        onClick={() => setPendingDelete(null)}
+                      >
+                        取消
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.confirmDelete}
+                        onClick={() => {
+                          onDelete(session.id);
+                          setPendingDelete(null);
+                        }}
+                      >
+                        删除
+                      </button>
+                    </div>
+                  </div>
+                ) : editing ? (
                   <input
                     className={styles.sessionRenameInput}
                     value={draft}
@@ -129,7 +173,7 @@ export function SessionList({
                   </>
                 )}
 
-                {!editing && (
+                {!editing && pendingDelete?.id !== session.id && (
                   /* V2（2026-08-26）：⋯ 菜单（重命名/删除，34px 命中区）。
                      二次调整：从"常驻显示"改回"鼠标移上去才显示"（抄 DSH
                      会话列表的 hover 操作模式）——行平时干净，干预才动手。
@@ -166,20 +210,6 @@ export function SessionList({
       <div className={styles.sidebarFoot}>
         <p>点击切换会话 · 悬停 ⋯ 重命名 / 删除</p>
       </div>
-
-      {/* 删除确认弹框：替换浏览器 confirm，走纸记录仪语言（危险操作 error 红） */}
-      {pendingDelete && (
-        <ConfirmDialog
-          title="删除会话"
-          message={`删除会话「${pendingDelete.title ?? pendingDelete.id}」？此操作不可恢复，会话记录将被清空。`}
-          confirmLabel="删除"
-          onConfirm={() => {
-            onDelete(pendingDelete.id);
-            setPendingDelete(null);
-          }}
-          onCancel={() => setPendingDelete(null)}
-        />
-      )}
     </aside>
   );
 }

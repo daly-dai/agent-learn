@@ -148,6 +148,57 @@
   outline: none;
 }
 
+/* 行内删除确认条（2026-08-28，替代居中 ConfirmDialog）：
+   复用行内重命名的"状态替换行内容"模式，样式按 34px 命中区（V2 口径）。
+   危险操作（删除）用 error 红笔，取消按钮纸底静默——与审批卡同语言 */
+.sessionConfirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.confirmText {
+  font-family: var(--font-mono);
+  font-size: 12px; /* 整数（评审：12.5 非整数，对齐 §10.5 等宽口径） */
+  color: var(--pen-error);
+}
+
+.confirmActions {
+  display: flex;
+  gap: 8px;
+}
+
+.confirmCancel,
+.confirmDelete {
+  min-height: var(--hit);
+  padding: 0 14px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  border-radius: var(--r);
+  cursor: pointer;
+}
+
+.confirmCancel {
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+}
+
+.confirmCancel:hover {
+  border-color: var(--ink-mid);
+}
+
+.confirmDelete {
+  color: var(--plate);
+  background: var(--pen-error);
+  border: 1px solid var(--pen-error);
+}
+
+.confirmDelete:hover {
+  filter: brightness(1.08);
+}
+
 .sidebarFoot {
   padding: 10px 16px;
   border-top: 1px solid var(--line-soft);

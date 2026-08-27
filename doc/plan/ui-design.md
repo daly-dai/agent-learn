@@ -110,3 +110,29 @@ PLAN 九节写着"漂亮动画 / 复杂 UI"暂缓。这次只做了排版与信�
 **构图**：中间白（阅读面）+ 两侧灰（会话栏 / 轨迹）——"灰色侧边栏 + 白色中间"成立的关键是**落差够**（白 vs #e4e4e4 ≈ 20 单位），之前 #e0e0e0/#ececec 只差 12 单位，糊在一起才不好看。
 
 **教训（写给自己）**：设计身份是用户的需求，不是 AI 的发明。AI 给一个主题时，要标注"这是继承决定，不是你的需求"——用户有权利随时丢弃它。§10.1 的走纸记录仪描述保留为历史，不再作为当前方向。
+
+---
+
+## 10.8 V2 补记（2026-08-28）：原语库评估——dialog/mask 出局，删除确认就地化
+
+> 触发：用户问"哪些原语组件值得封装"→ 逐组件精读后**推翻了两个候选原语**。核心教训：**"值得封装"的判据不是"看起来像什么"，而是"重复度 + 未来复用者数量"**。
+
+**原语候选评估（基于代码事实，不是拍脑袋）**：
+
+| 候选原语 | 评估 | 结论 |
+|---|---|---|
+| `ui/dialog/` 模态骨架 | 唯一使用者 confirm-dialog（删除会话），而删除确认改行内后使用者归零 | ❌ 不封装 |
+| `ui/mask/` 遮罩层 | 全站只有 confirm-dialog 一个 mask，approval/ask-user 都是底部卡片（无遮罩）——"重复度最高"是误判 | ❌ 不封装（并入 dialog 也不需要了） |
+| `useGlobalKeydown` hook | 只有 approval-dialog 一个全局监听者，menu/ask-user 都是局部 onKeyDown | ❌ 不封装（一个 adapter = 假设的 seam） |
+| `ui/select` / `collapse` / `stepper` | collapse 只有 TaskPanel 一个使用者；select/stepper 无真实需求点 | ❌ 不封装（按需原则） |
+| **`app/lib/keys.ts` 纯函数层** | **真实重复**：approval 有内联实现（埋在 useEffect 不可测）、menu 缺 isPlainKey 防护（Ctrl+方向键也触发导航的隐患） | ✅ 封装 |
+
+**删除确认改造（B3-③ 联动）**：confirm-dialog（居中 mask 弹框）退役删除（-155 行），改为**行内确认条**——复用 session-list 已有的"行内重命名"模式（状态替换行内容）：点 ⋯→删除 后该行原地变成"删除后不可恢复 [取消][删除]"红字确认条。**全站从此零模态弹框**（审批/提问本就钉底部，删除就地确认），mask 彻底出局。
+
+**keys.ts seam 设计**（教学点）：收**最小结构**（`{ctrlKey,metaKey,altKey}` / `{tagName?}`）而非真实 DOM 事件 → node 环境直接单测（B8 ① 许可），无需 jsdom。接入：approval-dialog 内联判定搬出、menu 补 isPlainKey 防护。
+
+**待办（B3 遗留，未排期）**：
+1. **验收口径核查**：10.5 说"等宽标签最小 12px"，但全站仍有 18 处 <12px（approvalKey 10.5px、message-row 元信息 10-11px、sessionMeta 11px 等）——需逐一判断"标签 vs 装饰"后决定是否上提
+2. **B3-⑤ 精读 DSH packages/client/AGENTS.md**（约束 AI 写前端的教材，建议放周五回顾 Phase 2）
+3. **注释纸感词汇标注**：trace-rail 已标"删除"历史，approval/ask-user/message-row/task-panel 的"走纸记录仪"注释还没标退役
+

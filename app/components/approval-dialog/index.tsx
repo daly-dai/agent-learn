@@ -20,6 +20,7 @@
 
 import { useEffect } from "react";
 import type { ToolApprovalRequest } from "../../lib/use-agent-run";
+import { isEditableTarget, isPlainKey } from "../../lib/keys";
 import styles from "./approval-dialog.module.css";
 
 /** 用户对一次确认的决定（B1-④：session/persist 是"允许"的两种记忆档） */
@@ -40,16 +41,10 @@ export function ApprovalDialog({ request, onApprove }: ApprovalDialogProps) {
   useEffect(() => {
     if (!request) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-      const target = e.target as HTMLElement | null;
-      if (
-        target &&
-        (target.tagName === "INPUT" ||
-          target.tagName === "TEXTAREA" ||
-          target.tagName === "SELECT")
-      ) {
-        return;
-      }
+      // 前置判定提炼到 app/lib/keys.ts（纯函数层，可单测）：
+      // 修饰键组合让路、焦点在编辑区让路（用户在打字，不抢键）
+      if (!isPlainKey(e)) return;
+      if (isEditableTarget(e.target as HTMLElement | null)) return;
       const k = e.key.toLowerCase();
       if (k === "y" || k === "1") {
         e.preventDefault();
