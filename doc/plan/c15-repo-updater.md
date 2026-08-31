@@ -213,7 +213,7 @@ updateRepo(name): Promise<UpdateResult>                      // POST /api/repos�
 4. 第二次点击（无新增）：显示"已是最新"，不重复总结
 5. 基线文件 `.repo-updates/pi.json` 生成且内容正确；`.repo-updates/` 已 gitignore
 6. 总结落盘 `workspace/更新日志/<日期>-<项目>.md` 生成（人看材料，不进 git）；落盘失败不阻塞
-7. `lib/repos/git.ts`（runGit/HEAD commit/新增 commit 解析/parseLsRemoteHash）与 `baseline.ts`
+7. `app/api/repos/_lib/git.ts`（runGit/HEAD commit/新增 commit 解析/parseLsRemoteHash）与 `baseline.ts`
    有单测绿（B8 ① 纯逻辑层）；`registry.test.ts` 断言分支是数据（DSH=master 非 main）
 8. `tsc --noEmit` 通过；code-review 双轴（11.5 ⑦）
 
@@ -263,3 +263,17 @@ updateRepo(name): Promise<UpdateResult>                      // POST /api/repos�
   面板接入属本详案（C15）范畴，不进 SOP**；全局文档不增加机制内容
 - 为什么不做方案 A（对话内工具）/方案 C（侧栏面板）：A 无可视化、一问一答；C 要动
   `page.tsx` 三栏布局、挤占主界面。B 独立页成本最低且是新路由页练习（方案对比详见会话记录）
+- 2026-08-31（为什么放 lib/，用户纠结过的边界）：用户问"repo 是业务功能/特供小工具，
+  为啥放 lib（lib 不是应该放 agent 相关内容吗）"。结论：**lib/ 的准入标准是"无 UI 依赖、
+  可单测、不反向依赖 app 的纯逻辑层"，不是"agent 专属"**（config/message 等非 agent 核心也在 lib）。
+  repo 放 lib 的理由：① 纯逻辑可单测（lib/repos/*.test.ts）② 复用 lib 模型管道
+  （selectModel+complete+fail-soft）③ 与 lib/session 三层模式同构。且"特供小工具"放 lib
+  最安全——不追求通用、不要了直接删 lib/repos 不影响 agent 代码；真正要防的污染是
+  "有 UI 耦合/依赖 app/不可单测"的东西进 lib（本目录已验证 0 条 @/app import）。
+  边界已注释在 `lib/repos/registry.ts` 顶部。
+- 2026-08-31（业务模块探索模式定案，repo 迁出 lib/）：用户进一步想清楚——lib/ 应是**纯 agent 内核**，
+  以后要基于内核探索更多落地实践，业务模块不该混进 lib（删起来要整块干净）→ **定 AGENTS.md 11.7**：
+  - lib/ = agent 内核（引擎/模型/会话/工具/类型），公共门面 `lib/index.ts`（外部从这里 import）
+  - **业务模块**放 `app/api/<模块>/_lib/`（`_` 前缀非路由，先例 `_pipeline`）+ 页面 + services，3 处目录
+  - repo 从 `lib/repos/` 迁到 `app/api/repos/_lib/`（本详案所有路径随之更新：_lib/registry、_lib/git…）
+  - 删一个业务模块 = 删 3 处目录，不影响 agent 内核；内核红线（lib/agent.ts）不变

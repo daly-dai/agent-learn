@@ -19,23 +19,23 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { join } from "node:path";
-import type { ToolCallContent } from "@/lib/types";
-import { createUserMessage } from "@/lib/message";
-import type { TeachingModel } from "@/lib/model";
-import type { ToolDecision } from "@/lib/agent";
-import { JsonlSessionStore } from "@/lib/session";
-import { isValidSessionId } from "@/lib/session";
+import {
+  createUserMessage,
+  JsonlSessionStore,
+  isValidSessionId,
+  getApprovalMode,
+  toolApprovals,
+  clearRun,
+  runControllers,
+  config,
+} from "@/lib";
+import type { ToolCallContent, ToolDecision, TeachingModel } from "@/lib";
 import type { StreamFrame } from "./_pipeline/frames";
 import { systemPrompt } from "./_pipeline/prompt";
 import { decideToolCall } from "./_pipeline/approval";
 import { selectModel } from "./_pipeline/model";
 import { createRequestContext } from "./_pipeline/context";
 import { runPipeline } from "./_pipeline/index";
-import { toolApprovals } from "@/lib/toolApproval";
-import { clearRun } from "@/lib/userAnswers";
-import { runControllers } from "@/lib/runControl";
-import { config } from "@/lib/config";
-import { getApprovalMode } from "@/lib/approvalMode";
 import { isReadOnlyBash } from "@/lib/permission/readonly";
 import {
   appendApprovalReceipt,
