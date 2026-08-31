@@ -64,3 +64,21 @@ compactIfNeeded 从拼贴升级为调模型生成结构化摘要（`## Goal / ##
 - 压缩卡片展开 `<pre>` → `<Markdown>`（摘要的 `## Goal` 等 Markdown 结构正确渲染）。
 - 路线 A 定案：压缩后前端**不展示被压原文**（与 pi/DSH 一致；数据都在 JSONL，以后随时可改）。
 - env 测试口子：`CONTEXT_WINDOW`（默认 1_000_000）/ `MIN_COMPACT_TOKENS`（默认 400）/ `KEEP_RECENT_MESSAGES`（默认 8）。
+
+## 升级补记（2026-08-27，触发：DSH 压缩系统走读——精读走读 24）
+
+> 原 B2 三步定稿 ✅ 已实现（2026-08-26）。本次精读 DSH `packages/compaction/*` 四包（`command-compact` 命令 / `compaction` 接口层 / `compaction-basic` 实现层 / `tool-result-pruner` 剪枝）后定位：**我们 = MVP 可用版，DSH = 工业成熟版；核心决策逐条同源（压老留新 / 切割不拆工具对 / LLM 结构化摘要 / 旧数据保留），差距分两类——A 类真差距（通用质量，值得打磨）×3，B 类场景差异（单会话单用户用不上，不抄）**。
+
+### A 类：打磨清单（条件触发，不做不崩）
+
+| # | 打磨项 | 现状 | 参考（DSH） | 触发时机 | 成本 |
+|---|---|---|---|---|---|
+| ① | compaction entry 补审计字段：被压消息 id 列表（shadowedSeqs 思想）+ 生成摘要的模型名 | 只有 summary / firstKeptEntryId / tokensBefore | `region.ts:447-461`（compaction/summary 事件） | 开始做长期会话复盘时 | 低 |
+| ② | "摘要必须更小" fail-closed：framed summary 估算 token ≥ 被压区域 → 不落盘 | 只有"待压区域太小不压"（经济性检查） | `region.ts:374-378` | 下次动 compact.ts 时顺带 | 低 |
+| ③ | tool-pairing 平衡升级：切割线 balance 扫描（assistant toolCall +1 / tool/result -1，balance==0 才可切）替代"保留区第一条不能是 toolResult"单点修正 | 单点修正（store.ts:212-225） | `tool-pairing.ts`（131 行，可整抄思路） | 亲眼看到孤儿工具坑 / 写复现测试时 | 中 |
+
+### B 类：不抄（记住为什么）
+
+durable 锁 + 稳定性检查（无并发，前端阻塞提示兜底）、KV cache 前缀复用（D1 已决策"复杂度换钱不划算"）、影子价格/影子价格事件（无计费消费方）、错误六分类 ManualCompactionError（我们降级策略更稳）、CompactionEngine 接口抽象（单一实现）。**打磨只打 A 类；B 类等场景变了（多会话并发 / 计费）再拿出来。**
+
+> 完整对比见 `workspace/精读走读-24-DSH-压缩对照.md`（八节 + 自检题 + 施工单）。
