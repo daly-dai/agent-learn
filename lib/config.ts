@@ -98,6 +98,10 @@ export const config = {
     workspace: env("WORKSPACE_ROOT", resolve(process.cwd(), "workspace")),
     traces: env("TRACE_DIR", resolve(process.cwd(), ".traces")),
     sessions: env("SESSION_DIR", resolve(process.cwd(), ".sessions")),
+    /** 参考开源项目根（C15 仓库更新面板：E:\agents-read 下的 git clone） */
+    reposRoot: env("REPOS_ROOT", "E:\\agents-read"),
+    /** 仓库更新基线（C15：记录每个仓库上次更新到的 commit，增量总结用；gitignore） */
+    repoBaselines: env("REPO_BASELINE_DIR", resolve(process.cwd(), ".repo-updates")),
   },
 
   /** 引擎行为（压缩阈值随 provider 走，见 config.provider） */

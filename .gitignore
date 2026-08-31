@@ -43,6 +43,9 @@ debug.log
 # agent sessions (会话记忆 JSONL，不提交)
 .sessions/
 
+# repo updater baselines (C15 仓库更新基线，机器用，不提交)
+.repo-updates/
+
 # workspace 学习笔记（用户决策：全部不进 git）
 /workspace/
 

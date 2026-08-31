@@ -1,0 +1,446 @@
+/* ============================================================
+   repos/page.module.css —— 仓库更新面板（C15）
+   归属：app/repos/page.tsx
+   ============================================================
+   设计（2026-08-31 frontend-design 重做）：
+     签名 = 重点标注卡（琥珀序号 + 左边条），页面唯一高光；
+     其余安静（状态点、等宽标识、细线分隔），可读性 > 装饰。
+   令牌全部来自 globals.css（中性壳 + 五支笔色），与观测台同语言。
+   ============================================================ */
+
+.page {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+}
+
+/* ============ 顶栏 ============ */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  height: 52px;
+  background: var(--plate);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.topbarLeft {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.subtitle {
+  font-size: 12.5px;
+  color: var(--ink-faint);
+}
+
+.back {
+  font-size: 13px;
+  color: var(--pen-user);
+  text-decoration: none;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--paper);
+}
+
+.back:hover {
+  background: var(--recorder);
+}
+
+/* ============ 左右主体 ============ */
+.body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 264px minmax(0, 1fr);
+}
+
+/* ============ 左侧：项目侧边栏 ============ */
+.sidebar {
+  background: var(--recorder);
+  border-right: 1px solid var(--line);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* 全部更新：实心主按钮（观测台「新建会话」同款配方） */
+.updateAllBtn {
+  min-height: var(--hit);
+  padding: 0 16px;
+  border: none;
+  border-radius: var(--r);
+  background: var(--ink);
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.updateAllBtn:hover:not(:disabled) {
+  background: var(--ink-hover);
+}
+
+.updateAllBtn:disabled {
+  background: var(--ink-faint);
+  cursor: default;
+}
+
+.repoList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+}
+
+/* 项目行：状态点 + 名字 + tag + 行内更新。div 模拟按钮（键盘可达） */
+.repoItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--r);
+  background: transparent;
+  font-size: 14px;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.repoItem:hover {
+  background: rgba(29, 33, 39, 0.06);
+}
+
+/* 选中：白底 + 左琥珀条（与重点标注同色系，全页唯一的两处琥珀） */
+.repoItemActive {
+  background: var(--plate);
+  box-shadow: inset 2px 0 0 var(--pen-signal);
+  font-weight: 600;
+}
+
+.repoItemMuted {
+  color: var(--ink-faint);
+}
+
+/* 状态点：有更新=琥珀实心，静默=灰（不靠文字喊"有更新"） */
+.repoDot {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+  opacity: 0.5;
+}
+
+.repoDotHot {
+  background: var(--pen-signal);
+  opacity: 1;
+}
+
+.repoName {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 有更新 tag：琥珀胶囊（用户明确要，保留但精致） */
+.tag {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--pen-signal-ink);
+  background: rgba(176, 116, 27, 0.14);
+  padding: 2px 7px;
+  border-radius: 99px;
+}
+
+/* 行内更新按钮：视觉紧凑 26px，命中区经负 margin 扩到 ≥34px（B3） */
+.rowUpdateBtn {
+  flex-shrink: 0;
+  min-width: 44px;
+  height: 26px;
+  margin: -4px -4px -4px 0;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  background: transparent;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: var(--ink-mid);
+  cursor: pointer;
+}
+
+.rowUpdateBtn:hover:not(:disabled) {
+  border-color: var(--line);
+  background: var(--plate);
+  color: var(--pen-user);
+}
+
+.rowUpdateBtn:disabled {
+  color: var(--ink-faint);
+  cursor: default;
+}
+
+/* ============ 右侧：项目详情 ============ */
+.detail {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--paper);
+}
+
+.detailInner {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 32px 40px 56px;
+}
+
+/* 头部：项目名是主角（等宽大字），分支是配角 */
+.detailHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 28px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.detailTitle {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+}
+
+.detailName {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.detailBranch {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--ink-faint);
+}
+
+.updateBtn {
+  min-height: var(--hit);
+  padding: 0 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--plate);
+  font-size: 13.5px;
+  color: var(--ink);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.updateBtn:hover:not(:disabled) {
+  border-color: var(--pen-user);
+  color: var(--pen-user);
+}
+
+.updateBtn:disabled {
+  color: var(--ink-faint);
+  cursor: default;
+  opacity: 0.7;
+}
+
+/* ============ 总结展示（重点标注卡 → 概览折叠 → 提交折叠） ============ */
+.summary {
+  font-size: 15px;
+}
+
+/* 本轮/日期标签（区分"本轮更新"与历史条目） */
+.summaryLabel {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-faint);
+  margin-bottom: 12px;
+  letter-spacing: 0.04em;
+}
+
+/* ---- 重点标注卡（签名元素） ---- */
+.takeaways {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.takeaway {
+  display: flex;
+  gap: 14px;
+  background: var(--plate);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--pen-signal);
+  border-radius: var(--r);
+  padding: 14px 16px;
+}
+
+.takeawayRank {
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--pen-signal);
+  line-height: 1.3;
+  min-width: 20px;
+}
+
+.takeawayBody {
+  min-width: 0;
+}
+
+.takeawayTitle {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  font-family: var(--font-mono);
+}
+
+.takeawayDetail {
+  font-size: 13.5px;
+  color: var(--ink-mid);
+  line-height: 1.7;
+}
+
+/* ---- 折叠区块（概览 / 提交） ---- */
+.fold {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 12px;
+  margin-top: 14px;
+}
+
+.foldSummary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--ink);
+  user-select: none;
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.foldSummary::-webkit-details-marker {
+  display: none;
+}
+
+.foldSummary::after {
+  content: "▸";
+  font-size: 11px;
+  color: var(--ink-faint);
+  transition: transform 0.15s;
+  margin-left: 2px;
+}
+
+.fold[open] .foldSummary::after {
+  transform: rotate(90deg);
+}
+
+/* 折叠区块的小圆点：概览=绿（LLM 总结），提交=灰 */
+.foldDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.foldDot-model {
+  background: var(--pen-model);
+}
+
+.foldDot-faint {
+  background: var(--ink-faint);
+}
+
+.foldBody {
+  margin-top: 12px;
+  padding-bottom: 4px;
+}
+
+.overview {
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.commitList {
+  margin: 0;
+  padding-left: 1.2em;
+  color: var(--ink-mid);
+  font-size: 13px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.commitList li {
+  margin: 4px 0;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+}
+
+/* ============ 历史时间线 ============ */
+.timeline {
+  margin-top: 36px;
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+}
+
+/* 每条历史 = 日期行 + 总结（重点标注展开，概览/提交折叠） */
+.timelineEntry {
+  padding: 16px 0 4px;
+}
+
+.timelineDate {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--pen-signal-ink);
+  margin-bottom: 14px;
+}
+
+/* ============ 通用 ============ */
+.hint {
+  color: var(--ink-faint);
+  font-size: 13.5px;
+}
+
+.resultError {
+  color: var(--pen-error);
+  font-size: 13.5px;
+}
