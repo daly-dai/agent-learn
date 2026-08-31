@@ -107,7 +107,7 @@ todo 是会话事件（非独立存储）；`todo_write` 整表替换幂等；�
 
 ### Phase 6：对话面板打磨 + 架构加固 —— ⏳ 排队
 - UI 打磨（消息渲染、工具调用卡片、事件时间线、终端面板、task 面板整合成统一布局）
-- 补测试（已完成大半：17 文件 118 用例）
+- 补测试（已完成大半：23 文件 188 用例）
 - 实现 L3 Trace Viewer（轨迹回放，参考 pi `export-html`）→ **A3**
 - 若出现"内核要被多个入口复用"的需求，把 `lib/` 抽成共享包（monorepo），这是"换架构"的正确时机
 
@@ -117,6 +117,8 @@ todo 是会话事件（非独立存储）；`todo_write` 整表替换幂等；�
 
 按"想理解什么"去读，不要通读整个 monorepo。**pi 是主参考**（本项目 = pi 思想的 Next.js 重写），其余项目按需对照：
 
+> **★ 2026-08-31 新增：`doc/开源项目导航手册/index.md`** —— 渐进式导航卡（一个项目一个文件：结构 + 功能→位置映射 + 搜索配方 + 已读标记；新增项目流程见 `sop-新增参考项目.md`）。**新会话先读它定位"去哪找"，再按下表深读**。走读笔记（`workspace/精读走读-*.md`）标 ✅ 的模块直接引用结论，不重读。
+
 | 想理解的问题 | 读这些文件 |
 | --- | --- |
 | Agent Loop 怎么停 / 怎么循环 | `pi/packages/agent/src/agent-loop.ts`、`agent.ts` |
@@ -125,13 +127,8 @@ todo 是会话事件（非独立存储）；`todo_write` 整表替换幂等；�
 | 上下文压缩 | `pi/packages/agent/src/harness/compaction/*.ts` |
 | 内置工具（读/写/改/终端） | `pi/packages/agent/src/harness/tools/{bash,read,write,edit,edit-diff,path-utils}.ts`；`pi/packages/coding-agent/src/core/tools/{find,grep,ls}.ts` |
 | 产品层会话管理 / 终端执行 | `pi/packages/coding-agent/src/core/{agent-session.ts,session-manager.ts,bash-executor.ts,exec.ts}` |
-| 教学版对照（和本项目同源） | `how-pi-agent-works/examples/teaching-agent/` + `how-pi-agent-works/docs/` |
 
-其他开源项目（`E:\agents-read` 下）：
-- `how-pi-agent-works` —— 教学路线 + 每步文档，**当前阶段最该精读**。
-- `pi` —— 真实产品，读上面列的文件，不要通读。
-- `smolagents-main` —— HuggingFace 的 Python 轻量 agent 框架，对照理解"工具/多步/代码执行"的另一种取舍。
-- `deepseek-harness` —— 即 DSH 本身（我正在运行的 harness），"会话/终端/task 面板/子 agent"完整落地的大型参考，做 Phase 4/5 时看相应模块。
+**参考项目清单**（`E:\agents-read` 下）：**唯一列表在 `doc/开源项目导航手册/index.md`**（每个项目一个文件：架构/功能→位置/搜索配方，按需打开）——新增/删除项目只改那里，PLAN 不各自维护，避免两套列表不同步。
 
 ---
 
@@ -165,6 +162,8 @@ todo 是会话事件（非独立存储）；`todo_write` 整表替换幂等；�
 | B2 真摘要压缩（三步） | `doc/plan/b2-compaction.md` + `doc/02-*.md`（四家对照） | ✅ 已实现 |
 | C7 配置整合 | `doc/plan/c7-config.md` | 骨架 ✅，设置页 UI ⏳ |
 | C13 斜杠命令面板 | `doc/plan/c13-slash-commands.md` | ⏳ 排队 |
+| **开源项目导航手册**（参考系速查 + 新增项目机制） | `doc/开源项目导航手册/index.md` | ✅ 2026-08-31 |
+| C15 仓库更新面板（手动更新 + LLM 变更总结） | `doc/plan/c15-repo-updater.md` | ⏳ 进行中（代码完成，待测） |
 
 ---
 
@@ -186,7 +185,7 @@ todo 是会话事件（非独立存储）；`todo_write` 整表替换幂等；�
 | **C** | Context & Memory Management（模型能看到什么） | JSONL 会话树 + **B2 ③ 真摘要压缩** ✅ | 无记忆分层（回忆/遗忘/新鲜度） | pi compaction / Reasonix memory | B、C |
 | **L** | Lifecycle & Orchestration（步骤如何组织、简单循环→复杂编排） | 单 agent ReAct 循环 + task 面板 | 无子智能体、handoffs、issue-to-PR 流程 | DSH todo/subagent / CodeWhale todo_snapshot | A、C |
 | **O** | Observability & Operations（如何测量追踪/成本/可靠性） | 事件流 + L2 轨迹落盘 | L3 回放没有；无成本跟踪 | pi export-html / OpenHands 泳道 | A、B |
-| **V** | Verification & Evaluation（轨迹→反馈/护栏/回归） | vitest 17 文件 118 用例 | 无 benchmark | smolagents / DSH test-support | A |
+| **V** | Verification & Evaluation（轨迹→反馈/护栏/回归） | vitest 23 文件 188 用例 | 无 benchmark | smolagents / DSH test-support | A |
 | **G** | Governance & Security（权限/身份/策略/审计） | 全量弹框 + 5h 超时 | 无分级、无记忆、无审批日志；bash 不做危险分析 | CodeWhale 四档 / Reasonix 静态分析 | **B（最快见效）** |
 
 注：模型适配（TeachingModel 接口）与配置集中化不在七层内——综述把"模型本身"排除在研究范围外、配置属横切关注点（第 10 章），归入阶段 B/C 单独处理。
@@ -211,7 +210,7 @@ todo 是会话事件（非独立存储）；`todo_write` 整表替换幂等；�
 | # | 做什么 | 参考 | 长在哪 | 验收标准 | 状态 |
 |---|---|---|---|---|---|
 | A1 | **Phase 5 task 面板** | DSH todo / CodeWhale todo_snapshot | 协议（todo 数组存会话）+ `app/components/task-panel/` | 模型产出任务清单，前端显示进度，刷新不丢 | ✅ |
-| A2 | **测试框架 vitest** | smolagents / DSH test-support | `lib/tools/` 先补单测（纯函数+fs） | tools 全测过，`pnpm test` 绿 | ✅（17 文件 118 用例） |
+| A2 | **测试框架 vitest** | smolagents / DSH test-support | `lib/tools/` 先补单测（纯函数+fs） | tools 全测过，`pnpm test` 绿 | ✅（23 文件 188 用例） |
 | A3 | **L3 Trace Viewer** | pi export-html / OpenHands 泳道 | 轨迹数据已有，加回放视图（`app/components/trace-viewer/`） | 能按 turn 前进/后退，工具调用↔结果配对 | ⏳ 排队 |
 | A4 | **ask_user_question** | DSH tool-ask-user / codex request_user_input | 新工具 + SSE 帧 + 前端弹层 | 模型提问 → 弹层 → 回答 → 继续 | ✅ |
 | A5 | **web_search / web_fetch** | DSH tool-web / CodeWhale Web 聚合 | 新工具（独立） | 模型能搜索并抓取网页；搜不到时 isError | ⏳ 排队 |
@@ -222,12 +221,19 @@ todo 是会话事件（非独立存储）；`todo_write` 整表替换幂等；�
 |---|---|---|---|---|
 | B1 | **审批升级四步**：① 只读命令放行（Reasonix `bash_readonly.go` + `shellsafe/*.go`）② 分级模式（CodeWhale `approval_mode.rs`，suggest/bypass/never + 运行时切换）③ 审批日志（CodeWhale `approval_log.rs`，JSONL 成对校验）④ 前端面板 + 记忆（Reasonix 内嵌卡片布局 + 本会话/一直允许） | Reasonix / CodeWhale / pi | `lib/permission/`（readonly / approval-log / approval-memory）+ `lib/approvalMode.ts` + `app/api/chat/route.ts` + approve/approval-mode 接口 + `app/components/approval-dialog` + `approval-mode-switch` | ✅（详案 `doc/plan/b1-approval.md`） |
 | B2 | **真摘要压缩**：拼贴 → 调模型生成结构化摘要（pi 六段 + DSH Files/Errors 两段；增量 previousSummary；经济性检查；MOCK 降级拼贴） | pi compaction + DSH + Reasonix | `lib/session/store.ts` + `lib/summarize.ts` | ✅（详案 `doc/plan/b2-compaction.md`） |
+| B2.1 | **压缩打磨三件套**（DSH 走读 24 触发）：① compaction entry 补审计字段（被压消息 id 列表 + 摘要模型名）② "摘要必须更小" fail-closed 检查（摘要 ≥ 被压区域不落盘）③ tool-pairing balance 升级（替代"第一条不是 toolResult"单点修正）；B 类不抄（锁/KV cache/影子价格/错误分类/接口抽象——场景不需要） | DSH compaction（走读 24 施工单） | `lib/session/store.ts` + `app/api/chat/_pipeline/compact.ts` | 💡 讨论中（条件触发：① 长期会话复盘时 ② 下次动 compact.ts 时 ③ 遇孤儿工具坑时） |
 | B3 | **UI V2：尺度升级 + 原语库**（2026-08-26 用户 UI 反馈触发：按钮太小、小家子气、溢出操作进 dropdown）：① 全面板尺度升级（按钮 ≥34px 命中区、字号上提、留白加大）② 第一个原语 = **下拉菜单 Menu**（溢出操作归集：顶栏「⋯」、会话行「⋯」、面板头部）③ 面板 chrome 统一（头部 = 标题 + 读数 + 操作区）④ dialog/collapse/select/stepper… 后续按需 ⑤ **精读 DSH `packages/client/AGENTS.md`**（约束 AI 写前端的教材；约束纪律见 `doc/plan/ui-design.md` §10.6） | DSH `dsh-client-ui-primitives` + Reasonix 面板族（走读 18） | `app/components/ui/`（新）+ 全部组件样式升级 | ⏳ 进行中（①②落地；08-27：原语评估全出局 + 删除确认行内化 + keys.ts + 等宽 12px 收口 + SessionRow 抽取 + **⑤精读完成**（对照表 `doc/知识点-04` + 新组件 checklist §10.9）） |
 | B4 | **文件 diff 预览**：edit/write 前生成 diff（红绿视图） | Cline / DSH DiffBlock | `lib/tools/edit.ts` + `app/components/ui/diff/` | ⏳ 排队 |
 | B5 | **hooks 注册表**：beforeToolCall 泛化成 onBeforeTool/onAfterTool | CodeWhale / DSH hooks | `lib/hooks.ts` + `lib/agent.ts` 透传 | ⏳ 排队 |
 | B6 | **记忆分层**：会话 + 摘要已有，补"主动回忆/新鲜度" | Reasonix memory | `lib/session/store.ts` + 未来记忆工具 | ⏳ 排队 |
 | B7 | **终端加固**：bash 输出全量落盘 + shell 危险分析（重定向/嵌套检测） | Reasonix shellsafe | `lib/tools/bash-runner.ts` | ⏳ 排队 |
 | B8 | **前端单元测试**（**非核心**，2026-08-26 用户标注"这个倒不是核心"）：① 纯函数层先行（`app/lib/`：trace-fold/messages/format——不随 UI 变，随时可做）② 组件/hooks 层（RTL：Menu/MessageRow/use-sessions）等"冻结信号"：全局令牌与骨架连续 2 轮迭代不改、组件 API 冻结 | vitest + Testing Library（参考 DSH test-support） | `app/lib/*.test.ts` + `app/components/**/*.test.tsx` | ⏳ 排队 |
+| B9 | **模型请求重试与退避**（外部评估 S1）：瞬时错误（429/5xx/超时）指数退避重试 2~3 次（`Retry-After` 头优先）、永久错误（401/400）fail-fast、请求加空闲超时兜底；重试过程发轨迹事件 | Claude Code / pi / DSH | `lib/deepseekModel.ts`（适配层内部，引擎无感） | ⏳ 排队（验收：stub fetch 前两次 429 第三次成功 → complete 正常返回 + 轨迹 2 条 retry；401 不重试） |
+| B10 | **工作区记忆文件注入**（外部评估 S2）：`systemPrompt` 常量 → `createSystemPrompt(workspaceRoot)` 工厂，尾部拼接 `workspace/AGENTS.md`（存在才注入 + 缓存；`@文件` 引用行一期可不做）；配套写种子文件 | Claude Code CLAUDE.md / pi AGENTS.md / Codex | `_pipeline/prompt.ts`（E2 预埋的扩展位，C8 Skills 同落点） | ⏳ 排队（验收：记忆文件写一条规矩 → 新会话模型遵守；文件不存在行为不变） |
+| B11 | **会话级运行锁**（外部评估 S3）：route.ts POST 入口 per-session 占用表（`Map<sessionId, runId>`），占用中返回 409 + 明确文案，finally 释放 | 所有成熟 harness 隐含前提 | `lib/runControl.ts`（run 级取消 → 加会话级互斥，概念同族） | ⏳ 排队（验收：并发两请求同 session → 第二个 409；不同 session 不受影响） |
+| B12 | **中断/崩溃会话自愈**（外部评估 S4）：`buildContext`（或 loadOrCreate 后）扫描尾部未配对 toolCall → **不改文件**，重建上下文时补合成 toolResult（"上次运行被中断，工具未执行"，isError=true）——pi 同款：存储是事实，修复在重建视图时 | Claude Code / pi resume | `lib/session/store.ts`（buildContext 或私有辅助，纯逻辑可单测） | ⏳ 排队（验收：手工构造孤儿 toolCall 会话文件 → 正常发消息不 400；合成结果进上下文且前端可见） |
+| B14 | **上下文余量指示**（外部评估 B 级顺手件）：数据已齐（done 帧 stats.tokens + 压缩阈值在 config），只差读数盘加一格"上下文 X%" | Claude Code /context | UI 读数盘一个格子 | ⏳ 排队（顺手，半小时~一天） |
+| B15 | **自动会话命名**（外部评估 B 级顺手件）：首轮 assistant 回复完成后用首条用户消息（或小模型一句话）生成 title 更新会话（title 字段 + 改名接口都有） | Claude Code / DSH | `app/api/sessions/route.ts` + UI | ⏳ 排队（顺手，半小时） |
 
 **阶段 C：功能丰富（远期，按需）**
 
@@ -247,6 +253,7 @@ todo 是会话事件（非独立存储）；`todo_write` 整表替换幂等；�
 | C12 | move_file / read_image | Reasonix move_file / DSH read_image | `lib/tools/` 两个小工具 | 随做（30 分钟一个） | ⏳ |
 | C13 | **斜杠命令面板** | pi `core/slash-commands.ts` / Reasonix `.reasonix/commands/*.md` | `lib/commands/` 注册表 + 前端斜杠输入 | **立即（一步到位）**；详案 `doc/plan/c13-slash-commands.md` | ⏳ 排队 |
 | C14 | **@ 文件匹配**（file mention）：输入 `@` 触发文件模糊搜索（文件+文件夹）→ 选中注入模型上下文（代码编写时点名要读的代码/配置；用户 08-27 提，**排在 C13 之后做**） | Codex `mention_codec`/`fuzzy_file_search` + pi `file-processor`（已实读） | `app/lib/mentions.ts`（纯函数）+ `app/api/file-search/` + `ui/mention-picker/` + 发送注入 | ⏳ 排队（详案 `doc/plan/c14-file-mention.md`：**含 A/B/C 方案对比与选 A 理由 + 效率实测（379 文件 7ms / 17k 文件 81ms，按真实工作区场景，**排除依赖是必须项**）+ debounce + 文件夹支持**；符号 @ 可配置不写死） |
+| C15 | **开源仓库更新面板**（用户 08-31 提）：`/repos` 页面（**左右布局**：左项目边栏 + 右详情）列出 `E:\agents-read` 7 个参考项目 → 手动点击更新 = git fetch + pull + LLM 总结新增 commit + ⭐重点标注（结合导航手册"我们拿走什么"）；基线 `.repo-updates/<项目>.json` 增量总结，落盘 `workspace/更新日志/<日期>-<项目>.md`。**分支是数据不是探测**（命令固定 fetch/log/pull，分支写进 registry：pi/codex=main，DSH=master）；**状态 = 进页面实时 `git ls-remote` 检查**（毫秒级，有更新才显示 tag，不误导） | git 标准 CLI + 复用本项目 B2 模型管道（`selectModel`+`complete`+fail-soft） | `lib/repos/`（registry/git/baseline/summarize）+ `app/api/repos/route.ts` + `app/services/repos/` + `app/repos/page.tsx`（首个独立路由页） | ⏳ 进行中（2026-08-31 已拍板：只做 3 个 git 仓库 / 全量增量总结 / 落盘 workspace/；UI 整改完成：左右布局 + ls-remote 实时检查 + git log 折叠；代码 tsc 绿，单测待本地跑）；详案 `doc/plan/c15-repo-updater.md` |
 
 > **非核心/可选（暂不排期，条件触发）**：**LSP 代码智能**（重型依赖——要起语言服务器进程，教学项目收益低；真需要代码智能时再评估）和 **tool_search 工具发现**（工具超过 20 个才需要，现在 12 个；等工具膨胀时再评估）。这两项不是"不学"，是"条件触发"。
 
