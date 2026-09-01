@@ -23,6 +23,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AgentMessage, SessionStats, TodoItem } from "@/lib/types";
 import type { AskQuestion } from "@/lib/tools/ask-user";
+import type { ContextPressure } from "@/app/lib/context-occupancy";
 import { appendDelta, replaceLast } from "./messages";
 import { readStream, type ObservedEvent, type StreamFrame } from "./sse";
 import {
@@ -31,6 +32,7 @@ import {
   answerUserQuestion,
   stopRun,
   sendMessage,
+  executeCommand,
 } from "@/app/services/chat";
 
 // 空会话的统计（读接口失败/清空后的兜底）
@@ -69,6 +71,13 @@ export function useAgentRun(sessionId: string) {
   const [todos, setTodos] = useState<TodoItem[]>([]);
   // 上下文压缩进行中（B2）：收到 compacting 帧置 true，done/error 复位
   const [compacting, setCompacting] = useState(false);
+  // C13 命令执行反馈：结果文案（成功 text / "没有可压缩的历史" / 失败）/ 执行中状态。
+  // 命令 API 成功返回 { result }，但前端要么刷新消息流（压了有卡片）、要么无变化
+  // （无可压历史）——必须有一个可见反馈，否则"点了没反应"。
+  const [commandFeedback, setCommandFeedback] = useState("");
+  const [commandRunning, setCommandRunning] = useState(false);
+  // C13 上下文占用（ContextMeter 数据源）：来自 GET 历史 / done 帧 / 命令刷新
+  const [contextPressure, setContextPressure] = useState<ContextPressure | undefined>(undefined);
 
   // 清空本地状态（不含服务端）：切会话共用同一份。
   // 从历史恢复 effect 里抽出来的公共逻辑——
@@ -85,6 +94,7 @@ export function useAgentRun(sessionId: string) {
     setToolOutputs({});
     setTodos([]);
     setCompacting(false);
+    setContextPressure(undefined);
   }, []);
 
   // 会话历史：挂载时 / sessionId 变化时触发。
@@ -104,6 +114,10 @@ export function useAgentRun(sessionId: string) {
           setMessages(data.messages);
         }
         setStats(data.stats ?? ZERO_STATS);
+        // 上下文占用恢复（C13 ContextMeter）：切会话后圆环归位
+        if (data.contextPressure !== undefined) {
+          setContextPressure(data.contextPressure);
+        }
         // 任务清单恢复：刷新/切换会话后面板不丢（Phase 5）
         if (Array.isArray(data.todos)) {
           setTodos(data.todos);
@@ -152,6 +166,8 @@ export function useAgentRun(sessionId: string) {
         setMessages(frame.messages);
         setRunId(frame.runId);
         setStats(frame.stats);
+        // 上下文占用权威值（C13 ContextMeter）：run 结束 = 当前上下文占用
+        setContextPressure(frame.contextPressure);
         // run 结束了：服务端不再有挂起的确认/提问（超时会自动处理），清掉弹框
         setPendingApproval(null);
         setPendingAsk(null);
@@ -282,14 +298,61 @@ export function useAgentRun(sessionId: string) {
     [sessionId, loading, applyFrame],
   );
 
+  // 执行一条斜杠命令（C13）：不走模型（DSH：without sending the command
+  // to the model）。反馈规则（用户拍板 2026-09-01：保留一个）：
+  //   - 消息流变了（压缩产生 compactionSummary 卡片）→ 卡片即反馈，不显示文案
+  //   - 消息流没变（无可压历史/业务错误）→ 显示结果文案兜底
+  // 执行中提示（commandRunning）也渲染在消息流末尾，不叠在输入框上。
+  // @returns 命令是否【业务成功】（result.kind === "success"）——
+  // C13 /export 门面：前端据它决定是否触发下载。业务失败（handler 返回
+  // error，如"会话为空"）不能触发下载，所以不能用"没抛异常"当成功。
+  const runCommand = useCallback(
+    async (line: string): Promise<boolean> => {
+      if (!sessionId || loading || commandRunning) return false;
+
+      setError("");
+      setCommandFeedback("");
+      setCommandRunning(true);
+      
+      try {
+        const { result } = await executeCommand({ line, sessionId });
+        // 命令落盘了会话：重新拉历史（/compact 压缩卡片从 buildContext 渲染）
+        const history = await fetchHistory(sessionId);
+        
+        setMessages(history.messages);
+        setStats(history.stats);
+        setTodos(history.todos ?? []);
+        // 压缩后上下文回落：圆环归位（ContextMeter 的直观闭环）
+        if (history.contextPressure !== undefined) {
+          setContextPressure(history.contextPressure);
+        }
+        // 消息条数变化 = 真的压了（摘要替换了旧消息）→ 卡片是反馈，不显示文案
+        const changed = history.messages.length !== messages.length;
+        setCommandFeedback(changed ? "" : (result.text ?? ""));
+        return result.kind === "success";
+      } catch (e) {
+        setCommandFeedback(`命令执行失败：${(e as Error).message}`);
+        return false;
+      } finally {
+        setCommandRunning(false);
+      }
+    },
+    [sessionId, loading, commandRunning, messages],
+  );
+
   return {
     messages,
     observed,
     loading,
     error,
+    setError, // C13：命令面板报错（未知命令）复用错误横幅
     runId,
     model,
     send,
+    runCommand,
+    commandFeedback,
+    commandRunning,
+    contextPressure,
     stats,
     pendingApproval,
     approve,

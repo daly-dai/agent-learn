@@ -85,6 +85,7 @@
 }
 
 .consoleFrame {
+  position: relative; /* C13：命令补全面板 absolute 定位锚点（贴输入框上方） */
   max-width: 880px; /* V2：830 → 880 */
   margin: 0 auto;
   display: grid;
@@ -95,6 +96,12 @@
   background: var(--plate);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
+}
+
+/* C13：命令补全面板的包裹层——不生成盒模型、不占 grid 子项位，
+   让 absolute 的 popup 直接相对 consoleFrame 定位（app/page.tsx） */
+.commandLayer {
+  display: contents;
 }
 
 .consoleFrame:focus-within {
@@ -164,6 +171,15 @@
   background: var(--line);
   color: #8b8f85;
   cursor: default;
+}
+
+/* C13：右侧控件组 = 上下文圆环 + 发送/停止按钮。
+   包成一个 grid 子项（col2），否则圆环会当第三个 grid 子项把
+   按钮挤到下一行（textarea/圆环/按钮变三行）。flex 横排 + 垂直居中。 */
+.consoleActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .consoleHint {

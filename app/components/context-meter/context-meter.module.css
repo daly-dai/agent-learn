@@ -1,0 +1,112 @@
+/* ============================================================
+   context-meter.module.css —— 上下文占用圆环（C13）
+   归属组件：app/components/context-meter/index.tsx
+   ============================================================
+   抄 DSH ContextMeter.module.css 的结构，令牌映射到本项目：
+     --dsw-alias-border-l3        → --line（圆环底轨）
+     --dsw-alias-label-tertiary   → --ink-faint（圆环填充默认）
+     --dsw-specific-menu          → --plate（面板底）
+     --dsw-alias-border-inverted  → --line（面板边）
+     --dsw-shadow-lv3             → 与 ui/menu 面板同款投影
+   高占用警示：>= 75% 圆环填充转信号色（用户能预判"快该压缩了"）。
+   ============================================================ */
+
+.root {
+  position: relative;
+  display: inline-flex;
+}
+
+/* 28px 圆形命中区（DSH 同款，与发送按钮同列） */
+.trigger {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-mid);
+  cursor: pointer;
+}
+
+.trigger:hover {
+  background: var(--paper);
+}
+
+.track {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 2;
+}
+
+.fill {
+  fill: none;
+  stroke: var(--ink-faint);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+/* 高占用：>= 75% 用信号色（压缩阈值心理：该注意了） */
+.trigger[data-high="true"] .fill {
+  stroke: var(--pen-signal);
+}
+
+/* 面板：贴圆环上方浮起，plate 底 + 细边 + 投影（ui/menu 浮层语言） */
+.panel {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  box-sizing: border-box;
+  width: 240px;
+  padding: 12px;
+  background: var(--plate);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: 0 12px 32px rgba(29, 33, 39, 0.18), 0 2px 8px rgba(29, 33, 39, 0.1);
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--ink-mid);
+  cursor: default;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.figures {
+  margin-left: auto;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+.percent {
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.headline {
+  color: var(--ink-faint);
+}
+
+/* 条形图：底部容器浅色，填充段按 percent 宽 */
+.bar {
+  display: flex;
+  margin: 10px 0 0;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--paper);
+  overflow: hidden;
+}
+
+.segment {
+  flex: none;
+  min-width: 2px;
+  height: 100%;
+  border-radius: 1px;
+  background: var(--ink-faint);
+}

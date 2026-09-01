@@ -54,7 +54,10 @@ import { ApprovalDialog } from "./components/approval-dialog";
 import { ApprovalModeSwitch } from "./components/approval-mode-switch";
 import { TaskPanel } from "./components/task-panel";
 import { AskUserCard } from "./components/ask-user-card";
+import { CommandMenu } from "./components/command-menu";
+import { ContextMeter } from "./components/context-meter";
 import { useAgentRun } from "./lib/use-agent-run";
+import { useCommandMenu } from "./lib/use-command-menu";
 import { useSessions } from "./lib/use-sessions";
 import { useStickyScroll } from "./lib/use-sticky-scroll";
 import { foldEvents } from "./lib/trace-fold";
@@ -100,9 +103,36 @@ export default function Home() {
     todos,
     stop,
     compacting,
+    runCommand,
+    commandFeedback,
+    commandRunning,
+    contextPressure,
+    setError,
   } = useAgentRun(currentId);
 
-  const [input, setInput] = useState("列出工作区文件"); // 输入框内容（表单状态留在页面，不进 hook）
+  // 输入控制台 + 命令面板（C13 拆出）：input 状态/快照/过滤/键盘导航/
+  // pick/submit 的命令分支全在 hook 里，页面只接线（use-command-menu.ts）。
+  const {
+    input,
+    setInput,
+    inputRef,
+    commandMenuOpen,
+    commandActiveIndex,
+    setCommandActiveIndex,
+    commandMenuRef,
+    filteredCommands,
+    handleInputChange,
+    handleKeyDown,
+    handleBlur,
+    pickCommand,
+    submit,
+  } = useCommandMenu({
+    onRunCommand: runCommand,
+    onSend: send,
+    onError: setError,
+    sessionId: currentId,
+    disabled: loading,
+  });
 
   // 审批模式（B1-②）：页面挂载时读服务端当前值；切换调接口（运行时生效，
   // 重启恢复 config 默认）。参考项目都有此入口（pi /settings、DSH /permission）
@@ -123,9 +153,9 @@ export default function Home() {
         /* 切换失败保持原状 */
       });
   }, []);
+  
   const transcriptRef = useRef<HTMLDivElement>(null); // 转录稿容器，新消息到达时滚到底
   const traceRef = useRef<HTMLDivElement>(null); // 轨迹容器，新事件到达时滚到底
-  const inputRef = useRef<HTMLTextAreaElement>(null); // 输入框，聚焦/自适应高度用
 
   // ---- 滚动跟随（吸底）----
   // 2026-08-26 修：原来每次 messages/observed 更新都强制 scrollToEnd——
@@ -144,18 +174,12 @@ export default function Home() {
     if (followTrace) scrollToEnd(traceRef.current);
   }, [observed, followTrace]);
 
-  // 输入框随内容长高（上限由 CSS 的 max-height 兜住）
-  useEffect(() => {
-    const box = inputRef.current;
-    if (!box) return;
-    box.style.height = "auto";
-    box.style.height = `${box.scrollHeight}px`;
-  }, [input]);
-
   // 列表保鲜（2026-08-26 修）：run 结束（loading true→false）后刷新会话列表。
   // 会话列表只在 挂载/新建/重命名/删除 时刷新，聊天后不刷 → 停在旧快照：
   // 新建会话聊完仍是"未命名会话 0 条"（消息数/预览/排序都不更新）。
   // 用 loading 跳变（而非 done 帧）判断：也覆盖出错/停止导致 run 结束的情况。
+  // 2026-09-01 补：命令执行完（commandRunning true→false）也刷新——
+  // /clear 清空会话后左侧列表若不刷会停在旧条数（46 条），刷新页面才消失。
   const prevLoadingRef = useRef(loading);
   useEffect(() => {
     if (prevLoadingRef.current && !loading) {
@@ -163,15 +187,13 @@ export default function Home() {
     }
     prevLoadingRef.current = loading;
   }, [loading, refresh]);
-
-  // 发送入口（表单提交 / 回车都走这里）：
-  // 页面负责「校验非空 + 清空输入框」，真正的请求交给 hook 的 send(text)
-  function submit() {
-    if (!input.trim() || loading) return;
-    const text = input.trim();
-    setInput("");
-    send(text);
-  }
+  const prevCommandRunningRef = useRef(commandRunning);
+  useEffect(() => {
+    if (prevCommandRunningRef.current && !commandRunning) {
+      refresh(); // 命令改写了会话文件（/clear 清空、/compact 压缩）→ 列表保鲜
+    }
+    prevCommandRunningRef.current = commandRunning;
+  }, [commandRunning, refresh]);
 
   // 点空态例句：把文案填进输入框并聚焦（不直接发送，用户可再改）
   function pickSeed(text: string) {
@@ -237,6 +259,20 @@ export default function Home() {
                   <span>正在压缩上下文，请稍候…</span>
                 </div>
               )}
+              {/* C13 命令执行状态：渲染在消息流末尾（跟 compacting 同位置），
+                  不叠在输入框上。执行中提示 / 无变化的兜底结果文案
+                  （压缩成功时卡片即反馈，文案为空） */}
+              {commandRunning && (
+                <div className={styles.compacting} role="status">
+                  <span className={styles.compactingLabel}>命令</span>
+                  <span>正在执行，请稍候…</span>
+                </div>
+              )}
+              {commandFeedback && (
+                <div className={styles.compacting} role="status">
+                  <span>{commandFeedback}</span>
+                </div>
+              )}
               {/* 待确认卡片（B1-④）已从消息流移到底部决策区（2026-08-26，
                   用户要求"像 askUser 悬浮在输入框位置"）——见下方 decisionBar */}
             </div>
@@ -290,44 +326,62 @@ export default function Home() {
               }}
             >
               <div className={styles.consoleFrame}>
+                {/* C13 命令补全面板：贴输入框上方浮起；键盘导航在 textarea
+                    onKeyDown 处理（焦点始终在输入框，只移高亮项）。
+                    display:contents —— 包裹 div 不生成盒模型，不占 consoleFrame
+                    grid 的子项位（否则 popup 会把两列布局撑成两行），
+                    popup 的 absolute 定位祖先仍是 consoleFrame。 */}
+                {commandMenuOpen && (
+                  <div ref={commandMenuRef} className={styles.commandLayer}>
+                    <CommandMenu
+                      commands={filteredCommands}
+                      activeIndex={commandActiveIndex}
+                      onActiveChange={setCommandActiveIndex}
+                      onPick={pickCommand}
+                    />
+                  </div>
+                )}
                 <textarea
                   className={styles.consoleInput}
                   ref={inputRef}
                   rows={1}
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    // 回车发送；Shift+Enter 换行；中文输入法选词时的回车不算发送
-                    if (e.key !== "Enter" || e.shiftKey) return;
-                    if (e.nativeEvent.isComposing) return;
-                    e.preventDefault();
-                    submit();
-                  }}
+                  onChange={(e) => handleInputChange(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  onBlur={handleBlur}
                   placeholder="给它一个目标，例如：读取 agent-notes.md 并总结要点"
                   disabled={loading}
                   autoFocus
                 />
-                {/* 发送按钮在 run 进行中「变身」为停止按钮：
-                    位置永远不变（操作跟随视线），角色随 loading 切换。
-                    stop 需要 runId（来自 SSE run 帧），未到时短暂不可点 */}
-                {loading ? (
-                  <button
-                    className={styles.consoleStop}
-                    type="button"
-                    onClick={() => stop(runId)}
-                    disabled={!runId}
-                  >
-                    停止
-                  </button>
-                ) : (
-                  <button
-                    className={styles.consoleSend}
-                    type="submit"
-                    disabled={!input.trim()}
-                  >
-                    发送
-                  </button>
-                )}
+                {/* 上下文占用圆环（C13，抄 DSH ContextMeter）：发送按钮旁，
+                    压缩后回落——占用感知的直观闭环 */}
+                {/* 右侧控件组：圆环 + 发送/停止按钮。
+                    必须包成一个 grid 子项（col2），否则圆环会当第三个
+                    grid 子项把按钮挤到下一行（三级布局 bug，见 .consoleActions） */}
+                <div className={styles.consoleActions}>
+                  <ContextMeter pressure={contextPressure} />
+                  {/* 发送按钮在 run 进行中「变身」为停止按钮：
+                      位置永远不变（操作跟随视线），角色随 loading 切换。
+                      stop 需要 runId（来自 SSE run 帧），未到时短暂不可点 */}
+                  {loading ? (
+                    <button
+                      className={styles.consoleStop}
+                      type="button"
+                      onClick={() => stop(runId)}
+                      disabled={!runId}
+                    >
+                      停止
+                    </button>
+                  ) : (
+                    <button
+                      className={styles.consoleSend}
+                      type="submit"
+                      disabled={!input.trim()}
+                    >
+                      发送
+                    </button>
+                  )}
+                </div>
               </div>
               <p className={styles.consoleHint}>
                 Enter 发送 · Shift + Enter 换行 · 每次发送开始新的一次 run
