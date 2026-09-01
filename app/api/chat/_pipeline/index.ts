@@ -27,6 +27,7 @@ import type { StreamFrame } from "./frames";
 import { createPipelineTools } from "./tools";
 import { maybeCompact } from "./compact";
 import { askUserAnswer } from "./ask-user";
+import { computeContextPressure } from "./context";
 
 export type RunPipelineParams = {
   systemPrompt: string;
@@ -119,7 +120,7 @@ export async function runPipeline(params: RunPipelineParams) {
     onCompacting: (tokensBefore) => send({ type: "compacting", tokensBefore }),
   });
 
-  // 3) 推送最终权威结果（全量历史 + 统计 + 任务清单）
+  // 3) 推送最终权威结果（全量历史 + 统计 + 任务清单 + 上下文占用）
   send({
     type: "done",
     messages: store.buildContext(),
@@ -127,5 +128,6 @@ export async function runPipeline(params: RunPipelineParams) {
     runId: recorder.runId,
     stats: store.stats(),
     todos: store.getLatestTodos() ?? [],
+    contextPressure: computeContextPressure(store),
   });
 }

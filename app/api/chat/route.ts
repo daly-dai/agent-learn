@@ -18,10 +18,8 @@
 // ============================================================
 
 import { NextRequest, NextResponse } from "next/server";
-import { join } from "node:path";
 import {
   createUserMessage,
-  JsonlSessionStore,
   isValidSessionId,
   getApprovalMode,
   toolApprovals,
@@ -29,13 +27,14 @@ import {
   runControllers,
   config,
 } from "@/lib";
-import type { ToolCallContent, ToolDecision, TeachingModel } from "@/lib";
+import type { ToolCallContent, ToolDecision } from "@/lib";
 import type { StreamFrame } from "./_pipeline/frames";
 import { systemPrompt } from "./_pipeline/prompt";
 import { decideToolCall } from "./_pipeline/approval";
-import { selectModel } from "./_pipeline/model";
-import { createRequestContext } from "./_pipeline/context";
+import { selectModelSafe } from "./_pipeline/model";
+import { createRequestContext, createSessionStore } from "./_pipeline/context";
 import { runPipeline } from "./_pipeline/index";
+import { computeContextPressure } from "./_pipeline/context";
 import { isReadOnlyBash } from "@/lib/permission/readonly";
 import {
   appendApprovalReceipt,
@@ -88,19 +87,13 @@ export async function POST(req: NextRequest) {
 
   // 模型选择：MOCK_MODE=true 用离线 Mock，否则用真实 DeepSeek。
   // 缺 key 时直接返回 400，让前端能显示清楚的错误，而不是崩在服务端。
-  let model: TeachingModel;
-  let modelLabel: string;
-  try {
-    const selected = selectModel();
-
-    model = selected.model;
-    modelLabel = selected.label;
-  } catch (error) {
-    return NextResponse.json(
-      { error: (error as Error).message },
-      { status: 400 },
-    );
+  // selectModelSafe 统一"选择失败 → error 文案"（command route 同款）。
+  const selected = selectModelSafe();
+  if (!selected.ok) {
+    return NextResponse.json({ error: selected.error }, { status: 400 });
   }
+  const model = selected.model;
+  const modelLabel = selected.label;
 
   // 创建用户消息
   const userMessage = createUserMessage(text.trim());
@@ -197,17 +190,14 @@ export async function GET(req: NextRequest) {
   if (!isValidSessionId(sessionId)) {
     return NextResponse.json({ error: "非法 sessionId" }, { status: 400 });
   }
-  const store = new JsonlSessionStore(
-    join(sessionDir, `${sessionId}.jsonl`),
-    workspaceRoot,
-    sessionId,
-  );
+  const store = createSessionStore(sessionId);
   return NextResponse.json({
     sessionId,
     leafId: store.getLeafId(),
     messages: store.buildContext(),
     stats: store.stats(),
     todos: store.getLatestTodos() ?? [],
+    contextPressure: computeContextPressure(store), // C13 ContextMeter 数据源
   });
 }
 
@@ -220,11 +210,7 @@ export async function DELETE(req: NextRequest) {
   if (!isValidSessionId(sessionId)) {
     return NextResponse.json({ error: "非法 sessionId" }, { status: 400 });
   }
-  const store = new JsonlSessionStore(
-    join(sessionDir, `${sessionId}.jsonl`),
-    workspaceRoot,
-    sessionId,
-  );
+  const store = createSessionStore(sessionId);
   await store.reset();
   return NextResponse.json({ ok: true, sessionId });
 }

@@ -15,6 +15,7 @@ import type {
   ToolDefinition,
 } from "@/lib/types";
 import type { AskQuestion } from "@/lib/tools/ask-user";
+import type { ContextPressure } from "@/app/lib/context-occupancy";
 
 // SSE 帧的联合类型（服务端 route.ts 推送同名帧）
 export type StreamFrame =
@@ -29,6 +30,8 @@ export type StreamFrame =
       stats: SessionStats;
       // 任务清单（Phase 5）：权威恢复值
       todos: TodoItem[];
+      // 当前上下文占用（C13 ContextMeter 数据源）
+      contextPressure: ContextPressure;
     }
   | { type: "error"; message: string }
   // 写/改/删工具需要人工确认：前端弹框，用户决定后回传 /api/chat/approve

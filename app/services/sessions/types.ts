@@ -4,11 +4,11 @@
 // PATCH 重命名 / DELETE 删除）
 // ============================================================
 
-/** 会话摘要（列表一项）：id 是身份，title 是给人看的名字 */
+/** 会话摘要（列表一项）：id 是身份，title 是给人看的名字。
+ *  2026-09-01：messageCount 已删（左侧不展示条数，用户拍板"前后端都省事"） */
 export type SessionSummary = {
   id: string;
   title?: string;
-  messageCount: number;
   /** 文件最后修改时间（毫秒） */
   updatedAt: number;
   preview?: string;

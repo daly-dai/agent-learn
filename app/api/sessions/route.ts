@@ -7,7 +7,7 @@
 //   /api/chat      管「会话里的对话」—— 发消息 / 历史 / 清空当前会话消息
 //
 // 接口一览：
-//   GET    → 会话列表 [{ id, title?, messageCount, updatedAt, preview }]
+//   GET    → 会话列表 [{ id, title?, updatedAt, preview }]（条数已删，2026-09-01）
 //   POST   → 新建空会话（body: { title? }）→ { id }
 //   PATCH  → 重命名（body: { id, title }）→ { ok }
 //   DELETE → 删除会话（?id=）→ { ok }

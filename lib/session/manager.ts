@@ -20,7 +20,6 @@ import { JsonlSessionStore } from "./store";
 export type SessionSummary = {
   id: string;
   title?: string;
-  messageCount: number;
   /** 文件最后修改时间（毫秒），用作「最近活跃」排序与展示 */
   updatedAt: number;
   /** 首条用户消息的文本（截断），列表里给个上下文提示 */
@@ -130,18 +129,16 @@ async function summarizeSessionFile(
     const mtime = await stat(filePath).then((s) => s.mtimeMs);
 
     let title: string | undefined;
-    let messageCount = 0;
     let preview: string | undefined;
 
     for (const line of raw.split("\n").filter(Boolean)) {
       const entry = JSON.parse(line) as SessionEntry;
       if (entry.type === "session") {
         title = entry.title;
-      } else if (entry.type === "message") {
-        messageCount += 1;
-        if (preview === undefined && entry.message.role === "user") {
-          // 预览是单行展示：messageText 保留结构（模型/摘要用），
-          // 这里把换行压成空格再截断，避免会话列表出现换行。
+      } else if (entry.type === "message" && preview === undefined) {
+        // 预览是单行展示：messageText 保留结构（模型/摘要用），
+        // 这里把换行压成空格再截断，避免会话列表出现换行。
+        if (entry.message.role === "user") {
           preview = truncate(messageText(entry.message).replace(/\n/g, " "), 60);
         }
       }
@@ -150,7 +147,6 @@ async function summarizeSessionFile(
     return {
       id,
       ...(title ? { title } : {}),
-      messageCount,
       updatedAt: mtime,
       ...(preview ? { preview } : {}),
     };

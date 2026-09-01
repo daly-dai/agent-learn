@@ -24,6 +24,9 @@ import type {
   StopRunResult,
   ClearHistoryResult,
   SendMessageParams,
+  CommandsResult,
+  ExecuteCommandParams,
+  ExecuteCommandResult,
 } from "./types";
 
 /** GET /api/chat?sessionId= —— 会话历史 + 会话级统计（挂载/切换时恢复） */
@@ -82,4 +85,31 @@ export function sendMessage(params: SendMessageParams): Promise<Response> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(params),
   });
+}
+
+// ---- C13 斜杠命令 ----
+
+/** GET /api/chat/commands —— 命令列表（前端命令面板数据源，slashCatalog 快照） */
+export function fetchCommands(): Promise<CommandsResult> {
+  return api("/api/chat/commands");
+}
+
+/** POST /api/chat/command —— 执行一条斜杠命令（不走模型；未知命令 400） */
+export function executeCommand(
+  params: ExecuteCommandParams,
+): Promise<ExecuteCommandResult> {
+  return api("/api/chat/command", { method: "POST", body: params });
+}
+
+/** GET /api/chat/export —— 下载会话 JSONL（/export 门面模式的下载侧：
+ *  命令 handler 只校验，真正的文件走这个独立 GET，浏览器触发下载） */
+export function downloadSessionFile(sessionId: string): void {
+  const url = `/api/chat/export?sessionId=${encodeURIComponent(sessionId)}`;
+  // 用临时 <a> 触发下载（不离开页面）；服务端 Content-Disposition 已强制附件
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${sessionId}.jsonl`; // 兜底文件名（响应头优先）
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }

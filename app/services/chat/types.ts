@@ -5,6 +5,8 @@
 // ============================================================
 
 import type { AgentMessage, SessionStats, TodoItem } from "@/lib/types";
+// type-only：context-occupancy 类型面无依赖，前端 bundle 安全
+import type { ContextPressure } from "@/app/lib/context-occupancy";
 
 /** GET /api/chat?sessionId= → 会话历史（叶子路径全部消息）+ 会话级统计 + 任务清单 */
 export type ChatHistoryResult = {
@@ -14,6 +16,8 @@ export type ChatHistoryResult = {
   stats: SessionStats;
   /** 任务清单（Phase 5）：叶子回溯取最新 todo 条目；没有则为空数组 */
   todos: TodoItem[];
+  /** 当前上下文占用（C13 ContextMeter 数据源） */
+  contextPressure: ContextPressure;
 };
 
 /** POST /api/chat/approve 参数：回传用户对挂起确认的决定（B1-④ 三档信任） */
@@ -51,3 +55,18 @@ export type ClearHistoryResult = { ok: true; sessionId: string };
 
 /** POST /api/chat 参数（SSE 流式接口，返回形状特殊，见 index.ts） */
 export type SendMessageParams = { text: string; sessionId: string };
+
+// ---- C13 斜杠命令（POST /api/chat/command + GET /api/chat/commands）----
+// type-only import：lib/commands 的类型面无 node 依赖，前端 bundle 安全。
+import type { CommandDescriptor, CommandResult } from "@/lib/commands";
+
+/** GET /api/chat/commands → 命令列表（slashCatalog 快照数据源） */
+export type CommandsResult = { commands: CommandDescriptor[] };
+
+/** POST /api/chat/command 参数：完整命令行 */
+export type ExecuteCommandParams = { line: string; sessionId: string };
+
+/** POST /api/chat/command → 命令执行结果（不走模型） */
+export type ExecuteCommandResult = { result: CommandResult };
+
+export type { CommandDescriptor, CommandResult };
