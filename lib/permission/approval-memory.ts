@@ -39,6 +39,13 @@ export function rememberSession(sessionId: string, toolName: string): void {
   sessionApprovals.set(sessionId, set);
 }
 
+/** 清空本会话记忆（B18：显式 reset 接口）。
+ *  用途：测试隔离（不跨测试泄漏）与开发调试。
+ *  不挂 globalThis 内部字段名——测试不该黑进实现细节。 */
+export function resetSessionApprovals(): void {
+  sessionApprovals.clear();
+}
+
 // ---------- 持久化规则（磁盘，跨会话） ----------
 
 const RULES_FILE = "approval-rules.json";

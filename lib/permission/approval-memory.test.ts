@@ -13,6 +13,7 @@ import {
   loadPersistRules,
   rememberPersist,
   rememberSession,
+  resetSessionApprovals,
 } from "./approval-memory";
 
 let tmpDir: string;
@@ -23,9 +24,9 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(tmpDir, { recursive: true, force: true });
-  // 清空全局 session 记忆（防测试间污染）
-  const g = globalThis as { __sessionApprovals?: Map<string, Set<string>> };
-  g.__sessionApprovals = new Map();
+  // B18：用显式 reset 接口清空全局会话记忆（原来直接改内部字段
+  // `g.__sessionApprovals = new Map()`——测试黑进实现细节，字段改名就崩）
+  resetSessionApprovals();
 });
 
 describe("会话级记忆（内存）", () => {

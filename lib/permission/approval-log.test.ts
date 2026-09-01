@@ -2,11 +2,11 @@
 // approval-log.test.ts —— 审批日志单测（纯函数 + fs）
 // ============================================================
 
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, describe, expect, it } from "vitest";
 import {
   appendApprovalReceipt,
   loadApprovalReceipts,
@@ -43,7 +43,16 @@ function freshDir(): string {
 }
 
 afterEach(() => {
-  // 交给系统临时目录清理，不手动删（测试只读校验逻辑）
+  // 单测之间无需清理（每个用例独立 freshDir）
+});
+
+// B18：真实清理——原来只 push 不删（"交给系统临时目录"），
+// 每个用例一个 mkdtemp 目录，跑多了会在系统 tmp 累积垃圾
+afterAll(() => {
+  for (const dir of tmpDirs) {
+    rmSync(dir, { recursive: true, force: true });
+  }
+  tmpDirs.length = 0;
 });
 
 describe("replayApprovalReceipts —— 成对校验（纯函数）", () => {

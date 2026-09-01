@@ -20,21 +20,8 @@ import {
   messageText,
   text,
 } from "./message";
-import type { AssistantMessage, AgentMessage, UserMessage } from "./types";
-import type { CompleteInput, TeachingModel } from "./model";
-
-/** 测试用假模型：记录/断言请求，返回固定响应 */
-class FakeModel implements TeachingModel {
-  constructor(
-    private readonly handler: (
-      input: CompleteInput,
-    ) => AssistantMessage | Promise<AssistantMessage>,
-  ) {}
-
-  async complete(input: CompleteInput): Promise<AssistantMessage> {
-    return this.handler(input);
-  }
-}
+import type { AgentMessage, UserMessage } from "./types";
+import { FakeModel } from "./testing/fake-model"; // B16：共享假模型基建
 
 /** 取 user 消息的纯文本（断言提示词内容用） */
 function userText(message: AgentMessage): string {

@@ -50,11 +50,8 @@ describe("config.provider —— provider 可扩展结构", () => {
     expect(config.provider.contextWindow).toBe(1_000_000);
   });
 
-  it("每个 provider 自带压缩参数（窗口/预留/保留）——新增厂商只需加一项", () => {
-    const provider = smallWindowProvider();
-    // 结构完备性：压缩相关参数齐全，能直接驱动 shouldCompact
-    expect(provider.reserveTokens).toBeGreaterThan(0);
-    expect(provider.keepRecentTokens).toBeGreaterThan(0);
-    expect(provider.keepRecentMessages).toBeGreaterThan(0);
-  });
+  // B18：原「每个 provider 自带压缩参数」测试已删除——它断言的是测试自己
+  // 构造的 smallWindowProvider() 字面量（16_384 > 0 恒真），测自己造的数据
+  // 没有失败可能，是无效断言。结构完备性已由 shouldCompact 的行为测试
+  // （上面第二个 it：110K 不触发 / 115K 触发）间接覆盖——能驱动判断才是真的完备。
 });

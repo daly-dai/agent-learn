@@ -33,9 +33,9 @@ describe("grep", () => {
   it("无匹配返回 (无匹配)", async () => {
     const result = await tool.execute({ pattern: "zzz-not-exist" });
     expect(result.details).toMatchObject({ count: 0, truncated: false });
-    if (result.content[0].type === "text") {
-      expect(result.content[0].text).toBe("(无匹配)");
-    }
+    // B18：grep 的结果一定是 text 块，直接断言（原 if 条件断言会让类型意外时静默通过）
+    expect(result.content[0].type).toBe("text");
+    expect(result.content[0].text).toBe("(无匹配)");
   });
 
   it("无效正则抛错（输入问题回给模型）", async () => {
@@ -46,6 +46,8 @@ describe("grep", () => {
     const result = await tool.execute({ pattern: ".", maxResults: 2 });
     const details = result.details as { count: number; truncated: boolean };
     expect(details.count).toBeLessThanOrEqual(2);
+    // B18：测试名说"标记 truncated"就必须断言 truncated（fixture 匹配行数必 > 2）
+    expect(details.truncated).toBe(true);
   });
 
   it("正则按行匹配（^ 锚定行首）", async () => {

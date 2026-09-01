@@ -14,8 +14,11 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { JsonlSessionStore, summarizeEntries } from "./store";
-import { createAssistantMessage, createUserMessage, text } from "../message";
-import type { AgentMessage } from "../types";
+import { createAssistantMessage, createUserMessage, messageText, text } from "../message";
+import type { AgentMessage, SessionEntry } from "../types";
+
+/** B18：find 类型守卫用（保留区第一条必须是 message 条目） */
+type MessageEntry = Extract<SessionEntry, { type: "message" }>;
 
 /** 触发准备 + 落盘（B2 ③：prepareCompaction + commitCompaction 两步） */
 async function compact(store: JsonlSessionStore, maxTokens: number, keepRecent: number) {
@@ -62,7 +65,7 @@ function toolResultMessage(id: string, output: string): AgentMessage {
   };
 }
 
-describe("compactIfNeeded —— 压缩切点", () => {
+describe("prepareCompaction —— 压缩切点（B18：describe 改名，方法已从 compactIfNeeded 演进为两步）", () => {
   it("切点落在 toolResult 上时，firstKeptEntryId 往前挪到配对的 assistant", async () => {
     const { store, cleanup } = makeStore();
 
@@ -94,17 +97,23 @@ describe("compactIfNeeded —— 压缩切点", () => {
     // 触发压缩：maxApproxTokens 设极小，keepRecentMessages=1（最极端切点）
     const entry = await compact(store, 1, 1);
     expect(entry).toBeDefined();
-    if (!entry) return;
+    // B18：expect 失败即测试失败，这里用非空断言收窄类型——原 `if (!entry) return`
+    // 会让后续类型检查意外时静默通过，fail-loud 更诚实
+    const prep = entry!;
 
     // 修复后：firstKeptEntryId 不应指向 toolResult（t2 的结果），
     // 而应指向它配对的 assistant（t2 的调用）或更早。
+    // B18：find 直接过滤 type === "message"，让类型不匹配时断言失败而不是静默通过
     const keptEntry = store
       .getEntries()
-      .find((e) => e.id === entry.firstKeptEntryId);
+      .find(
+        (e): e is MessageEntry =>
+          e.id === prep.firstKeptEntryId && e.type === "message",
+      );
     expect(keptEntry).toBeDefined();
-    if (!keptEntry || keptEntry.type !== "message") return;
+    const kept = keptEntry!;
 
-    expect(keptEntry.message.role).not.toBe("toolResult");
+    expect(kept.message.role).not.toBe("toolResult");
 
     // 重建上下文：保留区第一条不可能是"孤儿 toolResult"——它前面必须有 assistant
     const context = store.buildContext();
@@ -132,16 +141,18 @@ describe("compactIfNeeded —— 压缩切点", () => {
 
     const entry = await compact(store, 1, 2);
     expect(entry).toBeDefined();
-    if (!entry) return;
+    const prep = entry!;
 
     // keepRecentMessages=2 时尾部 2 条 = [user"二", user"三"]，第一条是 user（安全），
     // 修复不应改变这个切点——firstKeptEntryId 应指向 user"二"（第 4 条）
     const keptEntry = store
       .getEntries()
-      .find((e) => e.id === entry.firstKeptEntryId);
+      .find(
+        (e): e is MessageEntry =>
+          e.id === prep.firstKeptEntryId && e.type === "message",
+      );
     expect(keptEntry).toBeDefined();
-    if (!keptEntry || keptEntry.type !== "message") return;
-    expect(keptEntry.message.role).toBe("user");
+    expect(keptEntry!.message.role).toBe("user");
 
     cleanup();
   });
@@ -156,16 +167,18 @@ describe("compactIfNeeded —— 压缩切点", () => {
 
     const entry = await compact(store, 1, 2);
     expect(entry).toBeDefined();
-    if (!entry) return;
+    const prep = entry!;
 
     // keepRecentMessages=2 时尾部 2 条 = [toolResult(t1), user"二"]，
     // 修复前 firstKeptEntryId 指向 toolResult（坏）；修复后往前挪一条 → assistant(t1)
     const keptEntry = store
       .getEntries()
-      .find((e) => e.id === entry.firstKeptEntryId);
+      .find(
+        (e): e is MessageEntry =>
+          e.id === prep.firstKeptEntryId && e.type === "message",
+      );
     expect(keptEntry).toBeDefined();
-    if (!keptEntry || keptEntry.type !== "message") return;
-    expect(keptEntry.message.role).toBe("assistant");
+    expect(keptEntry!.message.role).toBe("assistant");
 
     cleanup();
   });
@@ -187,7 +200,11 @@ describe("buildContext —— 压缩摘要消息类型（B2，2026-08-25）", ()
     // 摘要消息必须是 compactionSummary 类型，不是 user
     const first = context[0];
     expect(first.role).toBe("compactionSummary");
-    if (first.role !== "compactionSummary") return;
+    // B18：expect 已断言 role，这里用类型守卫收窄（原 if return 在断言失败时
+    // 会静默通过——role 检查本应让测试红，改为显式抛错 fail-loud）
+    if (first.role !== "compactionSummary") {
+      throw new Error("上下文第一条应为 compactionSummary");
+    }
 
     // 摘要内容正确（含被压缩的旧消息）
     expect(first.summary).toContain("user");
@@ -210,10 +227,10 @@ describe("prepareCompaction —— B2 ③ LLM 摘要准备（2026-08-25）", () 
 
     const firstPrep = store.prepareCompaction(1, 2);
     expect(firstPrep).toBeDefined();
-    if (!firstPrep) return;
+    const first = firstPrep!;
     // 第一次压缩：没有旧摘要
-    expect(firstPrep.previousSummary).toBeUndefined();
-    await store.commitCompaction(firstPrep, "## Goal\n第一轮目标");
+    expect(first.previousSummary).toBeUndefined();
+    await store.commitCompaction(first, "## Goal\n第一轮目标");
 
     // 第二轮：新消息进来，再次触发压缩
     await store.appendMessage(createUserMessage("四"));
@@ -222,12 +239,12 @@ describe("prepareCompaction —— B2 ③ LLM 摘要准备（2026-08-25）", () 
 
     const secondPrep = store.prepareCompaction(1, 2);
     expect(secondPrep).toBeDefined();
-    if (!secondPrep) return;
+    const second = secondPrep!;
 
     // 关键：第二次压缩必须带上第一次的摘要（否则旧信息永久丢失）
-    expect(secondPrep.previousSummary).toBe("## Goal\n第一轮目标");
+    expect(second.previousSummary).toBe("## Goal\n第一轮目标");
     // 待压区不应包含第一次压缩点之前被压过的原文（它们由 previousSummary 代表）
-    const texts = secondPrep.messagesToSummarize.map((m) =>
+    const texts = second.messagesToSummarize.map((m) =>
       m.role === "user" ? m.content.map((c) => c.text).join("") : "",
     );
     expect(texts.some((t) => t.includes("一"))).toBe(false);
@@ -246,11 +263,11 @@ describe("prepareCompaction —— B2 ③ LLM 摘要准备（2026-08-25）", () 
 
     const prep = store.prepareCompaction(1, 2);
     expect(prep).toBeDefined();
-    if (!prep) return;
+    const p = prep!;
 
     // 待压区域有内容 → token 数 > 0（route.ts 拿它跟 config.agent.minCompactTokens 比）
-    expect(prep.tokensToSummarize).toBeGreaterThan(0);
-    expect(prep.tokensToSummarize).toBeLessThanOrEqual(prep.tokensBefore);
+    expect(p.tokensToSummarize).toBeGreaterThan(0);
+    expect(p.tokensToSummarize).toBeLessThanOrEqual(p.tokensBefore);
 
     cleanup();
   });
@@ -265,6 +282,138 @@ describe("prepareCompaction —— B2 ③ LLM 摘要准备（2026-08-25）", () 
     expect(store.prepareCompaction(1, 5)).toBeUndefined();
     // token 没超阈值不压
     expect(store.prepareCompaction(10_000, 1)).toBeUndefined();
+
+    cleanup();
+  });
+});
+
+// ============================================================
+// 会话树语义（B18 ② 补齐：switchLeaf / appendTodo / getLatestTodos / stats）
+// 这些是 Phase 2 分支切换 + Phase 5 task 面板的地基行为，此前零测试。
+// ============================================================
+describe("会话树语义 —— 分支 / todo / 统计", () => {
+  it("appendTodo + getLatestTodos：从叶子回溯到最新一条 todo", async () => {
+    const { store, cleanup } = makeStore();
+
+    // 还没有 todo → undefined
+    expect(store.getLatestTodos()).toBeUndefined();
+
+    await store.appendMessage(createUserMessage("一"));
+    await store.appendTodo([{ content: "任务A", status: "pending" }]);
+    expect(store.getLatestTodos()).toEqual([
+      { content: "任务A", status: "pending" },
+    ]);
+
+    // todo 之后再追加消息：getLatestTodos 仍能沿叶子回溯找到（todo 是会话事件）
+    await store.appendMessage(createUserMessage("二"));
+    expect(store.getLatestTodos()).toEqual([
+      { content: "任务A", status: "pending" },
+    ]);
+
+    cleanup();
+  });
+
+  it("todo 整表替换语义：新 todo 条目覆盖旧条目（Phase 5 只读展示最新）", async () => {
+    const { store, cleanup } = makeStore();
+
+    await store.appendTodo([{ content: "旧清单", status: "pending" }]);
+    await store.appendTodo([
+      { content: "新任务1", status: "in_progress" },
+      { content: "新任务2", status: "pending" },
+    ]);
+
+    expect(store.getLatestTodos()).toEqual([
+      { content: "新任务1", status: "in_progress" },
+      { content: "新任务2", status: "pending" },
+    ]);
+
+    cleanup();
+  });
+
+  it("switchLeaf 切分支后 appendMessage 长在新分支，buildContext 只含新分支", async () => {
+    const { store, cleanup } = makeStore();
+
+    const branchPoint = await store.appendMessage(createUserMessage("主线一"));
+    await store.appendMessage(createUserMessage("主线二"));
+
+    // 切回主线一，岔出支线
+    store.switchLeaf(branchPoint);
+    await store.appendMessage(createUserMessage("支线一"));
+
+    const context = store.buildContext();
+    const texts = context.map((m) => messageText(m));
+    expect(texts).toContain("主线一");
+    expect(texts).toContain("支线一");
+    // 旧分支的"主线二"不在新分支路径上（树的分支语义）
+    expect(texts).not.toContain("主线二");
+
+    cleanup();
+  });
+
+  it("switchLeaf 改变叶子后，getLatestTodos 沿新路径回溯（可见性随分支）", async () => {
+    const { store, cleanup } = makeStore();
+
+    await store.appendMessage(createUserMessage("一")); // entry_1
+    await store.appendTodo([{ content: "任务A", status: "pending" }]); // entry_2
+    const leafAfterTodo = store.getLeafId()!; // 记住 todo 之后的分支点
+    await store.appendMessage(createUserMessage("主线一")); // entry_3
+
+    // 当前叶子在 todo 之后 → 回溯路径含 todo → 可见
+    expect(store.getLatestTodos()).toEqual([
+      { content: "任务A", status: "pending" },
+    ]);
+
+    // 切到 todo 之前的 message（entry_1）→ 新路径不含 todo → undefined
+    const firstMessageId = store
+      .getEntries()
+      .find((e) => e.type === "message")!.id;
+    store.switchLeaf(firstMessageId);
+    expect(store.getLatestTodos()).toBeUndefined();
+
+    // 切回 todo 之后的分支 → todo 恢复可见（叶子决定回溯路径）
+    store.switchLeaf(leafAfterTodo);
+    expect(store.getLatestTodos()).toEqual([
+      { content: "任务A", status: "pending" },
+    ]);
+
+    cleanup();
+  });
+
+  it("switchLeaf 未知 id 抛错（fail-closed：不静默切到不存在的位置）", () => {
+    const { store, cleanup } = makeStore();
+
+    expect(() => store.switchLeaf("no-such-entry")).toThrow(/Unknown session entry/);
+
+    cleanup();
+  });
+
+  it("stats：turns/tools/tokens 正确，todo/compaction 条目不计入", async () => {
+    const { store, cleanup } = makeStore();
+
+    await store.appendMessage(createUserMessage("一"));
+    await store.appendMessage({
+      role: "assistant",
+      content: [text("第一轮回答")],
+      stopReason: "stop",
+      usage: { input: 10, output: 20, totalTokens: 30 },
+      timestamp: Date.now(),
+    });
+    await store.appendMessage({
+      role: "toolResult",
+      toolCallId: "t1",
+      toolName: "echo",
+      content: [text("结果")],
+      details: {},
+      isError: false,
+      timestamp: Date.now(),
+    });
+    await store.appendTodo([{ content: "任务", status: "pending" }]);
+
+    const stats = store.stats();
+    expect(stats.turns).toBe(1); // assistant 消息数
+    expect(stats.tools).toBe(1); // toolResult 消息数
+    expect(stats.tokens).toBe(30); // assistant usage.totalTokens 之和
+    // todo 条目不干扰统计（本来就不计，但钉死：即使叶子是 todo 也一样）
 
     cleanup();
   });
