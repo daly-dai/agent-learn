@@ -9,15 +9,20 @@
 // mock 策略：vi.mock selectModel（返回 FakeModel）与 config（临时目录）。
 // ============================================================
 
-import { afterAll, describe, expect, it, vi } from "vitest";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AssistantMessage } from "@/lib/types";
 import type { CompleteInput, TeachingModel } from "@/lib/model";
 
 // ---- 先 mock 再 import 被测模块 ----
-const tempDir = mkdtempSync(join(tmpdir(), "repo-summarize-test-"));
+// 坑（2026-09-01 修）：vi.mock 工厂提升到文件顶部执行，引用顶层 const 会
+// TDZ；vi.hoisted 回调也在 import 之前执行，拿不到 import 的 fs/os——
+// 只用 node 全局（process.env）拼固定路径，beforeAll 重建保证干净。
+const tempDir = vi.hoisted(
+  () => `${process.env.TEMP ?? "/tmp"}/repo-summarize-test`,
+);
 
 /** 可编程的假模型：每个测试自己 setHandler */
 class FakeModel implements TeachingModel {
@@ -53,6 +58,11 @@ vi.mock("@/lib/config", () => ({
 }));
 
 import { summarizeUpdate, saveUpdateLog } from "./summarize";
+
+beforeAll(() => {
+  rmSync(tempDir, { recursive: true, force: true });
+  mkdirSync(tempDir, { recursive: true });
+});
 
 /** 构造 assistant 消息的便捷函数 */
 function assistant(

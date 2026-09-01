@@ -8,15 +8,20 @@
 // mock config.paths.workspace → 临时目录。
 // ============================================================
 
-import { afterAll, describe, expect, it, vi } from "vitest";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 // ---- 先 mock config 再 import 被测模块 ----
-const tempDir = mkdtempSync(join(tmpdir(), "repo-history-test-"));
+// 坑（2026-09-01 修）：vi.mock 工厂提升到文件顶部执行，引用顶层 const 会
+// TDZ；vi.hoisted 回调也在 import 之前执行，拿不到 import 的 fs/os——
+// 只用 node 全局（process.env）拼固定路径，beforeAll 重建保证干净。
+const tempDir = vi.hoisted(
+  () => `${process.env.TEMP ?? "/tmp"}/repo-history-test`,
+);
+// logsDir 只在测试体内用（vi.mock 工厂只引用 tempDir），可以放顶层普通代码
 const logsDir = join(tempDir, "更新日志");
-mkdirSync(logsDir, { recursive: true });
 
 vi.mock("@/lib/config", () => ({
   config: {
@@ -27,6 +32,11 @@ vi.mock("@/lib/config", () => ({
 }));
 
 import { listUpdateLogs, parseLogFileName, readAllLogs, readLatestLog } from "./history";
+
+beforeAll(() => {
+  rmSync(tempDir, { recursive: true, force: true });
+  mkdirSync(logsDir, { recursive: true });
+});
 
 describe("parseLogFileName —— 文件名解析（纯函数）", () => {
   it("合法文件名：拆出日期和项目名", () => {

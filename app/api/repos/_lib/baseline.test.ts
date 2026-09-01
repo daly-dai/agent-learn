@@ -7,13 +7,20 @@
 // 所以用 vi.mock 把 config 换成临时目录——见文件尾的 mock。
 // ============================================================
 
-import { afterAll, describe, expect, it, vi } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 // ---- 先 mock config，再 import 被测模块（vitest 的 hoist 要求）----
-const tempDir = mkdtempSync(join(tmpdir(), "repo-baseline-test-"));
+// 坑（2026-09-01 修）：vi.mock 工厂会被提升到文件顶部执行，工厂里引用
+// 顶层 const 会 TDZ（"Cannot access 'tempDir' before initialization"）；
+// vi.hoisted 回调同样在 import 之前执行，也拿不到 import 的 mkdtempSync
+// （"Cannot access '__vi_import_0__'"）。正解：vi.hoisted 里只用 node
+// 全局（process.env）拼固定路径，beforeAll 重建保证干净。
+const tempDir = vi.hoisted(
+  () => `${process.env.TEMP ?? "/tmp"}/repo-baseline-test`,
+);
 
 vi.mock("@/lib/config", () => ({
   config: {
@@ -24,6 +31,12 @@ vi.mock("@/lib/config", () => ({
 }));
 
 import { baselinePath, readBaseline, writeBaseline } from "./baseline";
+
+// 固定路径可复现：跑前清掉上次残留（崩溃遗留目录不影响本测试）
+beforeAll(() => {
+  rmSync(tempDir, { recursive: true, force: true });
+  mkdirSync(tempDir, { recursive: true });
+});
 
 describe("baseline —— 仓库更新基线", () => {
   afterAll(() => {

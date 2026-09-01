@@ -41,16 +41,24 @@ ONLY output the summary. Do NOT continue the conversation. Do NOT ask questions.
 
 /**
  * 组装总结提示词。
+ * totalCount 单独传（2026-09-01 修）：调用方先 slice(0, MAX) 再传 commits，
+ * buildPrompt 从 commits.length 看不出原始总数——截断提示"共 N 条"永不触发
+ * （死代码，被单测逮住）。把原始数量作为独立参数，提示才有意义。
  * 关注点（repo.note）来自导航手册——告诉模型"这个项目对我们学什么
  * 最有价值"，让 ⭐ 标注结合本项目实际，而不是泛泛而谈。
  */
-function buildPrompt(repoName: string, note: string, commits: string[]): string {
+function buildPrompt(
+  repoName: string,
+  note: string,
+  commits: string[],
+  totalCount: number,
+): string {
   const commitLines = commits
     .map((c) => `- ${c}`)
     .join("\n");
 
-  const truncated = commits.length > MAX_COMMITS_IN_PROMPT
-    ? `\n\n(共 ${commits.length} 条，以下展示前 ${MAX_COMMITS_IN_PROMPT} 条)`
+  const truncated = totalCount > MAX_COMMITS_IN_PROMPT
+    ? `\n\n(共 ${totalCount} 条，以下展示前 ${MAX_COMMITS_IN_PROMPT} 条)`
     : "";
 
   return `以下是一个开源参考项目 "${repoName}" 最近的新增提交（git log --oneline）：
@@ -114,7 +122,12 @@ export async function summarizeUpdate(
     return { text: "", degraded: true };
   }
 
-  const prompt = buildPrompt(repoName, note, commits.slice(0, MAX_COMMITS_IN_PROMPT));
+  const prompt = buildPrompt(
+    repoName,
+    note,
+    commits.slice(0, MAX_COMMITS_IN_PROMPT),
+    commits.length, // 原始总数（截断提示用）
+  );
 
   const result = await model.complete({
     systemPrompt: SYSTEM_PROMPT,
