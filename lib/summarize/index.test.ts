@@ -12,16 +12,16 @@ import { describe, expect, it } from "vitest";
 import {
   generateSummary,
   serializeConversation,
-} from "./summarize";
+} from "./index";
 import {
   createAssistantMessage,
   createCompactionSummaryMessage,
   createUserMessage,
   messageText,
   text,
-} from "./message";
-import type { AgentMessage, UserMessage } from "./types";
-import { FakeModel } from "./testing/fake-model"; // B16：共享假模型基建
+} from "../message";
+import type { AgentMessage, UserMessage } from "../types";
+import { FakeModel } from "../testing/fake-model"; // B16：共享假模型基建
 
 /** 取 user 消息的纯文本（断言提示词内容用） */
 function userText(message: AgentMessage): string {

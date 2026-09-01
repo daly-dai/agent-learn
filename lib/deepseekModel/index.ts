@@ -31,10 +31,10 @@ import type {
   ToolCallContent,
   ToolDefinition,
   Usage,
-} from "./types";
-import type { CompleteInput, TeachingModel } from "./model";
-import { messageText, text } from "./message";
-import { config } from "./config";
+} from "../types";
+import type { CompleteInput, TeachingModel } from "../model";
+import { messageText, text } from "../message";
+import { config } from "../config";
 
 // 模型/地址/调试开关全部来自 lib/config.ts（唯一配置入口）：
 // DEFAULT 只是"config 兜底"，正式使用在 .env.local 用环境变量覆盖

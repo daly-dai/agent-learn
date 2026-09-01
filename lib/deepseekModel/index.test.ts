@@ -21,15 +21,15 @@
 // ============================================================
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { DeepSeekModel } from "./deepseekModel";
+import { DeepSeekModel } from "./index";
 import {
   createAssistantMessage,
   createCompactionSummaryMessage,
   createUserMessage,
   messageText,
   text,
-} from "./message";
-import type { AgentMessage, ToolCallContent } from "./types";
+} from "../message";
+import type { AgentMessage, ToolCallContent } from "../types";
 
 // ---------- fetch stub 辅助 ----------
 

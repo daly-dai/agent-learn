@@ -7,7 +7,7 @@
 // ============================================================
 
 import { describe, expect, it } from "vitest";
-import { config, shouldCompact, type ProviderConfig } from "./config";
+import { config, shouldCompact, type ProviderConfig } from "./index";
 
 /** 构造一个"小窗口"的测试 provider（模拟 128K 窗口的某家模型） */
 function smallWindowProvider(): ProviderConfig {

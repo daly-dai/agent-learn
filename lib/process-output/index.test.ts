@@ -8,7 +8,7 @@
 // ============================================================
 
 import { describe, expect, it } from "vitest";
-import { createOutputDecoder } from "./process-output";
+import { createOutputDecoder } from "./index";
 
 /** "异步机制演示" 的 GBK 字节（对照乱码样本里 D2EC B2BD BBFAD6C6 D1DD CABE） */
 const GBK_YI_BU = Buffer.from([0xd2, 0xec, 0xb2, 0xbd]); // 异步

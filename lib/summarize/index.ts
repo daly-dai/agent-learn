@@ -18,9 +18,9 @@
 // 不碰存储（sessionStore 管切点/落盘）、不碰路由（route.ts 管组合/降级）。
 // ============================================================
 
-import type { AgentMessage, ToolCallContent } from "./types";
-import type { TeachingModel } from "./model";
-import { createUserMessage, messageText } from "./message";
+import type { AgentMessage, ToolCallContent } from "../types";
+import type { TeachingModel } from "../model";
+import { createUserMessage, messageText } from "../message";
 
 // toolResult 超长截断（pi：TOOL_RESULT_MAX_CHARS=2000，防止工具输出撑爆摘要请求）
 const TOOL_RESULT_MAX_CHARS = 2000;
