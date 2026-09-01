@@ -9,8 +9,8 @@
 // 对齐 pi 把 compaction 独立于 session（见 doc/02 决策）。
 // ============================================================
 
-export { JsonlSessionStore, summarizeEntries } from "./store";
-export type { CompactionPreparation } from "./store";
+export { JsonlSessionStore, summarizeEntries, estimateTokens } from "./store";
+export type { CompactionEntry, CompactionPreparation } from "./store";
 export {
   SessionManager,
   generateSessionId,

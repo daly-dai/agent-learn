@@ -65,5 +65,20 @@ export { getApprovalMode, setApprovalMode } from "./approvalMode";
 export { toolApprovals } from "./toolApproval";
 export { userAnswers, makeAskKey, clearRun } from "./userAnswers";
 
+// 命令面板（C13：lib/commands 子模块，命令=工具家族第二成员）
+export { createCommandRegistry, toDescriptor, sortByName } from "./commands";
+export type {
+  CommandApi,
+  CommandDescriptor,
+  CommandInvocation,
+  CommandRegistry,
+  CommandResult,
+  CommandSource,
+  SlashCommand,
+} from "./commands";
+export { createCompactCommand } from "./commands/compact";
+export { createClearCommand } from "./commands/clear";
+export { createExportCommand } from "./commands/export";
+
 // 配置（唯一配置入口）
 export { config } from "./config";

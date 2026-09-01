@@ -26,7 +26,7 @@ import type { AgentMessage, SessionEntry, SessionStats, TodoItem } from "../type
 import { createCompactionSummaryMessage, isTextContent, text } from "../message";
 
 type MessageEntry = Extract<SessionEntry, { type: "message" }>;
-type CompactionEntry = Extract<SessionEntry, { type: "compaction" }>;
+export type CompactionEntry = Extract<SessionEntry, { type: "compaction" }>;
 type TodoEntry = Extract<SessionEntry, { type: "todo" }>;
 
 /**
@@ -430,7 +430,7 @@ export function summarizeEntries(messages: AgentMessage[]): string {
 }
 
 /** 粗略估算 token 数：中英文混合下平均一个字符约 0.5 token，够触发阈值即可 */
-function estimateTokens(messages: AgentMessage[]): number {
+export function estimateTokens(messages: AgentMessage[]): number {
   return messages.reduce((sum, message) => {
     const content = extractText(message);
     return sum + Math.ceil(content.length / 2);
