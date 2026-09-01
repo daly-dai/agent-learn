@@ -17,10 +17,10 @@
 // ============================================================
 
 import { describe, expect, it } from "vitest";
-import { runAgentLoop } from "./agent";
-import { ToolRegistry } from "./tools";
-import { createAssistantMessage, createUserMessage, messageText, text } from "./message";
-import { FakeModel } from "./testing/fake-model";
+import { runAgentLoop } from "./index";
+import { ToolRegistry } from "../tools";
+import { createAssistantMessage, createUserMessage, messageText, text } from "../message";
+import { FakeModel } from "../testing/fake-model";
 import type {
   AgentEvent,
   AgentMessage,
@@ -28,8 +28,8 @@ import type {
   ToolCallContent,
   ToolResultMessage,
   ToolResult,
-} from "./types";
-import type { ToolExecutor } from "./tools/types";
+} from "../types";
+import type { ToolExecutor } from "../tools/types";
 
 /** 造一条带 toolCall 的 assistant 消息 */
 function assistantWithToolCall(

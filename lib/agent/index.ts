@@ -5,10 +5,10 @@ import type {
   ToolCallContent,
   ToolDefinition,
   ToolResultMessage,
-} from "./types";
-import type { TeachingModel } from "./model";
-import type { ToolRegistry } from "./tools";
-import { createAssistantMessage, text } from "./message";
+} from "../types";
+import type { TeachingModel } from "../model";
+import type { ToolRegistry } from "../tools";
+import { createAssistantMessage, text } from "../message";
 
 // ------------------------------------------------------------
 // 审批决策：模型想调用工具时，由使用端决定「放行 / 拦截 / 改写参数」。
