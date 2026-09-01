@@ -137,7 +137,8 @@ export function SessionRow({
             <div className={styles.sessionPreview}>{session.preview}</div>
           )}
           <div className={styles.sessionMeta}>
-            <span>{session.messageCount} 条</span>
+            {/* 2026-09-01：条数已删（占空间 + /clear 后要刷新才更新，
+                用户拍板"不要展示多少条了"）——只留时间 */}
             <span>{formatClock(session.updatedAt)}</span>
           </div>
         </>
