@@ -194,8 +194,7 @@ app/components/command-menu/          CommandMenu：补全面板（继承 ui/men
 
 ### 遗留（后续批量时处理）
 
-- `/model /skills /export` 未做（Q2 范围）：/export 按 DSH 门面模式（handler 校验 + 独立下载 route）；/model /skills 纯前端命令（source: "builtin"，handler 不填 api）
-- `supportsInlineArgs` 语义已定义（true → 前端填回输入框补参数；默认 → 直接执行），/model gpt-4o 场景用它
+- `/model /skills` **延后到 C8 Skills 一起做**（2026-09-01 用户拍板：当前无 skill 体系，单独做没意义）：/model 模型选择/展示（config 驱动，切换接口按 selectModel 扩展，`supportsInlineArgs` 语义已定义——true → 前端填回输入框补参数，`/model gpt-4o` 场景用它）；/skills 技能列表（C8 时展示已启用技能）。均为纯前端命令（source: "builtin"，handler 不填 api）
 - 生命周期日志（DSH command/run↔command/done）未引入（决策：先 console，不引入事件系统）
 
 ---
