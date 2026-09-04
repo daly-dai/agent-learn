@@ -57,6 +57,7 @@ import { AskUserCard } from "./components/ask-user-card";
 import { CommandMenu } from "./components/command-menu";
 import { ContextMeter } from "./components/context-meter";
 import { useAgentRun } from "./lib/use-agent-run";
+import { useRunStore } from "./lib/run-store";
 import { useCommandMenu } from "./lib/use-command-menu";
 import { useSessions } from "./lib/use-sessions";
 import { useStickyScroll } from "./lib/use-sticky-scroll";
@@ -174,19 +175,12 @@ export default function Home() {
     if (followTrace) scrollToEnd(traceRef.current);
   }, [observed, followTrace]);
 
-  // 列表保鲜（2026-08-26 修）：run 结束（loading true→false）后刷新会话列表。
+  // 列表保鲜（2026-08-26 修，2026-09-02 B22 升级）：
   // 会话列表只在 挂载/新建/重命名/删除 时刷新，聊天后不刷 → 停在旧快照：
-  // 新建会话聊完仍是"未命名会话 0 条"（消息数/预览/排序都不更新）。
-  // 用 loading 跳变（而非 done 帧）判断：也覆盖出错/停止导致 run 结束的情况。
-  // 2026-09-01 补：命令执行完（commandRunning true→false）也刷新——
-  // /clear 清空会话后左侧列表若不刷会停在旧条数（46 条），刷新页面才消失。
-  const prevLoadingRef = useRef(loading);
-  useEffect(() => {
-    if (prevLoadingRef.current && !loading) {
-      refresh();
-    }
-    prevLoadingRef.current = loading;
-  }, [loading, refresh]);
+  // 会话跑完仍是旧预览/旧时间。B22 前用「当前会话 loading 跳变」判断——
+  // 只覆盖前台会话；B22 多会话并行后，后台会话跑完当前页面无感。
+  // 现在订阅 store：任一会话桶 run 结束（loading true→false，含 done/error/
+  // 停止/网络断）或命令执行完 → refresh。刷新幂等，多触发只是多一次 GET。
   const prevCommandRunningRef = useRef(commandRunning);
   useEffect(() => {
     if (prevCommandRunningRef.current && !commandRunning) {
@@ -194,6 +188,19 @@ export default function Home() {
     }
     prevCommandRunningRef.current = commandRunning;
   }, [commandRunning, refresh]);
+
+  useEffect(() => {
+    // zustand subscribe：任何桶的 run 收尾（loading 熄灭）都刷新列表。
+    // 为什么不用 done 帧事件：覆盖 error/停止/网络断等没有 done 帧的收尾
+    return useRunStore.subscribe((state, prev) => {
+      const anyRunEnded = Object.keys(state.runs).some((id) => {
+        const was = prev.runs[id];
+        const now = state.runs[id];
+        return was?.loading === true && now?.loading === false;
+      });
+      if (anyRunEnded) refresh();
+    });
+  }, [refresh]);
 
   // 点空态例句：把文案填进输入框并聚焦（不直接发送，用户可再改）
   function pickSeed(text: string) {
@@ -228,6 +235,8 @@ export default function Home() {
             rename(id, title);
           }}
           onDelete={(id) => {
+            // B22：删会话 = 服务端删除 + 本地清桶（abort 在跑流，帧不再写）
+            useRunStore.getState().deleteRun(id);
             remove(id);
           }}
         />

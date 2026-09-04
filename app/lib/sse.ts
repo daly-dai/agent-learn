@@ -53,16 +53,21 @@ export type StreamFrame =
 /** 事件 + 前端观测到它的时刻（协议不动，时间戳加在这一层） */
 export type ObservedEvent = { seq: number; at: number; event: AgentEvent };
 
-/** 逐块读 SSE，按空行切帧 */
+/** 逐块读 SSE，按空行切帧。signal：主动中止（删会话/停止时断流，不等服务端） */
 export async function readStream(
   body: ReadableStream<Uint8Array>,
   onFrame: (frame: StreamFrame) => void,
+  opts?: { signal?: AbortSignal },
 ): Promise<void> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
 
   while (true) {
+    if (opts?.signal?.aborted) {
+      reader.cancel().catch(() => {});
+      throw new DOMException("流已被中止", "AbortError");
+    }
     const { done, value } = await reader.read();
 
     if (done) break;

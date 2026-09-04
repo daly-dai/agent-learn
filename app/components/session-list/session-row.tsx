@@ -21,6 +21,7 @@
 import { useEffect, useRef } from "react";
 import type { SessionSummary } from "../../lib/use-sessions";
 import { formatClock } from "../../lib/format";
+import { useSessionRunPhase } from "../../lib/run-store";
 import { Menu } from "../ui/menu";
 import styles from "./session-list.module.css";
 
@@ -69,6 +70,11 @@ export function SessionRow({
   useEffect(() => {
     if (confirmingDelete) cancelRef.current?.focus();
   }, [confirmingDelete]);
+
+  // 本会话的 run 阶段（B22 多会话状态点）：self-subscribe，不进 page props。
+  // 极轻订阅：selector 返回一个小字符串，只有 phase 变化才触发重渲——
+  // 别的会话每帧更新时本行 selector 求值结果不变 → 不重渲。
+  const phase = useSessionRunPhase(session.id);
 
   return (
     <div
@@ -137,6 +143,26 @@ export function SessionRow({
             <div className={styles.sessionPreview}>{session.preview}</div>
           )}
           <div className={styles.sessionMeta}>
+            {/* B22 状态点：只显示非当前会话（当前会话主体界面已有状态展示）。
+                派生规则（用户拍板 2026-09-02）：
+                  running            → loading 呼吸点
+                  waiting-approval / waiting-ask → 黄点（等你操作）
+                  done               → 绿点（上次跑完了，保持到下次 startRun）
+                  idle / error       → 不显示（error 由会话内横幅展示） */}
+            {!current && phase !== "idle" && phase !== "error" && (
+              <span
+                className={styles.sessionDot}
+                data-phase={phase}
+                title={
+                  phase === "running"
+                    ? "正在执行"
+                    : phase === "done"
+                      ? "上次运行已完成"
+                      : "等待你的确认"
+                }
+                role="status"
+              />
+            )}
             {/* 2026-09-01：条数已删（占空间 + /clear 后要刷新才更新，
                 用户拍板"不要展示多少条了"）——只留时间 */}
             <span>{formatClock(session.updatedAt)}</span>

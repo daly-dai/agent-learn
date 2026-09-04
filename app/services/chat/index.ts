@@ -78,12 +78,17 @@ export function stopRun(params: StopRunParams): Promise<StopRunResult> {
   return api("/api/chat/stop", { method: "POST", body: params });
 }
 
-/** POST /api/chat —— 发消息（SSE 流式）。不走 api<T>：需要 res.body 交给 readStream */
-export function sendMessage(params: SendMessageParams): Promise<Response> {
+/** POST /api/chat —— 发消息（SSE 流式）。不走 api<T>：需要 res.body 交给 readStream。
+ *  opts.signal：删会话/停止时主动中止请求（B22 消费循环持有自己的 controller） */
+export function sendMessage(
+  params: SendMessageParams,
+  opts?: { signal?: AbortSignal },
+): Promise<Response> {
   return fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(params),
+    signal: opts?.signal,
   });
 }
 

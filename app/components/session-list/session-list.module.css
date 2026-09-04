@@ -109,11 +109,53 @@
 
 .sessionMeta {
   display: flex;
+  align-items: center;
   gap: 10px;
   margin-top: 4px;
   font-family: var(--font-mono);
   font-size: 12px; /* V2：11 → 12（§10.5 口径） */
   color: var(--ink-faint);
+}
+
+/* B22 会话状态点：视觉三态全由 data-phase 驱动（B20：状态派生移到 CSS，
+   JS 只写语义属性，不写颜色/动画）。三色三义（2026-09-02 二次调整：
+   running 原用琥珀呼吸，与 waiting 黄点同色难区分且不显眼——改深墨呼吸，
+   浅灰背景上墨点呼吸最醒目）：
+     running            → 深墨呼吸点（活跃执行中，动 = 活着）
+     waiting-approval/ask → 琥珀黄点（静置：等你操作，与呼吸区分开）
+     done               → 绿点（跑完）
+   idle/error 不渲染（JSX 已过滤） */
+.sessionDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sessionDot[data-phase="running"] {
+  background: var(--ink);
+  animation: dot-breathe 0.9s ease-in-out infinite;
+}
+
+.sessionDot[data-phase="waiting-approval"],
+.sessionDot[data-phase="waiting-ask"] {
+  background: var(--pen-signal);
+}
+
+.sessionDot[data-phase="done"] {
+  background: var(--pen-model);
+}
+
+@keyframes dot-breathe {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.72);
+  }
 }
 
 /* ⋯ 菜单的定位锚：贴会话行右上角，菜单右对齐展开。
