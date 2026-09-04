@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 520" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+  <defs>
+    <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/>
+    </marker>
+    <marker id="arr2-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8b5cf6"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="640" y="34" text-anchor="middle" font-size="20" font-weight="700" fill="#1e293b">模型每次到底"看到"什么：从当前叶子回溯拼出的上下文</text>
+
+  <!-- Left panel: disk -->
+  <rect x="20" y="55" width="580" height="400" rx="12" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+  <text x="40" y="82" font-size="14" font-weight="700" fill="#475569">磁盘：会话 = JSONL 树（一行一个 entry，id/parentId 成树）</text>
+  <text x="40" y="100" font-size="11" fill="#94a3b8">只追加，永不删 — 全量保留</text>
+
+  <!-- Tree nodes (main trunk: highlighted path) -->
+  <!-- session 头 -->
+  <rect x="260" y="120" width="80" height="36" rx="6" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+  <text x="300" y="142" text-anchor="middle" font-size="11" font-weight="600" fill="#475569">session 头</text>
+
+  <line x1="300" y1="156" x2="300" y2="170" stroke="#8b5cf6" stroke-width="2.5"/>
+
+  <!-- msg1: user (highlighted) -->
+  <rect x="240" y="170" width="120" height="40" rx="6" fill="#dbeafe" stroke="#3b82f6" stroke-width="2.5"/>
+  <text x="300" y="187" text-anchor="middle" font-size="11" font-weight="600" fill="#1d4ed8">msg1: user</text>
+  <text x="300" y="201" text-anchor="middle" font-size="10" fill="#1e293b">id=1 parentId=0</text>
+
+  <line x1="300" y1="210" x2="300" y2="224" stroke="#8b5cf6" stroke-width="2.5"/>
+
+  <!-- msg2: assistant (highlighted) -->
+  <rect x="240" y="224" width="120" height="40" rx="6" fill="#d1fae5" stroke="#10b981" stroke-width="2.5"/>
+  <text x="300" y="241" text-anchor="middle" font-size="11" font-weight="600" fill="#047857">msg2: assistant</text>
+  <text x="300" y="255" text-anchor="middle" font-size="10" fill="#1e293b">id=2 parentId=1</text>
+
+  <line x1="300" y1="264" x2="300" y2="278" stroke="#8b5cf6" stroke-width="2.5"/>
+
+  <!-- msg3: user (highlighted, branch point) -->
+  <rect x="240" y="278" width="120" height="40" rx="6" fill="#dbeafe" stroke="#3b82f6" stroke-width="2.5"/>
+  <text x="300" y="295" text-anchor="middle" font-size="11" font-weight="600" fill="#1d4ed8">msg3: user</text>
+  <text x="300" y="309" text-anchor="middle" font-size="10" fill="#1e293b">id=3 parentId=2</text>
+
+  <!-- Branch lines from msg3 -->
+  <line x1="300" y1="318" x2="300" y2="328" stroke="#94a3b8" stroke-width="1.5"/>
+  <line x1="170" y1="328" x2="430" y2="328" stroke="#94a3b8" stroke-width="1.5"/>
+  <line x1="170" y1="328" x2="170" y2="340" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="3,2"/>
+  <line x1="430" y1="328" x2="430" y2="340" stroke="#8b5cf6" stroke-width="2.5"/>
+
+  <!-- msg4: assistant (old branch, dimmed) -->
+  <rect x="110" y="340" width="120" height="40" rx="6" fill="#f8fafc" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="4,3"/>
+  <text x="170" y="357" text-anchor="middle" font-size="11" font-weight="600" fill="#94a3b8">msg4: assistant</text>
+  <text x="170" y="371" text-anchor="middle" font-size="10" fill="#94a3b8">id=4 parentId=3</text>
+  <text x="170" y="395" text-anchor="middle" font-size="10" fill="#94a3b8" font-style="italic">旧分支（可 switchLeaf 回来）</text>
+
+  <!-- msg5: assistant (current branch, highlighted) -->
+  <rect x="370" y="340" width="120" height="40" rx="6" fill="#d1fae5" stroke="#10b981" stroke-width="2.5"/>
+  <text x="430" y="357" text-anchor="middle" font-size="11" font-weight="600" fill="#047857">msg5: assistant</text>
+  <text x="430" y="371" text-anchor="middle" font-size="10" fill="#1e293b">id=5 parentId=3</text>
+
+  <line x1="430" y1="380" x2="430" y2="394" stroke="#8b5cf6" stroke-width="2.5"/>
+
+  <!-- msg6: toolResult -->
+  <rect x="370" y="394" width="120" height="40" rx="6" fill="#fef3c7" stroke="#f59e0b" stroke-width="2.5"/>
+  <text x="430" y="411" text-anchor="middle" font-size="11" font-weight="600" fill="#b45309">msg6: toolResult</text>
+  <text x="430" y="425" text-anchor="middle" font-size="10" fill="#1e293b">id=6 parentId=5</text>
+
+  <line x1="430" y1="434" x2="430" y2="438" stroke="#8b5cf6" stroke-width="2.5"/>
+
+  <!-- leafId pointer -->
+  <rect x="370" y="438" width="120" height="3" fill="none"/>
+  <rect x="345" y="438" width="170" height="36" rx="6" fill="#f3e8ff" stroke="#8b5cf6" stroke-width="2.5" stroke-dasharray="5,3"/>
+  <text x="430" y="455" text-anchor="middle" font-size="11" font-weight="700" fill="#7c3aed">msg7: assistant</text>
+  <text x="430" y="468" text-anchor="middle" font-size="10" fill="#7c3aed">id=7 parentId=6</text>
+  <!-- leafId arrow -->
+  <line x1="530" y1="456" x2="555" y2="456" stroke="#8b5cf6" stroke-width="2" marker-end="url(#arr2-purple)"/>
+  <text x="565" y="460" font-size="12" font-weight="700" fill="#7c3aed">leafId</text>
+  <text x="565" y="475" font-size="10" fill="#7c3aed">= 当前最新</text>
+
+  <!-- Middle arrow: buildContext -->
+  <path d="M 610 255 L 645 255" fill="none" stroke="#8b5cf6" stroke-width="3" marker-end="url(#arr2-purple)"/>
+  <text x="628" y="240" text-anchor="middle" font-size="12" font-weight="700" fill="#7c3aed">buildContext()</text>
+  <text x="628" y="275" text-anchor="middle" font-size="10" fill="#7c3aed">从叶子回溯</text>
+
+  <!-- Right panel: what model sees -->
+  <rect x="660" y="55" width="600" height="400" rx="12" fill="#faf5ff" stroke="#d8b4fe" stroke-width="1.5"/>
+  <text x="680" y="82" font-size="14" font-weight="700" fill="#7c3aed">模型看到的上下文（buildContext 从叶子回溯）</text>
+  <text x="680" y="100" font-size="11" fill="#a78bfa">沿 parentId 回溯整条路径 → 按序发给模型</text>
+
+  <!-- Linear path -->
+  <rect x="760" y="120" width="100" height="34" rx="6" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+  <text x="810" y="141" text-anchor="middle" font-size="10" font-weight="600" fill="#475569">session 头</text>
+
+  <line x1="810" y1="154" x2="810" y2="164" stroke="#8b5cf6" stroke-width="2"/>
+
+  <rect x="740" y="164" width="140" height="34" rx="6" fill="#dbeafe" stroke="#3b82f6" stroke-width="2"/>
+  <text x="810" y="185" text-anchor="middle" font-size="10" font-weight="600" fill="#1d4ed8">msg1: user</text>
+
+  <line x1="810" y1="198" x2="810" y2="208" stroke="#8b5cf6" stroke-width="2"/>
+
+  <rect x="740" y="208" width="140" height="34" rx="6" fill="#d1fae5" stroke="#10b981" stroke-width="2"/>
+  <text x="810" y="229" text-anchor="middle" font-size="10" font-weight="600" fill="#047857">msg2: assistant</text>
+
+  <line x1="810" y1="242" x2="810" y2="252" stroke="#8b5cf6" stroke-width="2"/>
+
+  <rect x="740" y="252" width="140" height="34" rx="6" fill="#dbeafe" stroke="#3b82f6" stroke-width="2"/>
+  <text x="810" y="273" text-anchor="middle" font-size="10" font-weight="600" fill="#1d4ed8">msg3: user</text>
+
+  <line x1="810" y1="286" x2="810" y2="296" stroke="#8b5cf6" stroke-width="2"/>
+
+  <rect x="740" y="296" width="140" height="34" rx="6" fill="#d1fae5" stroke="#10b981" stroke-width="2"/>
+  <text x="810" y="317" text-anchor="middle" font-size="10" font-weight="600" fill="#047857">msg5: assistant</text>
+
+  <line x1="810" y1="330" x2="810" y2="340" stroke="#8b5cf6" stroke-width="2"/>
+
+  <rect x="740" y="340" width="140" height="34" rx="6" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
+  <text x="810" y="361" text-anchor="middle" font-size="10" font-weight="600" fill="#b45309">msg6: toolResult</text>
+
+  <line x1="810" y1="374" x2="810" y2="384" stroke="#8b5cf6" stroke-width="2"/>
+
+  <rect x="735" y="384" width="150" height="40" rx="6" fill="#f3e8ff" stroke="#8b5cf6" stroke-width="2.5"/>
+  <text x="810" y="404" text-anchor="middle" font-size="10" font-weight="700" fill="#7c3aed">msg7: assistant</text>
+  <text x="810" y="417" text-anchor="middle" font-size="9" fill="#7c3aed">← leafId（回溯起点）</text>
+
+  <!-- Annotation: msg4 skipped -->
+  <rect x="920" y="164" width="300" height="60" rx="8" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5"/>
+  <text x="935" y="186" font-size="11" font-weight="600" fill="#dc2626">msg4（旧分支）不在路径上</text>
+  <text x="935" y="204" font-size="11" fill="#991b1b">模型完全看不到它</text>
+  <text x="935" y="218" font-size="10" fill="#991b1b" font-style="italic">但磁盘上还在，switchLeaf 可回来</text>
+
+  <!-- Key takeaways -->
+  <rect x="20" y="470" width="1240" height="42" rx="8" fill="#fffbeb" stroke="#fbbf24" stroke-width="1.5"/>
+  <text x="40" y="495" font-size="12" font-weight="600" fill="#92400e">三个关键点：① 磁盘存的 ≠ 模型看到的（磁盘是树全量，模型看回溯路径）　② 为什么是树不是数组：支持 switchLeaf 分支切换　③ "当前" = leafId，切会话 = 移动叶子指针，不删历史</text>
+</svg>

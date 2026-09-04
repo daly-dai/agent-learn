@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 420" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+  <defs>
+    <marker id="a11" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3b82f6"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="640" y="30" text-anchor="middle" font-size="20" font-weight="700" fill="#1e293b">我们的压缩实现：三步走（prepare → generate → commit）</text>
+
+  <!-- Step 1: 准备 -->
+  <rect x="30" y="60" width="380" height="240" rx="12" fill="#eff6ff" stroke="#93c5fd" stroke-width="2"/>
+  <rect x="30" y="60" width="380" height="36" rx="12" fill="#3b82f6"/>
+  <rect x="30" y="78" width="380" height="18" fill="#3b82f6"/>
+  <text x="220" y="83" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">① 准备（纯计算，不碰模型）</text>
+
+  <text x="50" y="118" font-size="11" font-weight="600" fill="#1d4ed8">lib/session/store.ts · prepareCompaction</text>
+  <text x="50" y="138" font-size="11" fill="#1e40af">回答：压哪些？留哪些？上次摘要是什么？</text>
+  <line x1="50" y1="148" x2="390" y2="148" stroke="#cbd5e1" stroke-width="1"/>
+  <text x="50" y="168" font-size="11" fill="#1e293b">1. 估算 token 数，没超阈值 → 不压</text>
+  <text x="50" y="188" font-size="11" fill="#1e293b">2. 找上次摘要（增量更新用）</text>
+  <text x="50" y="208" font-size="11" fill="#1e293b">3. 选切点：保留最近 N 条</text>
+  <text x="70" y="225" font-size="10" fill="#64748b">while (切点落在 toolResult) 前移</text>
+  <text x="50" y="245" font-size="11" fill="#1e293b">4. 返回 { messagesToSummarize,</text>
+  <text x="70" y="260" font-size="10" fill="#64748b">previousSummary, firstKeptEntryId, ... }</text>
+  <rect x="50" y="272" width="340" height="22" rx="4" fill="#d1fae5" stroke="#22c55e" stroke-width="1"/>
+  <text x="220" y="287" text-anchor="middle" font-size="10" font-weight="600" fill="#15803d">✅ 可单独写测试（不碰模型）</text>
+
+  <!-- Arrow 1→2 -->
+  <line x1="415" y1="180" x2="440" y2="180" stroke="#3b82f6" stroke-width="3" marker-end="url(#a11)"/>
+
+  <!-- Step 2: 生成 -->
+  <rect x="450" y="60" width="380" height="240" rx="12" fill="#ecfdf5" stroke="#6ee7b7" stroke-width="2"/>
+  <rect x="450" y="60" width="380" height="36" rx="12" fill="#10b981"/>
+  <rect x="450" y="78" width="380" height="18" fill="#10b981"/>
+  <text x="640" y="83" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">② 生成（调模型）</text>
+
+  <text x="470" y="118" font-size="11" font-weight="600" fill="#047857">lib/summarize.ts · generateSummary</text>
+  <text x="470" y="138" font-size="11" fill="#065f46">回答：把消息变成提示词，让模型写总结</text>
+  <line x1="470" y1="148" x2="810" y2="148" stroke="#a7f3d0" stroke-width="1"/>
+  <text x="470" y="168" font-size="11" fill="#1e293b">序列化：消息 → 纯文本</text>
+  <text x="490" y="183" font-size="10" fill="#64748b">[User]: ... [Assistant]: ...</text>
+  <text x="490" y="197" font-size="10" fill="#64748b">参数只写 key 名（D7 防泄漏）</text>
+  <text x="470" y="218" font-size="11" fill="#1e293b">调模型：systemPrompt + messages</text>
+  <text x="490" y="233" font-size="10" fill="#64748b">tools: []（不让模型干活，写总结）</text>
+  <text x="490" y="247" font-size="10" fill="#64748b">previousSummary 增量更新</text>
+  <text x="470" y="268" font-size="11" fill="#1e293b">失败检查：</text>
+  <text x="490" y="283" font-size="10" fill="#ef4444">stopReason=error → null</text>
+  <text x="490" y="297" font-size="10" fill="#ef4444">摘要为空 → null（fail-closed D9）</text>
+
+  <!-- Arrow 2→3 -->
+  <line x1="835" y1="180" x2="860" y2="180" stroke="#3b82f6" stroke-width="3" marker-end="url(#a11)"/>
+
+  <!-- Step 3: 落盘 -->
+  <rect x="870" y="60" width="380" height="240" rx="12" fill="#fffbeb" stroke="#fcd34d" stroke-width="2"/>
+  <rect x="870" y="60" width="380" height="36" rx="12" fill="#f59e0b"/>
+  <rect x="870" y="78" width="380" height="18" fill="#f59e0b"/>
+  <text x="1060" y="83" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">③ 落盘 + 接线</text>
+
+  <text x="890" y="118" font-size="11" font-weight="600" fill="#b45309">lib/session/store.ts · commitCompaction</text>
+  <text x="890" y="138" font-size="11" fill="#92400e">回答：摘要存进文件，顶替旧消息</text>
+  <line x1="890" y1="148" x2="1230" y2="148" stroke="#fde68a" stroke-width="1"/>
+  <text x="890" y="168" font-size="11" fill="#1e293b">store.appendEntry({</text>
+  <text x="910" y="183" font-size="10" fill="#64748b">type: "compaction",</text>
+  <text x="910" y="197" font-size="10" fill="#64748b">summary: summary,</text>
+  <text x="910" y="211" font-size="10" fill="#64748b">tokensBefore: ...,</text>
+  <text x="910" y="225" font-size="10" fill="#64748b">firstKeptEntryId: ...</text>
+  <text x="890" y="240" font-size="11" fill="#1e293b">})</text>
+  <text x="890" y="262" font-size="11" fill="#1e293b">消息仍在文件里（只追加不删）</text>
+  <text x="890" y="277" font-size="10" fill="#64748b">buildContext 过滤掉旧消息</text>
+  <rect x="890" y="287" width="340" height="22" rx="4" fill="#fef3c7" stroke="#f59e0b" stroke-width="1"/>
+  <text x="1060" y="302" text-anchor="middle" font-size="10" font-weight="600" fill="#b45309">经济性检查：tokensToSummarize >= 400</text>
+
+  <!-- Bottom: why split into 3 steps -->
+  <rect x="30" y="320" width="1220" height="85" rx="10" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+  <text x="50" y="345" font-size="13" font-weight="700" fill="#475569">为什么拆成三步？</text>
+  <text x="50" y="368" font-size="12" fill="#1e293b">①③ 是纯逻辑（不碰模型），可以单独写测试；② 是唯一碰模型的地方，放产品层（route.ts）组合。</text>
+  <text x="50" y="388" font-size="12" fill="#64748b">这和 pi 的 prepareCompaction → compact → 落盘 完全对齐 — 三步分离是"教科书做法"。</text>
+</svg>

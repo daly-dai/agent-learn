@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 500" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+  <defs>
+    <marker id="a9d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#10b981"/>
+    </marker>
+    <marker id="a9o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#f59e0b"/>
+    </marker>
+    <marker id="a9b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#3b82f6"/>
+    </marker>
+    <marker id="a9g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="640" y="28" text-anchor="middle" font-size="20" font-weight="700" fill="#1e293b">DSH 压缩事务：10 步顺序（锁 + 日志 + 替换）</text>
+
+  <!-- Left column: steps 1-5 -->
+  <!-- Step 1 -->
+  <rect x="60" y="55" width="380" height="50" rx="8" fill="#d1fae5" stroke="#10b981" stroke-width="2"/>
+  <text x="75" y="75" font-size="12" font-weight="700" fill="#047857">1. 校验范围</text>
+  <text x="75" y="93" font-size="10" fill="#065f46">存在、顺序、两端 tool-pairing 平衡</text>
+  <line x1="250" y1="108" x2="250" y2="120" stroke="#10b981" stroke-width="2" marker-end="url(#a9d)"/>
+
+  <!-- Step 2 -->
+  <rect x="60" y="125" width="380" height="50" rx="8" fill="#d1fae5" stroke="#10b981" stroke-width="2"/>
+  <text x="75" y="145" font-size="12" font-weight="700" fill="#047857">2. 检查锁</text>
+  <text x="75" y="163" font-size="10" fill="#065f46">有未闭合的 compaction/start = busy，拒绝</text>
+  <line x1="250" y1="178" x2="250" y2="190" stroke="#10b981" stroke-width="2" marker-end="url(#a9o)"/>
+
+  <!-- Step 3 -->
+  <rect x="60" y="195" width="380" height="50" rx="8" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
+  <text x="75" y="215" font-size="12" font-weight="700" fill="#b45309">3. append compaction/start</text>
+  <text x="75" y="233" font-size="10" fill="#92400e">durable 锁（落日志），此时才允许 yield（异步）</text>
+  <line x1="250" y1="248" x2="250" y2="260" stroke="#f59e0b" stroke-width="2" marker-end="url(#a9d)"/>
+
+  <!-- Step 4 -->
+  <rect x="60" y="265" width="380" height="50" rx="8" fill="#d1fae5" stroke="#10b981" stroke-width="2"/>
+  <text x="75" y="285" font-size="12" font-weight="700" fill="#047857">4. prepareCompaction</text>
+  <text x="75" y="303" font-size="10" fill="#065f46">重新定价被替换区间 + 构建总结输入</text>
+  <line x1="250" y1="318" x2="250" y2="330" stroke="#10b981" stroke-width="2" marker-end="url(#a9d)"/>
+
+  <!-- Step 5 -->
+  <rect x="60" y="335" width="380" height="50" rx="8" fill="#d1fae5" stroke="#10b981" stroke-width="2"/>
+  <text x="75" y="355" font-size="12" font-weight="700" fill="#047857">5. summarizeCompaction</text>
+  <text x="75" y="373" font-size="10" fill="#065f46">调 LLM（此处异步，可能被中断/取消）</text>
+
+  <!-- Arrow 5 → 6 (horizontal) -->
+  <path d="M 445 360 L 620 360 L 620 80 L 715 80" fill="none" stroke="#94a3b8" stroke-width="2.5" marker-end="url(#a9g)" stroke-dasharray="6,3"/>
+  <text x="530" y="352" text-anchor="middle" font-size="10" fill="#64748b">异步返回后</text>
+
+  <!-- Right column: steps 6-10 -->
+  <!-- Step 6 -->
+  <rect x="720" y="55" width="380" height="50" rx="8" fill="#d1fae5" stroke="#10b981" stroke-width="2"/>
+  <text x="735" y="75" font-size="12" font-weight="700" fill="#047857">6. 稳定性检查</text>
+  <text x="735" y="93" font-size="10" fill="#065f46">surface 变没变？自动=全量检查，手动=区间检查</text>
+  <line x1="910" y1="108" x2="910" y2="120" stroke="#10b981" stroke-width="2" marker-end="url(#a9o)"/>
+
+  <!-- Step 7 -->
+  <rect x="720" y="125" width="380" height="50" rx="8" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
+  <text x="735" y="145" font-size="12" font-weight="700" fill="#b45309">7. append compaction/summary</text>
+  <text x="735" y="163" font-size="10" fill="#92400e">log-only 事件，记录总结内容 / 影子价格</text>
+  <line x1="910" y1="178" x2="910" y2="190" stroke="#f59e0b" stroke-width="2" marker-end="url(#a9b)"/>
+
+  <!-- Step 8 - HIGHLIGHT -->
+  <rect x="720" y="195" width="380" height="50" rx="8" fill="#dbeafe" stroke="#3b82f6" stroke-width="3"/>
+  <text x="735" y="215" font-size="12" font-weight="700" fill="#1d4ed8">8. append user/message (replace)</text>
+  <text x="735" y="233" font-size="10" fill="#1e40af">真正的 surface 替换！带 compactCheckpointSource</text>
+  <line x1="910" y1="248" x2="910" y2="260" stroke="#3b82f6" stroke-width="2" marker-end="url(#a9o)"/>
+
+  <!-- Step 9 -->
+  <rect x="720" y="265" width="380" height="50" rx="8" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
+  <text x="735" y="285" font-size="12" font-weight="700" fill="#b45309">9. append compaction/end</text>
+  <text x="735" y="303" font-size="10" fill="#92400e">释放锁</text>
+  <line x1="910" y1="318" x2="910" y2="330" stroke="#f59e0b" stroke-width="2" marker-end="url(#a9g)"/>
+
+  <!-- Step 10 -->
+  <rect x="720" y="335" width="380" height="50" rx="8" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+  <text x="735" y="355" font-size="12" font-weight="700" fill="#475569">10. flush()</text>
+  <text x="735" y="373" font-size="10" fill="#64748b">手动路径：持久化 checkpoint</text>
+
+  <!-- Legend -->
+  <rect x="60" y="405" width="14" height="14" rx="3" fill="#d1fae5" stroke="#10b981" stroke-width="1.5"/>
+  <text x="80" y="416" font-size="11" fill="#64748b">处理步骤</text>
+  <rect x="170" y="405" width="14" height="14" rx="3" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="190" y="416" font-size="11" fill="#64748b">log-only 事件</text>
+  <rect x="300" y="405" width="14" height="14" rx="3" fill="#dbeafe" stroke="#3b82f6" stroke-width="2"/>
+  <text x="320" y="416" font-size="11" fill="#64748b">surface 替换事件</text>
+  <rect x="440" y="405" width="14" height="14" rx="3" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/>
+  <text x="460" y="416" font-size="11" fill="#64748b">其他</text>
+
+  <!-- Key insight -->
+  <rect x="60" y="435" width="1160" height="55" rx="10" fill="#fffbeb" stroke="#fbbf24" stroke-width="1.5"/>
+  <text x="80" y="458" font-size="12" font-weight="600" fill="#92400e">关键设计：start/summary/end 三个事件都是 log-only（不进 surface），真正改写会话表面的是第 8 步 user/message(replace)。</text>
+  <text x="80" y="476" font-size="11" fill="#92400e">锁是 durable 的（落日志），崩溃后重放能认出"有未完成的压缩"。shadow-price 协议：替换事件不标价，价格由紧贴它的 summary 声明。</text>
+</svg>

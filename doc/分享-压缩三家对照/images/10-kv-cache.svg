@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 500" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+  <defs>
+    <marker id="a10" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="640" y="28" text-anchor="middle" font-size="20" font-weight="700" fill="#1e293b">KV cache 原理：为什么"只取前 100 条"能命中"200 条的缓存"</text>
+
+  <!-- Top panel: 前缀命中 -->
+  <rect x="20" y="50" width="1240" height="180" rx="12" fill="#ecfdf5" stroke="#6ee7b7" stroke-width="1.5"/>
+  <rect x="20" y="50" width="1240" height="30" rx="12" fill="#10b981"/>
+  <rect x="20" y="65" width="1240" height="15" fill="#10b981"/>
+  <text x="640" y="70" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">✅ 前缀命中：总结请求 = 原 200 条前缀 + 末尾追加指令</text>
+
+  <!-- Cache hit segments -->
+  <rect x="50" y="95" width="160" height="40" rx="6" fill="#d1fae5" stroke="#22c55e" stroke-width="2"/>
+  <text x="130" y="119" text-anchor="middle" font-size="11" font-weight="600" fill="#15803d">system + tools</text>
+
+  <text x="220" y="119" font-size="14" fill="#22c55e">+</text>
+
+  <rect x="235" y="95" width="500" height="40" rx="6" fill="#d1fae5" stroke="#22c55e" stroke-width="2"/>
+  <text x="485" y="113" text-anchor="middle" font-size="11" font-weight="600" fill="#15803d">被压缩区间消息（前 100 条）</text>
+  <text x="485" y="128" text-anchor="middle" font-size="9" fill="#166534">K/V 只依赖 system+tools+前面消息 → 与完整请求一模一样</text>
+
+  <text x="745" y="119" font-size="14" fill="#22c55e">+</text>
+
+  <rect x="760" y="95" width="250" height="40" rx="6" fill="#fef3c7" stroke="#f59e0b" stroke-width="2.5"/>
+  <text x="885" y="113" text-anchor="middle" font-size="11" font-weight="700" fill="#b45309">新指令</text>
+  <text x="885" y="128" text-anchor="middle" font-size="9" fill="#92400e">COMPACTION_INSTRUCTION</text>
+
+  <!-- Annotations -->
+  <text x="50" y="155" font-size="11" fill="#15803d">┌── 复用缓存，零重算 ──────────────────────────────────────────────┘</text>
+  <text x="50" y="172" font-size="11" font-weight="600" fill="#b45309">                                                    └── 只算这一小截</text>
+  <text x="50" y="195" font-size="11" fill="#64748b">因果注意力：token i 的 K/V 只依赖 1..i 的 token。两边前缀逐字节相同 → 前 100 条的 K/V 一模一样 → 直接复用</text>
+
+  <!-- Bottom panel: 前缀破坏 -->
+  <rect x="20" y="250" width="1240" height="160" rx="12" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5"/>
+  <rect x="20" y="250" width="1240" height="30" rx="12" fill="#ef4444"/>
+  <rect x="20" y="265" width="1240" height="15" fill="#ef4444"/>
+  <text x="640" y="270" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">❌ 前缀破坏：中间改了一个字，后面全部失效</text>
+
+  <!-- Cache miss segments -->
+  <rect x="50" y="295" width="160" height="40" rx="6" fill="#d1fae5" stroke="#22c55e" stroke-width="2"/>
+  <text x="130" y="319" text-anchor="middle" font-size="11" font-weight="600" fill="#15803d">system + tools</text>
+
+  <text x="220" y="319" font-size="14" fill="#ef4444">+</text>
+
+  <rect x="235" y="295" width="120" height="40" rx="6" fill="#fee2e2" stroke="#ef4444" stroke-width="2.5"/>
+  <text x="295" y="313" text-anchor="middle" font-size="11" font-weight="700" fill="#991b1b">改了一个字!</text>
+  <text x="295" y="328" text-anchor="middle" font-size="9" fill="#991b1b">分叉点</text>
+
+  <text x="365" y="319" font-size="14" fill="#ef4444">+</text>
+
+  <rect x="380" y="295" width="355" height="40" rx="6" fill="#fee2e2" stroke="#ef4444" stroke-width="2"/>
+  <text x="557" y="313" text-anchor="middle" font-size="11" font-weight="600" fill="#991b1b">被压缩区间消息（前 100 条）</text>
+  <text x="557" y="328" text-anchor="middle" font-size="9" fill="#991b1b">从改动点起，K/V 全部作废</text>
+
+  <text x="745" y="319" font-size="14" fill="#ef4444">+</text>
+
+  <rect x="760" y="295" width="250" height="40" rx="6" fill="#fee2e2" stroke="#ef4444" stroke-width="2"/>
+  <text x="885" y="319" text-anchor="middle" font-size="11" font-weight="600" fill="#991b1b">新指令（也重算）</text>
+
+  <!-- Annotations -->
+  <text x="50" y="355" font-size="11" fill="#991b1b">└── 从改字处起，后面全部重算 ──────────────────────────────────────┘</text>
+  <text x="50" y="380" font-size="11" fill="#64748b">token 的表示依赖前面所有 token（通过注意力）。前缀中间某个 token 变了 → 它后面每个 token 都"看过"它 → 表示全变 → 缓存从改动点往后全部作废</text>
+
+  <!-- Bottom: key concepts -->
+  <rect x="20" y="425" width="1240" height="65" rx="10" fill="#fffbeb" stroke="#fbbf24" stroke-width="1.5"/>
+  <text x="40" y="448" font-size="12" font-weight="700" fill="#92400e">三个关键点</text>
+  <circle cx="35" cy="468" r="4" fill="#f59e0b"/>
+  <text x="48" y="472" font-size="11" fill="#1e293b">KV cache = 把输入前缀每个 token 的 K/V 缓存下来，下次前缀相同直接复用（类比：同一本书的同一段，第二次看不用重记笔记）</text>
+  <circle cx="35" cy="486" r="4" fill="#f59e0b"/>
+  <text x="48" y="490" font-size="11" fill="#1e293b">DSH 把总结指令放在最后一条消息而不是中间 — 指令插中间 = 分叉点提前，后面的消息全部不算前缀。分叉点越靠后，缓存复用越多</text>
+</svg>

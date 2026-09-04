@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 460" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+  <defs>
+    <marker id="a12" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="640" y="28" text-anchor="middle" font-size="20" font-weight="700" fill="#1e293b">增量更新：为什么"多次压缩"不丢信息</text>
+
+  <!-- Round 1 -->
+  <rect x="20" y="50" width="1240" height="160" rx="12" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+  <rect x="20" y="50" width="1240" height="28" rx="12" fill="#3b82f6"/>
+  <rect x="20" y="65" width="1240" height="13" fill="#3b82f6"/>
+  <text x="640" y="70" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">第一次压缩</text>
+
+  <!-- Messages → Summary -->
+  <rect x="50" y="95" width="260" height="95" rx="8" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
+  <text x="180" y="115" text-anchor="middle" font-size="12" font-weight="600" fill="#b45309">原始对话消息</text>
+  <text x="180" y="135" text-anchor="middle" font-size="10" fill="#92400e">[User]: 帮我写排序</text>
+  <text x="180" y="150" text-anchor="middle" font-size="10" fill="#92400e">[Assistant]: 好的，我来写…</text>
+  <text x="180" y="165" text-anchor="middle" font-size="10" fill="#92400e">[Tool result]: 已写入 sort.ts</text>
+  <text x="180" y="180" text-anchor="middle" font-size="10" fill="#92400e">…</text>
+
+  <line x1="315" y1="142" x2="355" y2="142" stroke="#94a3b8" stroke-width="2.5" marker-end="url(#a12)"/>
+  <text x="335" y="135" text-anchor="middle" font-size="9" fill="#64748b">压缩</text>
+
+  <rect x="360" y="95" width="300" height="95" rx="8" fill="#dbeafe" stroke="#3b82f6" stroke-width="2.5"/>
+  <text x="510" y="118" text-anchor="middle" font-size="12" font-weight="700" fill="#1d4ed8">摘要 #1</text>
+  <text x="510" y="138" text-anchor="middle" font-size="10" fill="#1e40af">## Goal</text>
+  <text x="510" y="153" text-anchor="middle" font-size="10" fill="#1e40af">用户要一个排序算法</text>
+  <text x="510" y="170" text-anchor="middle" font-size="10" fill="#1e40af">## Progress / Next Steps…</text>
+
+  <text x="510" y="190" text-anchor="middle" font-size="9" fill="#64748b" font-style="italic">存入会话文件（compaction entry）</text>
+
+  <!-- New messages -->
+  <rect x="700" y="95" width="220" height="95" rx="8" fill="#dcfce7" stroke="#22c55e" stroke-width="2"/>
+  <text x="810" y="118" text-anchor="middle" font-size="12" font-weight="600" fill="#15803d">新消息（第一轮后）</text>
+  <text x="810" y="138" text-anchor="middle" font-size="10" fill="#166534">[User]: 改成降序</text>
+  <text x="810" y="153" text-anchor="middle" font-size="10" fill="#166534">[Assistant]: 好的…</text>
+  <text x="810" y="168" text-anchor="middle" font-size="10" fill="#166534">…</text>
+
+  <line x1="665" y1="142" x2="695" y2="142" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+  <!-- Round 2 -->
+  <rect x="20" y="230" width="1240" height="160" rx="12" fill="#ecfdf5" stroke="#6ee7b7" stroke-width="1.5"/>
+  <rect x="20" y="230" width="1240" height="28" rx="12" fill="#10b981"/>
+  <rect x="20" y="245" width="1240" height="13" fill="#10b981"/>
+  <text x="640" y="250" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">第二次压缩 — 模型看到的输入</text>
+
+  <!-- New messages -->
+  <rect x="50" y="275" width="220" height="95" rx="8" fill="#dcfce7" stroke="#22c55e" stroke-width="2"/>
+  <text x="160" y="298" text-anchor="middle" font-size="12" font-weight="600" fill="#15803d">新消息</text>
+  <text x="160" y="318" text-anchor="middle" font-size="10" fill="#166534">[User]: 改成降序</text>
+  <text x="160" y="333" text-anchor="middle" font-size="10" fill="#166534">[Assistant]: 好的…</text>
+  <text x="160" y="348" text-anchor="middle" font-size="10" fill="#166534">…</text>
+  <text x="160" y="365" text-anchor="middle" font-size="9" fill="#64748b" font-style="italic">&lt;conversation&gt;标签</text>
+
+  <!-- Previous summary -->
+  <rect x="290" y="275" width="240" height="95" rx="8" fill="#dbeafe" stroke="#3b82f6" stroke-width="2.5"/>
+  <text x="410" y="298" text-anchor="middle" font-size="12" font-weight="700" fill="#1d4ed8">上一次摘要 #1</text>
+  <text x="410" y="318" text-anchor="middle" font-size="10" fill="#1e40af">## Goal</text>
+  <text x="410" y="333" text-anchor="middle" font-size="10" fill="#1e40af">用户要一个排序算法</text>
+  <text x="410" y="348" text-anchor="middle" font-size="10" fill="#1e40af">…Progress / Next Steps</text>
+  <text x="410" y="365" text-anchor="middle" font-size="9" fill="#64748b" font-style="italic">&lt;previous-summary&gt;标签</text>
+
+  <line x1="535" y1="322" x2="570" y2="322" stroke="#94a3b8" stroke-width="2.5" marker-end="url(#a12)"/>
+  <text x="553" y="315" text-anchor="middle" font-size="9" fill="#64748b">合并</text>
+
+  <!-- Updated summary -->
+  <rect x="575" y="275" width="320" height="95" rx="8" fill="#f3e8ff" stroke="#8b5cf6" stroke-width="2.5"/>
+  <text x="735" y="298" text-anchor="middle" font-size="12" font-weight="700" fill="#7c3aed">摘要 #2（更新版）</text>
+  <text x="735" y="318" text-anchor="middle" font-size="10" fill="#5b21b6">## Goal</text>
+  <text x="735" y="333" text-anchor="middle" font-size="10" fill="#5b21b6">用户要排序算法（要求降序）</text>
+  <text x="735" y="348" text-anchor="middle" font-size="10" fill="#5b21b6">## Progress: 已写好，改为降序</text>
+  <text x="735" y="365" text-anchor="middle" font-size="9" fill="#7c3aed" font-style="italic">旧信息保留 + 新进展合并</text>
+
+  <!-- UPDATE prompt -->
+  <rect x="920" y="275" width="320" height="95" rx="8" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
+  <text x="1080" y="298" text-anchor="middle" font-size="12" font-weight="600" fill="#b45309">UPDATE 提示词</text>
+  <text x="1080" y="320" text-anchor="middle" font-size="10" fill="#92400e">PRESERVE all existing</text>
+  <text x="1080" y="335" text-anchor="middle" font-size="10" fill="#92400e">information... ADD new</text>
+  <text x="1080" y="350" text-anchor="middle" font-size="10" fill="#92400e">progress...</text>
+  <text x="1080" y="365" text-anchor="middle" font-size="9" fill="#64748b" font-style="italic">D3 决策：pi 的显式增量机制</text>
+
+  <!-- Bottom analogy -->
+  <rect x="20" y="405" width="1240" height="45" rx="10" fill="#fffbeb" stroke="#fbbf24" stroke-width="1.5"/>
+  <text x="640" y="432" text-anchor="middle" font-size="12" fill="#92400e">类比：没有增量 = 每次写周报只看本周记录 → 上周定的目标全没了；有增量 = 每次附上上周周报 → 越写越完整。每次压缩都站在上一次的肩膀上，信息只会累积。</text>
+</svg>

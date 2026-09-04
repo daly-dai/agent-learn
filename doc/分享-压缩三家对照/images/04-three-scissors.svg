@@ -1,0 +1,206 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 540" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+  <defs>
+    <marker id="arr4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="640" y="28" text-anchor="middle" font-size="20" font-weight="700" fill="#1e293b">图二：同一段对话，三把剪刀（全场核心图）</text>
+
+  <!-- Legend -->
+  <rect x="380" y="42" width="16" height="16" rx="3" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="402" y="55" font-size="11" fill="#64748b">压进摘要</text>
+  <rect x="480" y="42" width="16" height="16" rx="3" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="502" y="55" font-size="11" fill="#64748b">保留原文</text>
+  <rect x="580" y="42" width="16" height="16" rx="3" fill="#f3e8ff" stroke="#8b5cf6" stroke-width="2.5"/>
+  <text x="602" y="55" font-size="11" fill="#64748b">✂ 保留区第一条</text>
+
+  <!-- 12 message boxes -->
+  <!-- ① user -->
+  <rect x="35" y="68" width="90" height="78" rx="6" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
+  <circle cx="80" cy="82" r="11" fill="#3b82f6"/>
+  <text x="80" y="86" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">1</text>
+  <text x="80" y="104" text-anchor="middle" font-size="10" font-weight="600" fill="#1d4ed8">user</text>
+  <text x="80" y="121" text-anchor="middle" font-size="9" fill="#1e293b">帮我写个</text>
+  <text x="80" y="134" text-anchor="middle" font-size="9" fill="#1e293b">排序函数</text>
+
+  <!-- ② assistant -->
+  <rect x="132" y="68" width="90" height="78" rx="6" fill="#d1fae5" stroke="#10b981" stroke-width="1.5"/>
+  <circle cx="177" cy="82" r="11" fill="#10b981"/>
+  <text x="177" y="86" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">2</text>
+  <text x="177" y="104" text-anchor="middle" font-size="10" font-weight="600" fill="#047857">assistant</text>
+  <text x="177" y="121" text-anchor="middle" font-size="9" fill="#1e293b">好的，</text>
+  <text x="177" y="134" text-anchor="middle" font-size="9" fill="#1e293b">我来写</text>
+
+  <!-- ③ assistant toolCall -->
+  <rect x="229" y="68" width="90" height="78" rx="6" fill="#d1fae5" stroke="#10b981" stroke-width="1.5"/>
+  <circle cx="274" cy="82" r="11" fill="#10b981"/>
+  <text x="274" y="86" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">3</text>
+  <text x="274" y="104" text-anchor="middle" font-size="10" font-weight="600" fill="#047857">asst+tool</text>
+  <text x="274" y="121" text-anchor="middle" font-size="9" fill="#1e293b">toolCall:</text>
+  <text x="274" y="134" text-anchor="middle" font-size="9" fill="#1e293b">write_file</text>
+
+  <!-- ④ toolResult -->
+  <rect x="326" y="68" width="90" height="78" rx="6" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5"/>
+  <circle cx="371" cy="82" r="11" fill="#f59e0b"/>
+  <text x="371" y="86" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">4</text>
+  <text x="371" y="104" text-anchor="middle" font-size="10" font-weight="600" fill="#b45309">toolResult</text>
+  <text x="371" y="121" text-anchor="middle" font-size="9" fill="#1e293b">已写入</text>
+  <text x="371" y="134" text-anchor="middle" font-size="9" fill="#1e293b">sort.ts</text>
+
+  <!-- ⑤ assistant toolCall -->
+  <rect x="423" y="68" width="90" height="78" rx="6" fill="#d1fae5" stroke="#10b981" stroke-width="1.5"/>
+  <circle cx="468" cy="82" r="11" fill="#10b981"/>
+  <text x="468" y="86" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">5</text>
+  <text x="468" y="104" text-anchor="middle" font-size="10" font-weight="600" fill="#047857">asst+tool</text>
+  <text x="468" y="121" text-anchor="middle" font-size="9" fill="#1e293b">toolCall:</text>
+  <text x="468" y="134" text-anchor="middle" font-size="9" fill="#1e293b">bash 测试</text>
+
+  <!-- ⑥ toolResult -->
+  <rect x="520" y="68" width="90" height="78" rx="6" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5"/>
+  <circle cx="565" cy="82" r="11" fill="#f59e0b"/>
+  <text x="565" y="86" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">6</text>
+  <text x="565" y="104" text-anchor="middle" font-size="10" font-weight="600" fill="#b45309">toolResult</text>
+  <text x="565" y="121" text-anchor="middle" font-size="9" fill="#1e293b">测试通过</text>
+
+  <!-- ⑦ assistant toolCall -->
+  <rect x="617" y="68" width="90" height="78" rx="6" fill="#d1fae5" stroke="#10b981" stroke-width="1.5"/>
+  <circle cx="662" cy="82" r="11" fill="#10b981"/>
+  <text x="662" y="86" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">7</text>
+  <text x="662" y="104" text-anchor="middle" font-size="10" font-weight="600" fill="#047857">asst+tool</text>
+  <text x="662" y="121" text-anchor="middle" font-size="9" fill="#1e293b">toolCall:</text>
+  <text x="662" y="134" text-anchor="middle" font-size="9" fill="#1e293b">bash 再跑</text>
+
+  <!-- ⑧ toolResult -->
+  <rect x="714" y="68" width="90" height="78" rx="6" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5"/>
+  <circle cx="759" cy="82" r="11" fill="#f59e0b"/>
+  <text x="759" y="86" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">8</text>
+  <text x="759" y="104" text-anchor="middle" font-size="10" font-weight="600" fill="#b45309">toolResult</text>
+  <text x="759" y="121" text-anchor="middle" font-size="9" fill="#1e293b">输出…</text>
+
+  <!-- ⑨ assistant text -->
+  <rect x="811" y="68" width="90" height="78" rx="6" fill="#d1fae5" stroke="#10b981" stroke-width="1.5"/>
+  <circle cx="856" cy="82" r="11" fill="#10b981"/>
+  <text x="856" y="86" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">9</text>
+  <text x="856" y="104" text-anchor="middle" font-size="10" font-weight="600" fill="#047857">assistant</text>
+  <text x="856" y="121" text-anchor="middle" font-size="9" fill="#1e293b">文本回复</text>
+
+  <!-- ⑩ user -->
+  <rect x="908" y="68" width="90" height="78" rx="6" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>
+  <circle cx="953" cy="82" r="11" fill="#3b82f6"/>
+  <text x="953" y="86" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">10</text>
+  <text x="953" y="104" text-anchor="middle" font-size="10" font-weight="600" fill="#1d4ed8">user</text>
+  <text x="953" y="121" text-anchor="middle" font-size="9" fill="#1e293b">改成降序</text>
+
+  <!-- ⑪ assistant toolCall -->
+  <rect x="1005" y="68" width="90" height="78" rx="6" fill="#d1fae5" stroke="#10b981" stroke-width="1.5"/>
+  <circle cx="1050" cy="82" r="11" fill="#10b981"/>
+  <text x="1050" y="86" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">11</text>
+  <text x="1050" y="104" text-anchor="middle" font-size="10" font-weight="600" fill="#047857">asst+tool</text>
+  <text x="1050" y="121" text-anchor="middle" font-size="9" fill="#1e293b">toolCall:</text>
+  <text x="1050" y="134" text-anchor="middle" font-size="9" fill="#1e293b">edit_file</text>
+
+  <!-- ⑫ toolResult -->
+  <rect x="1102" y="68" width="90" height="78" rx="6" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5"/>
+  <circle cx="1147" cy="82" r="11" fill="#f59e0b"/>
+  <text x="1147" y="86" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">12</text>
+  <text x="1147" y="104" text-anchor="middle" font-size="10" font-weight="600" fill="#b45309">toolResult</text>
+  <text x="1147" y="121" text-anchor="middle" font-size="9" fill="#1e293b">已修改</text>
+
+  <!-- Separator -->
+  <line x1="35" y1="158" x2="1192" y2="158" stroke="#e2e8f0" stroke-width="1"/>
+
+  <!-- Row 1: 我们 -->
+  <text x="35" y="175" font-size="13" font-weight="700" fill="#3b82f6">我们（保留区从 ⑦ 起）</text>
+  <!-- Cells: ①-⑥ red, ⑦ scissors, ⑧-⑫ green -->
+  <rect x="35" y="180" width="90" height="28" rx="4" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <rect x="132" y="180" width="90" height="28" rx="4" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <rect x="229" y="180" width="90" height="28" rx="4" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <rect x="326" y="180" width="90" height="28" rx="4" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <rect x="423" y="180" width="90" height="28" rx="4" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <rect x="520" y="180" width="90" height="28" rx="4" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <rect x="617" y="180" width="90" height="28" rx="4" fill="#f3e8ff" stroke="#8b5cf6" stroke-width="2.5"/>
+  <text x="662" y="198" text-anchor="middle" font-size="12" font-weight="700" fill="#7c3aed">✂</text>
+  <rect x="714" y="180" width="90" height="28" rx="4" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+  <rect x="811" y="180" width="90" height="28" rx="4" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+  <rect x="908" y="180" width="90" height="28" rx="4" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+  <rect x="1005" y="180" width="90" height="28" rx="4" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+  <rect x="1102" y="180" width="90" height="28" rx="4" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+  <!-- Annotation -->
+  <text x="35" y="225" font-size="11" fill="#64748b">预算想从 ⑧(toolResult) 开始留 → 但保留区第一条不能是 toolResult（孤儿 tool → DeepSeek 400）→ 前移到 ⑦，把 ⑦⑧ 这对完整留下</text>
+
+  <!-- Row 2: DSH -->
+  <text x="35" y="250" font-size="13" font-weight="700" fill="#f59e0b">DSH（保留区从 ⑨ 起）</text>
+  <!-- Cells: ①-⑧ red, ⑨ scissors, ⑩-⑫ green -->
+  <rect x="35" y="255" width="90" height="28" rx="4" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <rect x="132" y="255" width="90" height="28" rx="4" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <rect x="229" y="255" width="90" height="28" rx="4" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <rect x="326" y="255" width="90" height="28" rx="4" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <rect x="423" y="255" width="90" height="28" rx="4" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <rect x="520" y="255" width="90" height="28" rx="4" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <rect x="617" y="255" width="90" height="28" rx="4" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <rect x="714" y="255" width="90" height="28" rx="4" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <rect x="811" y="255" width="90" height="28" rx="4" fill="#f3e8ff" stroke="#8b5cf6" stroke-width="2.5"/>
+  <text x="856" y="273" text-anchor="middle" font-size="12" font-weight="700" fill="#7c3aed">✂</text>
+  <rect x="908" y="255" width="90" height="28" rx="4" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+  <rect x="1005" y="255" width="90" height="28" rx="4" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+  <rect x="1102" y="255" width="90" height="28" rx="4" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+  <!-- Annotation -->
+  <text x="35" y="300" font-size="11" fill="#64748b">从尾巴往前数 token 到 16% 预算 → 找最近 tool-call/result 配对平衡线（⑦⑧ balance=0）→ 从 ⑨ 起保留，⑦⑧ 被压但配对完整不悬空</text>
+
+  <!-- Row 3: pi -->
+  <text x="35" y="325" font-size="13" font-weight="700" fill="#10b981">pi（保留区从 ⑩ 起）</text>
+  <!-- Cells: ①-⑨ red, ⑩ scissors, ⑪-⑫ green -->
+  <rect x="35" y="330" width="90" height="28" rx="4" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <rect x="132" y="330" width="90" height="28" rx="4" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <rect x="229" y="330" width="90" height="28" rx="4" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <rect x="326" y="330" width="90" height="28" rx="4" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <rect x="423" y="330" width="90" height="28" rx="4" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <rect x="520" y="330" width="90" height="28" rx="4" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <rect x="617" y="330" width="90" height="28" rx="4" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <rect x="714" y="330" width="90" height="28" rx="4" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <rect x="811" y="330" width="90" height="28" rx="4" fill="#fee2e2" stroke="#ef4444" stroke-width="1.5"/>
+  <rect x="908" y="330" width="90" height="28" rx="4" fill="#f3e8ff" stroke="#8b5cf6" stroke-width="2.5"/>
+  <text x="953" y="348" text-anchor="middle" font-size="12" font-weight="700" fill="#7c3aed">✂</text>
+  <rect x="1005" y="330" width="90" height="28" rx="4" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+  <rect x="1102" y="330" width="90" height="28" rx="4" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+  <!-- Annotation -->
+  <text x="35" y="375" font-size="11" fill="#64748b">切点回退到轮起点 — ⑩(user "改成降序") 是新轮，从它开始 = 保住"用户请求 + 整轮执行"；⑨ 是第一轮收尾文本，跟着第一轮被压</text>
+
+  <!-- Constraint comparison -->
+  <rect x="35" y="395" width="1157" height="130" rx="10" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+  <text x="55" y="420" font-size="14" font-weight="700" fill="#475569">同一个"拆对"问题，三种约束强度</text>
+
+  <!-- Table header -->
+  <rect x="55" y="430" width="100" height="24" rx="4" fill="#e2e8f0"/>
+  <text x="105" y="446" text-anchor="middle" font-size="11" font-weight="600" fill="#475569">谁</text>
+  <rect x="160" y="430" width="350" height="24" rx="4" fill="#e2e8f0"/>
+  <text x="335" y="446" text-anchor="middle" font-size="11" font-weight="600" fill="#475569">约束</text>
+  <rect x="515" y="430" width="350" height="24" rx="4" fill="#e2e8f0"/>
+  <text x="690" y="446" text-anchor="middle" font-size="11" font-weight="600" fill="#475569">一句话</text>
+
+  <!-- Row: 我们 -->
+  <rect x="55" y="458" width="100" height="24" rx="4" fill="#dbeafe"/>
+  <text x="105" y="474" text-anchor="middle" font-size="11" font-weight="600" fill="#1d4ed8">我们</text>
+  <rect x="160" y="458" width="350" height="24" rx="4" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="335" y="474" text-anchor="middle" font-size="11" fill="#1e293b">保留区第一条 ≠ toolResult</text>
+  <rect x="515" y="458" width="350" height="24" rx="4" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="690" y="474" text-anchor="middle" font-size="11" fill="#1e293b">单点防护（防孤儿 tool → API 400）</text>
+
+  <!-- Row: DSH -->
+  <rect x="55" y="485" width="100" height="24" rx="4" fill="#fef3c7"/>
+  <text x="105" y="501" text-anchor="middle" font-size="11" font-weight="600" fill="#b45309">DSH</text>
+  <rect x="160" y="485" width="350" height="24" rx="4" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="335" y="501" text-anchor="middle" font-size="11" fill="#1e293b">任何切割线 tool-call/result balance == 0</text>
+  <rect x="515" y="485" width="350" height="24" rx="4" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="690" y="501" text-anchor="middle" font-size="11" fill="#1e293b">可重建（重放不悬空）</text>
+
+  <!-- Row: pi -->
+  <rect x="55" y="510" width="100" height="24" rx="4" fill="#d1fae5"/>
+  <text x="105" y="526" text-anchor="middle" font-size="11" font-weight="600" fill="#047857">pi</text>
+  <rect x="160" y="510" width="350" height="24" rx="4" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="335" y="526" text-anchor="middle" font-size="11" fill="#1e293b">切点回退到轮起点（user 消息）</text>
+  <rect x="515" y="510" width="350" height="24" rx="4" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="690" y="526" text-anchor="middle" font-size="11" fill="#1e293b">结构完整（turn 是语义单元，不腰斩）</text>
+</svg>

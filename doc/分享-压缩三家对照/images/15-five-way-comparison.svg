@@ -1,0 +1,180 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 620" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+  <!-- Title -->
+  <text x="640" y="26" text-anchor="middle" font-size="20" font-weight="700" fill="#1e293b">五家对照总表（分享用一页纸）</text>
+
+  <!-- Column headers -->
+  <rect x="20" y="45" width="130" height="30" rx="4" fill="#e2e8f0"/>
+  <text x="85" y="64" text-anchor="middle" font-size="11" font-weight="700" fill="#475569">维度</text>
+
+  <rect x="155" y="45" width="220" height="30" rx="4" fill="#3b82f6"/>
+  <text x="265" y="64" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">我们</text>
+
+  <rect x="380" y="45" width="220" height="30" rx="4" fill="#10b981"/>
+  <text x="490" y="64" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">pi</text>
+
+  <rect x="605" y="45" width="220" height="30" rx="4" fill="#8b5cf6"/>
+  <text x="715" y="64" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">codex</text>
+
+  <rect x="830" y="45" width="200" height="30" rx="4" fill="#f59e0b"/>
+  <text x="930" y="64" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">DSH</text>
+
+  <rect x="1035" y="45" width="225" height="30" rx="4" fill="#ef4444"/>
+  <text x="1147" y="64" text-anchor="middle" font-size="11" font-weight="700" fill="#fff">Claude Code</text>
+
+  <!-- Row 1: 存储模型 -->
+  <rect x="20" y="78" width="130" height="50" rx="4" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="85" y="107" text-anchor="middle" font-size="10" font-weight="600" fill="#475569">存储模型</text>
+  <rect x="155" y="78" width="220" height="50" rx="4" fill="#eff6ff" stroke="#93c5fd" stroke-width="1"/>
+  <text x="265" y="100" text-anchor="middle" font-size="9" fill="#1e293b">消息树 + 叶子指针</text>
+  <text x="265" y="115" text-anchor="middle" font-size="9" fill="#64748b">JSONL 只追加</text>
+  <rect x="380" y="78" width="220" height="50" rx="4" fill="#ecfdf5" stroke="#6ee7b7" stroke-width="1"/>
+  <text x="490" y="100" text-anchor="middle" font-size="9" fill="#1e293b">append-only 日志</text>
+  <text x="490" y="115" text-anchor="middle" font-size="9" fill="#64748b">读时过滤</text>
+  <rect x="605" y="78" width="220" height="50" rx="4" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="1"/>
+  <text x="715" y="100" text-anchor="middle" font-size="9" fill="#1e293b">窗口 id 链</text>
+  <text x="715" y="115" text-anchor="middle" font-size="9" fill="#64748b">+ world state</text>
+  <rect x="830" y="78" width="200" height="50" rx="4" fill="#fffbeb" stroke="#fcd34d" stroke-width="1"/>
+  <text x="930" y="100" text-anchor="middle" font-size="9" fill="#1e293b">事件日志</text>
+  <text x="930" y="115" text-anchor="middle" font-size="9" fill="#64748b">+ surface 折叠视图</text>
+  <rect x="1035" y="78" width="225" height="50" rx="4" fill="#fef2f2" stroke="#fca5a5" stroke-width="1"/>
+  <text x="1147" y="100" text-anchor="middle" font-size="9" fill="#1e293b">会话文件（本地）</text>
+  <text x="1147" y="115" text-anchor="middle" font-size="9" fill="#64748b">+ 服务端 cache_edits</text>
+
+  <!-- Row 2: 触发 -->
+  <rect x="20" y="131" width="130" height="50" rx="4" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="85" y="160" text-anchor="middle" font-size="10" font-weight="600" fill="#475569">触发</text>
+  <rect x="155" y="131" width="220" height="50" rx="4" fill="#eff6ff" stroke="#93c5fd" stroke-width="1"/>
+  <text x="265" y="153" text-anchor="middle" font-size="9" fill="#1e293b">run 结束阈值</text>
+  <text x="265" y="168" text-anchor="middle" font-size="9" fill="#64748b">窗口-预留 ≈984K</text>
+  <rect x="380" y="131" width="220" height="50" rx="4" fill="#ecfdf5" stroke="#6ee7b7" stroke-width="1"/>
+  <text x="490" y="153" text-anchor="middle" font-size="9" fill="#1e293b">threshold/overflow</text>
+  <text x="490" y="168" text-anchor="middle" font-size="9" fill="#64748b">/manual 三 reason</text>
+  <rect x="605" y="131" width="220" height="50" rx="4" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="1"/>
+  <text x="715" y="153" text-anchor="middle" font-size="9" fill="#1e293b">PreTurn + MidTurn</text>
+  <text x="715" y="168" text-anchor="middle" font-size="9" fill="#64748b">+ 换模型</text>
+  <rect x="830" y="131" width="200" height="50" rx="4" fill="#fffbeb" stroke="#fcd34d" stroke-width="1"/>
+  <text x="930" y="153" text-anchor="middle" font-size="9" fill="#1e293b">pressure(0.8)</text>
+  <text x="930" y="168" text-anchor="middle" font-size="9" fill="#64748b">+ context-overflow</text>
+  <rect x="1035" y="131" width="225" height="50" rx="4" fill="#fef2f2" stroke="#fca5a5" stroke-width="1"/>
+  <text x="1147" y="153" text-anchor="middle" font-size="9" fill="#1e293b">预留20k输出+13k缓冲</text>
+  <text x="1147" y="168" text-anchor="middle" font-size="9" fill="#64748b">失败3次熔断</text>
+
+  <!-- Row 3: 摘要生成 -->
+  <rect x="20" y="184" width="130" height="55" rx="4" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="85" y="216" text-anchor="middle" font-size="10" font-weight="600" fill="#475569">摘要生成</text>
+  <rect x="155" y="184" width="220" height="55" rx="4" fill="#eff6ff" stroke="#93c5fd" stroke-width="1"/>
+  <text x="265" y="206" text-anchor="middle" font-size="9" fill="#1e293b">LLM 结构化摘要</text>
+  <text x="265" y="221" text-anchor="middle" font-size="9" fill="#64748b">失败拼贴降级</text>
+  <rect x="380" y="184" width="220" height="55" rx="4" fill="#ecfdf5" stroke="#6ee7b7" stroke-width="1"/>
+  <text x="490" y="206" text-anchor="middle" font-size="9" fill="#1e293b">LLM 摘要</text>
+  <text x="490" y="221" text-anchor="middle" font-size="9" fill="#64748b">split-turn 特殊</text>
+  <rect x="605" y="184" width="220" height="55" rx="4" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="1"/>
+  <text x="715" y="201" text-anchor="middle" font-size="9" fill="#1e293b">三态：本地 memento</text>
+  <text x="715" y="216" text-anchor="middle" font-size="9" fill="#64748b">/ 远程 compact</text>
+  <text x="715" y="231" text-anchor="middle" font-size="9" fill="#64748b">/ TokenBudget 无摘要</text>
+  <rect x="830" y="184" width="200" height="55" rx="4" fill="#fffbeb" stroke="#fcd34d" stroke-width="1"/>
+  <text x="930" y="206" text-anchor="middle" font-size="9" fill="#1e293b">剪枝先行</text>
+  <text x="930" y="221" text-anchor="middle" font-size="9" fill="#64748b">→ LLM</text>
+  <rect x="1035" y="184" width="225" height="55" rx="4" fill="#fef2f2" stroke="#fca5a5" stroke-width="1"/>
+  <text x="1147" y="201" text-anchor="middle" font-size="9" fill="#1e293b">五段成本递增流水线</text>
+  <text x="1147" y="216" text-anchor="middle" font-size="9" fill="#64748b">前四段本地零API</text>
+  <text x="1147" y="231" text-anchor="middle" font-size="9" fill="#64748b">LLM 兜底</text>
+
+  <!-- Row 4: 保留策略 -->
+  <rect x="20" y="242" width="130" height="55" rx="4" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="85" y="274" text-anchor="middle" font-size="10" font-weight="600" fill="#475569">保留策略</text>
+  <rect x="155" y="242" width="220" height="55" rx="4" fill="#eff6ff" stroke="#93c5fd" stroke-width="1"/>
+  <text x="265" y="264" text-anchor="middle" font-size="9" fill="#1e293b">保留最近 N 条原文</text>
+  <text x="265" y="279" text-anchor="middle" font-size="9" fill="#64748b">定长</text>
+  <rect x="380" y="242" width="220" height="55" rx="4" fill="#ecfdf5" stroke="#6ee7b7" stroke-width="1"/>
+  <text x="490" y="264" text-anchor="middle" font-size="9" fill="#1e293b">原始 tail 20k tokens</text>
+  <text x="490" y="279" text-anchor="middle" font-size="9" fill="#64748b">retainedTail</text>
+  <rect x="605" y="242" width="220" height="55" rx="4" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="1"/>
+  <text x="715" y="264" text-anchor="middle" font-size="9" fill="#1e293b">只留用户消息 20k</text>
+  <text x="715" y="279" text-anchor="middle" font-size="9" fill="#64748b">assistant/tool 全丢</text>
+  <rect x="830" y="242" width="200" height="55" rx="4" fill="#fffbeb" stroke="#fcd34d" stroke-width="1"/>
+  <text x="930" y="264" text-anchor="middle" font-size="9" fill="#1e293b">比例制 retainRatio</text>
+  <text x="930" y="279" text-anchor="middle" font-size="9" fill="#64748b">0.16（窗口16%）</text>
+  <rect x="1035" y="242" width="225" height="55" rx="4" fill="#fef2f2" stroke="#fca5a5" stroke-width="1"/>
+  <text x="1147" y="264" text-anchor="middle" font-size="9" fill="#1e293b">脱水+九章节摘要</text>
+  <text x="1147" y="279" text-anchor="middle" font-size="9" fill="#64748b">+ 状态重注入</text>
+
+  <!-- Row 5: 切点约束 -->
+  <rect x="20" y="300" width="130" height="50" rx="4" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="85" y="329" text-anchor="middle" font-size="10" font-weight="600" fill="#475569">切点约束</text>
+  <rect x="155" y="300" width="220" height="50" rx="4" fill="#eff6ff" stroke="#93c5fd" stroke-width="1"/>
+  <text x="265" y="322" text-anchor="middle" font-size="9" fill="#1e293b">第一条 ≠ toolResult</text>
+  <text x="265" y="337" text-anchor="middle" font-size="9" fill="#64748b">API 400 教训</text>
+  <rect x="380" y="300" width="220" height="50" rx="4" fill="#ecfdf5" stroke="#6ee7b7" stroke-width="1"/>
+  <text x="490" y="322" text-anchor="middle" font-size="9" fill="#1e293b">turn 边界</text>
+  <text x="490" y="337" text-anchor="middle" font-size="9" fill="#64748b">+ split-turn</text>
+  <rect x="605" y="300" width="220" height="50" rx="4" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="1"/>
+  <text x="715" y="322" text-anchor="middle" font-size="9" fill="#1e293b">窗口记账纪元</text>
+  <text x="715" y="337" text-anchor="middle" font-size="9" fill="#64748b">非 turn 切点概念</text>
+  <rect x="830" y="300" width="200" height="50" rx="4" fill="#fffbeb" stroke="#fcd34d" stroke-width="1"/>
+  <text x="930" y="322" text-anchor="middle" font-size="9" fill="#1e293b">tool-pairing balance</text>
+  <text x="930" y="337" text-anchor="middle" font-size="9" fill="#64748b">任意线不拆对</text>
+  <rect x="1035" y="300" width="225" height="50" rx="4" fill="#fef2f2" stroke="#fca5a5" stroke-width="1"/>
+  <text x="1147" y="329" text-anchor="middle" font-size="9" fill="#64748b">—</text>
+
+  <!-- Row 6: 增量继承 -->
+  <rect x="20" y="353" width="130" height="50" rx="4" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="85" y="382" text-anchor="middle" font-size="10" font-weight="600" fill="#475569">增量继承</text>
+  <rect x="155" y="353" width="220" height="50" rx="4" fill="#eff6ff" stroke="#93c5fd" stroke-width="1"/>
+  <text x="265" y="382" text-anchor="middle" font-size="9" fill="#1e293b">previousSummary 递归</text>
+  <rect x="380" y="353" width="220" height="50" rx="4" fill="#ecfdf5" stroke="#6ee7b7" stroke-width="1"/>
+  <text x="490" y="375" text-anchor="middle" font-size="9" fill="#1e293b">previousSummary</text>
+  <text x="490" y="390" text-anchor="middle" font-size="9" fill="#64748b">+ details 文件清单</text>
+  <rect x="605" y="353" width="220" height="50" rx="4" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="1"/>
+  <text x="715" y="382" text-anchor="middle" font-size="9" fill="#1e293b">不递归（交接笔记）</text>
+  <rect x="830" y="353" width="200" height="50" rx="4" fill="#fffbeb" stroke="#fcd34d" stroke-width="1"/>
+  <text x="930" y="382" text-anchor="middle" font-size="9" fill="#1e293b">指令内合并单块</text>
+  <rect x="1035" y="353" width="225" height="50" rx="4" fill="#fef2f2" stroke="#fca5a5" stroke-width="1"/>
+  <text x="1147" y="382" text-anchor="middle" font-size="9" fill="#1e293b">不递归（同 codex）</text>
+
+  <!-- Row 7: 摘要请求缓存 -->
+  <rect x="20" y="406" width="130" height="50" rx="4" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="85" y="435" text-anchor="middle" font-size="10" font-weight="600" fill="#475569">摘要请求缓存</text>
+  <rect x="155" y="406" width="220" height="50" rx="4" fill="#eff6ff" stroke="#93c5fd" stroke-width="1"/>
+  <text x="265" y="428" text-anchor="middle" font-size="9" fill="#1e293b">独立请求</text>
+  <text x="265" y="443" text-anchor="middle" font-size="9" fill="#64748b">D1：不划算</text>
+  <rect x="380" y="406" width="220" height="50" rx="4" fill="#ecfdf5" stroke="#6ee7b7" stroke-width="1"/>
+  <text x="490" y="428" text-anchor="middle" font-size="9" fill="#1e293b">不进缓存</text>
+  <text x="490" y="443" text-anchor="middle" font-size="9" fill="#64748b">cacheRetention:none</text>
+  <rect x="605" y="406" width="220" height="50" rx="4" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="1"/>
+  <text x="715" y="428" text-anchor="middle" font-size="9" fill="#1e293b">复用 client_session</text>
+  <text x="715" y="443" text-anchor="middle" font-size="9" fill="#64748b">压缩中删最旧保前缀</text>
+  <rect x="830" y="406" width="200" height="50" rx="4" fill="#fffbeb" stroke="#fcd34d" stroke-width="1"/>
+  <text x="930" y="428" text-anchor="middle" font-size="9" fill="#1e293b">前缀复用</text>
+  <text x="930" y="443" text-anchor="middle" font-size="9" fill="#64748b">不失效 KV cache</text>
+  <rect x="1035" y="406" width="225" height="50" rx="4" fill="#fef2f2" stroke="#fca5a5" stroke-width="1"/>
+  <text x="1147" y="428" text-anchor="middle" font-size="9" fill="#1e293b">fork agent</text>
+  <text x="1147" y="443" text-anchor="middle" font-size="9" fill="#64748b">+ 共享 prompt cache</text>
+
+  <!-- Row 8: 健壮性 -->
+  <rect x="20" y="459" width="130" height="50" rx="4" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="85" y="488" text-anchor="middle" font-size="10" font-weight="600" fill="#475569">健壮性</text>
+  <rect x="155" y="459" width="220" height="50" rx="4" fill="#eff6ff" stroke="#93c5fd" stroke-width="1"/>
+  <text x="265" y="488" text-anchor="middle" font-size="9" fill="#1e293b">失败降级拼贴</text>
+  <rect x="380" y="459" width="220" height="50" rx="4" fill="#ecfdf5" stroke="#6ee7b7" stroke-width="1"/>
+  <text x="490" y="481" text-anchor="middle" font-size="9" fill="#1e293b">overflow 恢复</text>
+  <text x="490" y="496" text-anchor="middle" font-size="9" fill="#64748b">删失败消息重试</text>
+  <rect x="605" y="459" width="220" height="50" rx="4" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="1"/>
+  <text x="715" y="481" text-anchor="middle" font-size="9" fill="#1e293b">远程失败换模型</text>
+  <text x="715" y="496" text-anchor="middle" font-size="9" fill="#64748b">+ fallback prompt</text>
+  <rect x="830" y="459" width="200" height="50" rx="4" fill="#fffbeb" stroke="#fcd34d" stroke-width="1"/>
+  <text x="930" y="481" text-anchor="middle" font-size="9" fill="#1e293b">durable 锁</text>
+  <text x="930" y="496" text-anchor="middle" font-size="9" fill="#64748b">+ 六类错误码</text>
+  <rect x="1035" y="459" width="225" height="50" rx="4" fill="#fef2f2" stroke="#fca5a5" stroke-width="1"/>
+  <text x="1147" y="481" text-anchor="middle" font-size="9" fill="#1e293b">熔断+PTL剥洋葱</text>
+  <text x="1147" y="496" text-anchor="middle" font-size="9" fill="#64748b">降级</text>
+
+  <!-- Five key takeaways -->
+  <rect x="20" y="520" width="1240" height="90" rx="10" fill="#fffbeb" stroke="#fbbf24" stroke-width="1.5"/>
+  <text x="40" y="542" font-size="12" font-weight="700" fill="#92400e">五句话总结</text>
+  <text x="40" y="560" font-size="11" fill="#1e293b">1. 人人都禁 toolResult 作切点（三种实现强度，codex 用窗口纪元绕开）— API 契约是硬约束。</text>
+  <text x="40" y="575" font-size="11" fill="#1e293b">2. 保留什么 = 产品哲学：pi 保原文尾、codex 保用户消息尾、CC 保状态重建、DSH 比例制、我们定长 N 条。</text>
+  <text x="40" y="590" font-size="11" fill="#1e293b">3. 增量摘要不递归是潮流：pi 递归，codex/CC 显式不递归，DSH 指令内合并单块。</text>
+  <text x="640" y="560" font-size="11" fill="#1e293b">4. 缓存哲学两条路：pi"摘要隔离不进缓存" vs codex/DSH/CC"压缩尽量不伤前缀缓存"。</text>
+  <text x="640" y="575" font-size="11" fill="#1e293b">5. 零成本优先于摘要：DSH 剪枝、CC 五段流水线、codex TokenBudget — LLM 摘要是最后手段。</text>
+</svg>

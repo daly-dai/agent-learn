@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 450" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+  <defs>
+    <marker id="a14" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="640" y="28" text-anchor="middle" font-size="20" font-weight="700" fill="#1e293b">Claude Code：五段成本递增流水线（LLM 是最后兜底）</text>
+
+  <!-- Cost arrow -->
+  <line x1="40" y1="380" x2="1240" y2="380" stroke="#94a3b8" stroke-width="2" marker-end="url(#a14)"/>
+  <text x="1250" y="375" font-size="11" fill="#64748b">成本递增 →</text>
+  <text x="40" y="395" font-size="10" fill="#64748b">零 API</text>
+  <text x="1200" y="395" font-size="10" fill="#64748b">调 LLM</text>
+
+  <!-- Step 1: Budget Reduction -->
+  <rect x="30" y="300" width="220" height="70" rx="10" fill="#d1fae5" stroke="#22c55e" stroke-width="2"/>
+  <text x="140" y="325" text-anchor="middle" font-size="12" font-weight="700" fill="#15803d">Budget Reduction</text>
+  <text x="140" y="345" text-anchor="middle" font-size="10" fill="#166534">调整工具输出截断预算</text>
+  <text x="140" y="360" text-anchor="middle" font-size="10" fill="#166534">缩短工具结果上限</text>
+  <rect x="30" y="370" width="220" height="3" fill="#22c55e" opacity="0.3"/>
+
+  <!-- Step 2: Snip -->
+  <rect x="270" y="260" width="220" height="110" rx="10" fill="#d1fae5" stroke="#22c55e" stroke-width="2"/>
+  <text x="380" y="285" text-anchor="middle" font-size="12" font-weight="700" fill="#15803d">Snip</text>
+  <text x="380" y="305" text-anchor="middle" font-size="10" fill="#166534">截短旧工具输出</text>
+  <text x="380" y="320" text-anchor="middle" font-size="10" fill="#166534">留"做过什么"摘要行</text>
+  <text x="380" y="340" text-anchor="middle" font-size="10" fill="#166534">删除中间冗余</text>
+  <text x="380" y="360" text-anchor="middle" font-size="9" fill="#22c55e" font-style="italic">本地操作，零 API</text>
+
+  <!-- Step 3: Microcompact -->
+  <rect x="510" y="220" width="220" height="150" rx="10" fill="#d1fae5" stroke="#22c55e" stroke-width="2"/>
+  <text x="620" y="245" text-anchor="middle" font-size="12" font-weight="700" fill="#15803d">Microcompact</text>
+  <text x="620" y="265" text-anchor="middle" font-size="10" fill="#166534">工具输出局部内联压缩</text>
+  <text x="620" y="280" text-anchor="middle" font-size="10" fill="#166534">更精细的局部摘要</text>
+  <text x="620" y="295" text-anchor="middle" font-size="10" fill="#166534">替换冗长 tool result</text>
+  <text x="620" y="320" text-anchor="middle" font-size="9" fill="#22c55e" font-style="italic">本地操作</text>
+  <text x="620" y="335" text-anchor="middle" font-size="9" fill="#22c55e" font-style="italic">零 API 调用</text>
+
+  <!-- Step 4: Context Collapse -->
+  <rect x="750" y="180" width="220" height="190" rx="10" fill="#d1fae5" stroke="#22c55e" stroke-width="2"/>
+  <text x="860" y="205" text-anchor="middle" font-size="12" font-weight="700" fill="#15803d">Context Collapse</text>
+  <text x="860" y="225" text-anchor="middle" font-size="10" fill="#166534">更久远历史</text>
+  <text x="860" y="240" text-anchor="middle" font-size="10" fill="#166534">细粒度折叠</text>
+  <text x="860" y="255" text-anchor="middle" font-size="10" fill="#166534">多层消息合并</text>
+  <text x="860" y="275" text-anchor="middle" font-size="10" fill="#166534">旧消息→精简表示</text>
+  <text x="860" y="310" text-anchor="middle" font-size="9" fill="#22c55e" font-style="italic">本地操作</text>
+  <text x="860" y="325" text-anchor="middle" font-size="9" fill="#22c55e" font-style="italic">零 API 调用</text>
+  <text x="860" y="355" text-anchor="middle" font-size="9" fill="#22c55e" font-style="italic">多数会话走不到这</text>
+
+  <!-- Step 5: Auto-Compact -->
+  <rect x="990" y="130" width="250" height="240" rx="10" fill="#fef3c7" stroke="#f59e0b" stroke-width="2.5"/>
+  <text x="1115" y="155" text-anchor="middle" font-size="12" font-weight="700" fill="#b45309">Auto-Compact</text>
+  <text x="1115" y="175" text-anchor="middle" font-size="10" fill="#92400e">LLM 生成结构化摘要</text>
+  <text x="1115" y="190" text-anchor="middle" font-size="10" fill="#92400e">九章节摘要</text>
+  <text x="1115" y="205" text-anchor="middle" font-size="10" fill="#92400e">+ 状态重注入</text>
+  <text x="1115" y="220" text-anchor="middle" font-size="10" fill="#92400e">（文件/Plan/skill/工具）</text>
+  <text x="1115" y="250" text-anchor="middle" font-size="9" fill="#f59e0b" font-style="italic">⚠ 唯一调 LLM 的步骤</text>
+  <text x="1115" y="265" text-anchor="middle" font-size="9" fill="#f59e0b" font-style="italic">fork agent + 共享 cache</text>
+  <text x="1115" y="295" text-anchor="middle" font-size="9" fill="#92400e">预留 20k 输出 + 13k 缓冲</text>
+  <text x="1115" y="310" text-anchor="middle" font-size="9" fill="#92400e">连续失败 3 次 → 熔断</text>
+  <text x="1115" y="345" text-anchor="middle" font-size="9" fill="#92400e" font-style="italic">PTL 兜底：剥 20% 重试</text>
+
+  <!-- Divider line: 前4段 vs 第5段 -->
+  <line x1="975" y1="60" x2="975" y2="375" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="5,4"/>
+  <rect x="850" y="50" width="120" height="22" rx="11" fill="#22c55e"/>
+  <text x="910" y="65" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">本地零 API</text>
+  <rect x="1000" y="50" width="120" height="22" rx="11" fill="#f59e0b"/>
+  <text x="1060" y="65" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">调 LLM</text>
+
+  <!-- Key insight -->
+  <rect x="20" y="400" width="1240" height="40" rx="8" fill="#fffbeb" stroke="#fbbf24" stroke-width="1.5"/>
+  <text x="640" y="424" text-anchor="middle" font-size="12" fill="#92400e">设计意图：能用免费手段释放的空间，不花钱买。多数会话根本走不到 LLM 摘要 — 前四段全是本地操作，零 API 调用。</text>
+</svg>

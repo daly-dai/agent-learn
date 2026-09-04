@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 520" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+  <defs>
+    <marker id="a6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="640" y="32" text-anchor="middle" font-size="20" font-weight="700" fill="#1e293b">DSH 三件套：session / log / surface（不是平级，是"包含"）</text>
+
+  <!-- Session outer box -->
+  <rect x="140" y="55" width="1000" height="340" rx="16" fill="#f8fafc" stroke="#6366f1" stroke-width="2.5" stroke-dasharray="8,4"/>
+  <rect x="140" y="55" width="1000" height="36" rx="16" fill="#6366f1"/>
+  <rect x="140" y="73" width="1000" height="18" fill="#6366f1"/>
+  <text x="640" y="78" text-anchor="middle" font-size="15" font-weight="700" fill="#ffffff">Session（一个会话 = 一个对象，活在内存里）— "盒子"</text>
+
+  <!-- header -->
+  <rect x="170" y="105" width="280" height="60" rx="10" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
+  <text x="310" y="128" text-anchor="middle" font-size="13" font-weight="700" fill="#475569">header</text>
+  <text x="310" y="148" text-anchor="middle" font-size="11" fill="#64748b">元数据：id / cwd / 谱系 lineage / 创建时间</text>
+
+  <!-- log -->
+  <rect x="170" y="180" width="400" height="195" rx="10" fill="#fef3c7" stroke="#f59e0b" stroke-width="2.5"/>
+  <rect x="170" y="180" width="400" height="30" rx="10" fill="#f59e0b"/>
+  <rect x="170" y="195" width="400" height="15" fill="#f59e0b"/>
+  <text x="370" y="200" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">log（唯一真相，append-only）</text>
+
+  <text x="185" y="228" font-size="11" font-weight="600" fill="#92400e">private log: SessionEvent[]</text>
+  <text x="185" y="248" font-size="11" fill="#92400e">一行一个事件：</text>
+  <text x="185" y="268" font-size="11" fill="#92400e">  user/message、assistant/message</text>
+  <text x="185" y="288" font-size="11" fill="#92400e">  tool/result、turn/start</text>
+  <text x="185" y="308" font-size="11" fill="#92400e">  compaction/start、compaction/summary…</text>
+  <text x="185" y="340" font-size="11" font-weight="600" fill="#b45309">永不删 — 所有事件（含被压的）都在</text>
+  <text x="185" y="358" font-size="10" fill="#92400e" font-style="italic">类比：总账本，每一笔记录都在</text>
+
+  <!-- surface -->
+  <rect x="600" y="180" width="400" height="195" rx="10" fill="#dbeafe" stroke="#3b82f6" stroke-width="2.5"/>
+  <rect x="600" y="180" width="400" height="30" rx="10" fill="#3b82f6"/>
+  <rect x="600" y="195" width="400" height="15" fill="#3b82f6"/>
+  <text x="800" y="200" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">surfaceManager（折叠视图）</text>
+
+  <text x="615" y="228" font-size="11" font-weight="600" fill="#1d4ed8">session.surface（getter）</text>
+  <text x="615" y="250" font-size="11" fill="#1e40af">├── nodes: number[]</text>
+  <text x="730" y="250" font-size="10" fill="#64748b">← 可见 seq 索引列表</text>
+  <text x="615" y="272" font-size="11" fill="#1e40af">├── replaceGeneration</text>
+  <text x="765" y="272" font-size="10" fill="#64748b">← 替换版本号</text>
+  <text x="615" y="294" font-size="11" fill="#1e40af">└── _lastProcessedSeq</text>
+  <text x="800" y="294" font-size="10" fill="#64748b">← 增量折叠进度</text>
+  <text x="615" y="328" font-size="11" font-weight="600" fill="#1d4ed8">不是数据副本，是索引 + 折叠状态</text>
+  <text x="615" y="348" font-size="11" fill="#1e40af">读时 log[seq] 取出事件本体</text>
+  <text x="615" y="362" font-size="10" fill="#1d4ed8" font-style="italic">类比：展示架上摆着的编号清单</text>
+
+  <!-- Connection: surface references log -->
+  <line x1="600" y1="278" x2="570" y2="278" stroke="#6366f1" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#a6)"/>
+  <text x="585" y="270" text-anchor="middle" font-size="9" fill="#6366f1">引用</text>
+
+  <!-- Bottom: key insights -->
+  <rect x="20" y="410" width="1240" height="95" rx="10" fill="#fffbeb" stroke="#fbbf24" stroke-width="1.5"/>
+  <text x="40" y="435" font-size="13" font-weight="700" fill="#92400e">三个关键认知</text>
+  <circle cx="35" cy="458" r="4" fill="#f59e0b"/>
+  <text x="48" y="462" font-size="12" fill="#1e293b">log 和 surface 都是 session 的零件 — session = 容器，log = 内容物，surface = 容器里的"当前展示清单"</text>
+  <circle cx="35" cy="478" r="4" fill="#f59e0b"/>
+  <text x="48" y="482" font-size="12" fill="#1e293b">log 是唯一真相：所有事件（含被压缩掉的、被遮蔽的）都在 log 里，永不删</text>
+  <circle cx="35" cy="498" r="4" fill="#f59e0b"/>
+  <text x="48" y="502" font-size="12" fill="#1e293b">surface 不是数据副本，是索引 + 折叠状态：只存"现在该看哪些 seq"，消息本体还在 log</text>
+</svg>

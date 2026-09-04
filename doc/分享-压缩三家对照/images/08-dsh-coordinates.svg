@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 480" font-family="'Segoe UI','Microsoft YaHei','PingFang SC',sans-serif">
+  <defs>
+    <marker id="a8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="640" y="30" text-anchor="middle" font-size="20" font-weight="700" fill="#1e293b">DSH 两个坐标系：seq（log 下标）vs 表面位置（surface index）</text>
+
+  <!-- Log view (top) -->
+  <rect x="20" y="55" width="1240" height="130" rx="12" fill="#fffbeb" stroke="#fcd34d" stroke-width="1.5"/>
+  <rect x="20" y="55" width="1240" height="30" rx="12" fill="#f59e0b"/>
+  <rect x="20" y="70" width="1240" height="15" fill="#f59e0b"/>
+  <text x="640" y="75" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">log 视角（seq，单调递增）</text>
+
+  <!-- Log entries -->
+  <text x="40" y="108" font-size="10" fill="#92400e">seq:</text>
+  <!-- msg1..msg9 -->
+  <rect x="70" y="92" width="40" height="24" rx="4" fill="#d1fae5" stroke="#10b981" stroke-width="1"/>
+  <text x="90" y="107" text-anchor="middle" font-size="9" fill="#047857">msg1</text>
+  <text x="90" y="124" text-anchor="middle" font-size="8" fill="#64748b">seq=1</text>
+
+  <rect x="115" y="92" width="40" height="24" rx="4" fill="#d1fae5" stroke="#10b981" stroke-width="1"/>
+  <text x="135" y="107" text-anchor="middle" font-size="9" fill="#047857">msg2</text>
+  <text x="135" y="124" text-anchor="middle" font-size="8" fill="#64748b">seq=2</text>
+
+  <text x="165" y="107" font-size="10" fill="#94a3b8">…</text>
+
+  <rect x="180" y="92" width="40" height="24" rx="4" fill="#d1fae5" stroke="#10b981" stroke-width="1"/>
+  <text x="200" y="107" text-anchor="middle" font-size="9" fill="#047857">msg9</text>
+  <text x="200" y="124" text-anchor="middle" font-size="8" fill="#64748b">seq=9</text>
+
+  <!-- 保留区 -->
+  <rect x="230" y="92" width="200" height="24" rx="4" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="330" y="107" text-anchor="middle" font-size="10" font-weight="600" fill="#15803d">保留区（msg10~109）</text>
+  <text x="330" y="124" text-anchor="middle" font-size="8" fill="#64748b">seq=10~109</text>
+
+  <!-- compaction events -->
+  <rect x="440" y="92" width="60" height="24" rx="4" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="470" y="107" text-anchor="middle" font-size="9" fill="#b45309">start</text>
+  <text x="470" y="124" text-anchor="middle" font-size="8" fill="#64748b">seq=200</text>
+
+  <rect x="510" y="92" width="60" height="24" rx="4" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="540" y="107" text-anchor="middle" font-size="9" fill="#b45309">summary</text>
+  <text x="540" y="124" text-anchor="middle" font-size="8" fill="#64748b">seq=201</text>
+
+  <rect x="580" y="92" width="80" height="24" rx="4" fill="#dbeafe" stroke="#3b82f6" stroke-width="2.5"/>
+  <text x="620" y="107" text-anchor="middle" font-size="9" font-weight="700" fill="#1d4ed8">检查点</text>
+  <text x="620" y="124" text-anchor="middle" font-size="8" fill="#64748b">seq=203</text>
+
+  <rect x="670" y="92" width="50" height="24" rx="4" fill="#fef3c7" stroke="#f59e0b" stroke-width="1.5"/>
+  <text x="695" y="107" text-anchor="middle" font-size="9" fill="#b45309">end</text>
+  <text x="695" y="124" text-anchor="middle" font-size="8" fill="#64748b">seq=204</text>
+
+  <!-- Annotation: old data stays -->
+  <rect x="740" y="88" width="500" height="32" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="750" y="108" font-size="11" fill="#64748b">seq 1~100 被压的消息仍在文件里（log 永不删），检查点 append 在末尾</text>
+
+  <!-- Arrow connecting top and bottom -->
+  <path d="M 620 140 L 620 165 L 620 190" fill="none" stroke="#8b5cf6" stroke-width="2.5" marker-end="url(#a8)" stroke-dasharray="5,3"/>
+  <text x="640" y="165" font-size="11" font-weight="600" fill="#8b5cf6">同一个东西，两个坐标系</text>
+
+  <!-- Surface view (bottom) -->
+  <rect x="20" y="200" width="1240" height="120" rx="12" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+  <rect x="20" y="200" width="1240" height="30" rx="12" fill="#3b82f6"/>
+  <rect x="20" y="215" width="1240" height="15" fill="#3b82f6"/>
+  <text x="640" y="220" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">surface 视角（位置 index）</text>
+
+  <!-- Surface entries -->
+  <text x="40" y="252" font-size="10" fill="#1d4ed8">pos:</text>
+
+  <rect x="70" y="235" width="80" height="28" rx="6" fill="#dbeafe" stroke="#3b82f6" stroke-width="2.5"/>
+  <text x="110" y="253" text-anchor="middle" font-size="10" font-weight="700" fill="#1d4ed8">检查点</text>
+  <text x="110" y="268" text-anchor="middle" font-size="8" fill="#64748b">pos=0, seq=203</text>
+
+  <rect x="160" y="235" width="400" height="28" rx="6" fill="#dcfce7" stroke="#22c55e" stroke-width="1.5"/>
+  <text x="360" y="253" text-anchor="middle" font-size="10" font-weight="600" fill="#15803d">保留区（msg10~109）</text>
+  <text x="360" y="268" text-anchor="middle" font-size="8" fill="#64748b">pos=1~100, seq=10~109</text>
+
+  <!-- Annotation -->
+  <rect x="580" y="235" width="330" height="28" rx="6" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+  <text x="590" y="253" font-size="11" fill="#64748b">检查点顶替被压区间、站在 pos=0</text>
+
+  <!-- Key insight: start can be > end -->
+  <rect x="930" y="235" width="320" height="28" rx="6" fill="#fef2f2" stroke="#fca5a5" stroke-width="1"/>
+  <text x="940" y="253" font-size="10" fill="#991b1b">第二次压缩：start(seq=203) > end(seq=50)</text>
+
+  <!-- Digital account -->
+  <rect x="20" y="340" width="1240" height="130" rx="10" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+  <text x="40" y="365" font-size="14" font-weight="700" fill="#475569">一次压缩的数字账（200 条对话为例）</text>
+
+  <!-- Table header -->
+  <rect x="40" y="375" width="400" height="26" rx="4" fill="#e2e8f0"/>
+  <text x="240" y="392" text-anchor="middle" font-size="11" font-weight="600" fill="#475569"></text>
+  <rect x="445" y="375" width="380" height="26" rx="4" fill="#fef3c7"/>
+  <text x="635" y="392" text-anchor="middle" font-size="11" font-weight="600" fill="#b45309">压缩前</text>
+  <rect x="830" y="375" width="380" height="26" rx="4" fill="#d1fae5"/>
+  <text x="1020" y="392" text-anchor="middle" font-size="11" font-weight="600" fill="#15803d">压缩后</text>
+
+  <!-- Row 1: log -->
+  <text x="240" y="420" text-anchor="middle" font-size="11" fill="#1e293b">log 条数（文件）</text>
+  <text x="635" y="420" text-anchor="middle" font-size="11" fill="#1e293b">200</text>
+  <text x="1020" y="420" text-anchor="middle" font-size="11" font-weight="700" fill="#b45309">204（200 旧 + 4 压缩事件，1~100 还在）</text>
+
+  <!-- Row 2: surface -->
+  <text x="240" y="448" text-anchor="middle" font-size="11" fill="#1e293b">surface 节点数（模型可见）</text>
+  <text x="635" y="448" text-anchor="middle" font-size="11" fill="#1e293b">200</text>
+  <text x="1020" y="448" text-anchor="middle" font-size="11" font-weight="700" fill="#15803d">101（1 检查点 + 100 保留区）</text>
+
+  <text x="640" y="465" text-anchor="middle" font-size="10" font-style="italic" fill="#64748b">"101"是 surface 的（可见节点数），"204"是 log 的（文件条数）——两个数字别混</text>
+</svg>
