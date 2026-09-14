@@ -129,24 +129,40 @@ type TraceEntry = {
 
 ### 3.1 数据层（三处改动）
 
-**① trace 加 `sessionId`**
+**① 轨迹文件按会话归属（本方案的地基，2026-09-14 用户拍板）**
 
-```ts
-// lib/trace.ts
-static create(dir: string, model: string, sessionId: string): TraceRecorder
-// 写进 trace_start 行
-```
-调用点 `_pipeline/context.ts:63` 已经有 `sessionId` 在手，**一行透传**。不碰红线（红线是 `lib/agent/index.ts`）。
+现状：`.traces/run_<时间戳>_<随机>.jsonl`——**一个 run 一个文件，而且文件里没有任何字段说明它属于哪个会话**（实测现有 154 个文件的 `trace_start` 只有 `runId` / `model` / `ts`）。所以"打开某个会话的轨迹"今天**不是慢，是不存在**：没有任何索引能回答"这个 run 是谁的"。
+
+**形状 = 方案 C：`.traces/<sessionId>.<runId>.jsonl`**
+
+- 沿用项目**既有约定**：同一会话的兄弟文件用**文件名**表达，不是目录。先例就在隔壁——`.sessions/<sessionId>.jsonl` + `.sessions/<sessionId>.approval.jsonl`（B1 审批日志）
+- **列某会话的轨迹 = `readdir` + 前缀过滤 → 0 次文件内容读取**（.traces 现在 154 文件 / 25MB / 单个最大 1.15MB，逐个读头是不可接受的）
+- `isValidSessionId` = `/^[a-zA-Z0-9_-]+$/` **不含 `.`**，所以"首个 `.` 之前"就是会话 id，解析无歧义
+- **一个 run 一个文件 → 单文件不会无界增长**（上限就是单次 run 的量级），验收标准里"打开 877KB 不卡"才是按正确上限估的
+
+**为什么不选方案 B（`.traces/<sessionId>/<runId>.jsonl`）**：给 trace 引入一个**会话层自己都没有的目录层级**（`.sessions/` 平铺、53 个文件、0 个子目录），会让"同会话文件族"出现两种心智模型。
+
+**为什么不选方案 D（`.traces/<sessionId>.jsonl`，一个会话一个文件）**：它跟 `.sessions/<sessionId>.jsonl` 完全同名同构、最"对称"（DSH 正是这个形状——它的"轨迹"就是会话日志本身，所以根本不需要"run 属于谁"这个绑定），但它把 `.sessions/` 那个**正在被 C18 诊断为待修**的形状（单文件只追加、无界增长）又复制一层到 trace 上。**在准备修的病的形状上再盖一层，不合适。**
+
+**⭐ 不在 `trace_start` 里加 `sessionId` 字段（有意为之）**：文件名已经是唯一真相，再加一个字段就是**第二个真相**，两者可能漂移——这个项目已经栽过两次同类跟头（`header.version` 从不被读、`TraceSnapshot` 无人传），教训是"**结构不会忘，字段会忘**"。归属用**文件名**（结构）表达，runId 仍在 `trace_start` 里（本来就有）——这样 `readdir` 拿会话、读首行拿 runId，两边各有一份真相、互不重复。
+
+**⚠️ 与"按工作目录分组"的关系（2026-09-14 用户指出："会话也没分组，你现在开始 trace 分组了"）**：分组是**路径**问题、C18 是**文件内容**问题，**两者正交**，不会因为 C18 改了格式而白做；分组所需的 `cwd` **现成写在会话文件头里**（`{"type":"session","version":1,"id":...,"cwd":"E:\\..."}`），老会话也迁移得动。**分组迟早要做（用户定），但排在 A3 之后、并进 C18 的 A 档**（理由：C18 A 档本来就是"`list()` 只读文件头"，跟分组要"列目录 + 读头拿 cwd"是同一段代码，改两次不如改一次）。分组落地后本层形状变成 `.traces/<project>/<sessionId>.<runId>.jsonl`。
+
+**⭐ A3 与路径布局的耦合面：只有一处**。把 A3 的每层过一遍——折叠层收 `TraceRun[]`、`TraceRecorder` 的目录由调用方传入、视图收 `TraceFold`、tab 接线只是切显示，**全都与布局无关**；唯一受影响的是"给定 sessionId 找到它的轨迹文件"。所以先做完 A3 不会白做，**但那个函数要单独放成 `lib/trace-files.ts`**——这不是为分组预挖参数（那是"预挖空壳"），而是它本身就是一个内聚单元（会话 → 轨迹文件），分组时只改它的内部实现、签名不变。
+
+**①-b 调用点**：`TraceRecorder.create(dir, model)` 的 `dir` 由 `_pipeline/context.ts:63` 传入，改成传**文件基底名**（或把 sessionId 一起传进去拼文件名）。`sessionId` 在 `createRequestContext(params)` 里已经在手，**一行透传**。不碰红线（红线是 `lib/agent/index.ts`）。
 
 **② 两层读取（性能关键）**
 
 | 函数 | 读什么 | 用途 |
 |---|---|---|
-| `readTraceMeta(filePath)`（新） | **首行 + 尾行**（runId / model / ts / sessionId / messages / error） | 列表与聚合，**不解析全部** |
+| `readTraceMeta(filePath)`（新） | **首行 + 尾行**（首行：runId / model / ts；尾行：是否是 `trace_end`） | 列表与聚合，**不解析全部** |
 | `readTrace(filePath)`（已有，不动） | 全部条目 | 详情回放 |
 | `readTraceWindow(filePath, fromSeq, count)`（新，可选） | 某 seq 窗口 | 按需加载某一轮 |
 
-> ⚠️ **`readTrace()` 会跳过 `trace_start` 行**——所以 sessionId 只写在首行的话，读 entries 时拿不到。这正是 `readTraceMeta` 存在的理由。
+> ⚠️ **`readTrace()` 会跳过 `trace_start` / `trace_end` 两行元信息**（`lib/trace.ts:121` 的过滤条件）——所以"这个 run 是正常结束还是中途崩了"这个信息**只有读末行才知道**，`readTrace` 给不了。这正是 `readTraceMeta` 存在的理由：**尾行是不是 `trace_end`，就是 run 完整性的判据**（服务崩掉的文件尾部没有 `trace_end`，界面上该标出来而不是假装正常）。
+>
+> 实现注意：**"只读首末行"不等于 `readFile` 后 `split("\n")[0]`**——那还是把 1MB 全读进来了。要真的只读首末：首行读文件头一小段（~1KB），尾行走 `fstat` 拿 size 再从末尾读一小段。
 
 **③ 会话级坐标（解决多 run seq 重复）**
 
@@ -172,6 +188,7 @@ static create(dir: string, model: string, sessionId: string): TraceRecorder
 | 动作 | 路径 |
 |---|---|
 | **新增** | `lib/trace.ts` 扩展（sessionId + meta + window） |
+| **新增** | `lib/trace-files.ts`（**会话 → 轨迹文件的唯一耦合点**：`readdir` + 前缀过滤列出某会话的轨迹；分组落地时只改它的内部实现） |
 | **新增** | `app/api/traces/route.ts`（按 sessionId 列 run 的 meta） |
 | **新增** | `app/api/traces/[runId]/route.ts`（读一个 run 的 entries/window） |
 | **新增** | `app/lib/trace-steps/`（纯函数：`TraceEntry[]` → 记录 + 大纲 + 会话级坐标）**← 单测挂这里**（`index.ts` + `index.test.ts`，AGENTS.md 6.5 硬规则） |
@@ -179,7 +196,7 @@ static create(dir: string, model: string, sessionId: string): TraceRecorder
 | **删除（阶段 1 就做）** | `TraceSnapshot` 死类型（`lib/trace.ts`）+ 详案里的对应段落 |
 | **保留代码 / 断开接线（阶段 1）** | `app/components/trace-rail/`（整目录）+ `app/lib/trace-fold.ts` **文件留在仓库**，但从 `page.tsx` **移除渲染与它专属的接线**（`import` / `<TraceRail>` / `rows` useMemo / `traceRef` / 吸附滚动）——留作**回滚能力**，不占页面 |
 | **整体删除（阶段 2：新功能稳定后）** | 上面两个文件一起删，**不拆散** |
-| **修改** | `app/page.tsx`（tab 状态 + 换组件）、`_pipeline/context.ts`（透传 sessionId）、`globals.css`（注释） |
+| **修改** | `lib/trace.ts`（文件名带会话前缀）、`_pipeline/context.ts`（透传 sessionId 拼文件名）、`app/page.tsx`（tab 状态 + 换组件）、`globals.css`（注释） |
 
 > **为什么删 `TraceSnapshot`**：事件协议里**早就有** `tool_execution_start.args` / `tool_execution_end.result` / `tool_permission.*` / `message.usage` / `compaction.*`——快照字段是**过度设计**（提前设计了，结果没人用）。这是个教学点。
 
@@ -191,6 +208,9 @@ static create(dir: string, model: string, sessionId: string): TraceRecorder
 2. **「跳到下一个错误」**（同编译器的"下一个错误"）
 3. 每条记录展开看**输入 / 输出原文**（这是找出"入参就已经错了"的唯一途径——对话界面看不到工具参数）
 4. 抄 `session-query` 的 **`traceEvent` 事件关系**：`replacedBy` / `replacementChain` → **压缩的替换链**（旧消息被摘要替换，能追出来）
+5. **run 级失败也要落盘**（2026-09-14 施工中发现并接上）：`app/api/chat/route.ts` 的 `catch` 原来**只把错误发给 SSE、不记轨迹**；而 `finally` 无论如何都会执行 → 仍然写 `trace_end` → **崩掉的 run 和跑成功的 run 在轨迹文件里长得一模一样**，而 `runPipeline` 自己没有 try/catch（`_pipeline/` 只 `recorder.record(AgentEvent)`），所以抛异常型失败在轨迹里**零痕迹**。修法 3 行：`let runError` → catch 里记下 → `recorder.end({ messages, error: runError })`（`JSON.stringify` 丢掉 `undefined` 的键，正常收尾不会多出字段）。
+   - **⚠️ 两个语义必须分开**：`completed` = **文件写完了**（末行是不是 `trace_end`）；`summary.error` = **这次运行跑得怎么样**。崩掉的 run 是 "**`completed: true` + `error: "..."`**"——文件的完整性没问题，是这次运行失败了。不要把它们混成一个"状态"。
+   - 顺带：这 3 行让 `TraceMeta.summary.error` 从"**预留字段**"变成有使用路径的字段——否则本次提交就等于又造了一个 `header.version` / `TraceSnapshot`（同类病：写了、没人保证它对）。
 
 ## 5. 验收标准
 
@@ -209,7 +229,10 @@ static create(dir: string, model: string, sessionId: string): TraceRecorder
 
 ## 6. 风险 / 待定
 
-- **会话级坐标的具体形式**（`runIndex:seq` vs 重编号 `globalSeq`）——动手时定，`trace-steps.ts` 里可测
+- ~~**会话级坐标的具体形式**~~ ✅ **已定并落地**：`runIndex:seq`（`app/lib/trace-steps/index.ts`，12 用例覆盖跨 run 唯一 + 排序）；`globalSeq` 重编号方案不采用——它需要先把所有 run 读全才能编号，与"列表不读内容"直接冲突
+- **⚠️ 归属不写进字段、只写进文件名**（2026-09-14 定）：代价是**文件被单独拷走就丢了会话归属**。接受——调试黑盒本来就是"要拷就带着 runId（首行有）回去找原文件"；换来的是不出现"文件名与字段两个真相"。**若将来改主意，这是唯一要翻的决策点**
+- **⚠️ `readTraceMeta` 的"只读首末行"必须真的只读首末行**：`readFile` + `split("\n")[0]` 是最容易写出的假实现（1MB 还是全读进来了）。首行走文件头 ~1KB、尾行走 `fstat` + 从末尾读——这两步要单独测
+- **老 154 个 trace 文件归不到会话**（`trace_start` 里没有 sessionId，且**补不回来**）：不迁移、不删，读取时"文件名解析不出合法 sessionId 就跳过"。**不是选型变量**（A/B/C/D 四种方案下都一样）
 - **时间概览（Overview）一期做不做**：DSH 的是一条可拖选/缩放的时间轴。建议**一期先不做**，先出"记录表 + 检查器"，概览二期
 - **`trace-rail` 的回滚路径**（2026-09-14 用户定"代码保留、页面不展示"）：文件留在仓库，恢复 = 重接 `page.tsx` 那几行（组件 API 未变，git 历史里有原接线）。**代价**：仓库里会有一段时间的"未使用组件"——靠**阶段 2 整体删除**收口，别忘了
 - **沙箱限制**：vitest 跑不了（vite 8 spawn 触发命名管道 EPERM），单测写完需本地跑
