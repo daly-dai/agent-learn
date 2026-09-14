@@ -134,6 +134,11 @@ export async function POST(req: NextRequest) {
       // 客户端断开感知：标签页/浏览器关闭时，Next.js 会 abort 请求信号。
       req.signal.addEventListener("abort", finalizeRun);
 
+      // run 级失败：抛异常时只发 SSE 是不够的——轨迹文件才是事后回放的依据。
+      // 记在这里、在 finally 交给 recorder.end()，否则一个崩掉的 run 在轨迹里
+      // 和跑成功的 run 长得一模一样（catch 之后仍会走到 finally 写 trace_end）。
+      let runError: string | undefined;
+
       try {
         // 0) run 级取消：注册 AbortController（停止按钮通过 /api/chat/stop 触发）
         const abortController = new AbortController();
@@ -157,7 +162,8 @@ export async function POST(req: NextRequest) {
           beforeToolCall: (call) => handleToolApproval(call, send, sessionId),
         });
       } catch (e) {
-        send({ type: "error", message: (e as Error).message });
+        runError = (e as Error).message;
+        send({ type: "error", message: runError });
       } finally {
         // run 结束（正常/出错/被停止）：注销取消句柄 + 清理该 run 的挂起提问。
         // 用 finalizeRun 收口（含移除 abort 监听器），和客户端断开路径一致，
@@ -165,7 +171,10 @@ export async function POST(req: NextRequest) {
         req.signal.removeEventListener("abort", finalizeRun);
         finalizeRun();
         runControllers.delete(recorder.runId);
-        await recorder.end({ messages: recorder.entries.length });
+        // error 只在失败时带（JSON.stringify 会丢掉 undefined 的键）。
+        // completed 与 summary.error 是两件事：前者 = 文件写完了，
+        // 后者 = 这次运行跑得怎么样——崩掉的 run 是「文件完整 + 有 error」。
+        await recorder.end({ messages: recorder.entries.length, error: runError });
         controller.close();
       }
     },

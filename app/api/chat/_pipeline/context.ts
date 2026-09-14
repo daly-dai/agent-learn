@@ -60,7 +60,7 @@ export async function createRequestContext(params: {
     params.workspaceRoot,
     params.sessionId,
   );
-  const recorder = TraceRecorder.create(params.traceDir, params.modelLabel);
+  const recorder = TraceRecorder.create(params.traceDir, params.modelLabel, params.sessionId);
   await recorder.init();
   return { store, recorder };
 }
