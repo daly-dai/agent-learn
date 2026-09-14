@@ -60,7 +60,12 @@ export { generateSummary } from "./summarize";
 
 // 运行控制 / 轨迹 / 审批 / 提问（内核侧状态与能力）
 export { runControllers } from "./runControl";
-export { TraceRecorder } from "./trace";
+// 轨迹（A3）：TraceRecorder 写；readTrace / readTraceMeta 读单个文件；
+// listTraceFiles 把"某个会话的轨迹文件"定位出来（唯一与布局耦合的模块）
+export { TraceRecorder, readTrace, readTraceMeta } from "./trace";
+export type { TraceEntry, TraceMeta } from "./trace";
+export { listTraceFiles } from "./trace-files";
+export type { TraceFile } from "./trace-files";
 export { getApprovalMode, setApprovalMode } from "./approvalMode";
 export { toolApprovals } from "./toolApproval";
 export { userAnswers, makeAskKey, clearRun } from "./userAnswers";
