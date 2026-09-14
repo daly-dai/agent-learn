@@ -277,34 +277,10 @@ function RepoDetail({
         )}
       </div>
 
-      {!repo.isGit ? (
-        <p className={styles.hint}>zip 快照（无 git 历史），不支持更新。</p>
-      ) : state.error ? (
-        <p className={styles.resultError}>{state.error}</p>
-      ) : state.result ? (
-        state.result.updated ? (
-          state.result.summary?.degraded ? (
-            <>
-              <p className={styles.hint}>
-                未生成 LLM 总结（未配置 API key 或调用失败），仅列出提交。
-              </p>
-              <CommitFold commits={state.result.commits} />
-            </>
-          ) : (
-            <SummaryBlock
-              markdown={state.result.summary?.text ?? ""}
-              commits={state.result.commits}
-              label="本轮更新"
-            />
-          )
-        ) : (
-          <p className={styles.hint}>已是最新，无新增提交。</p>
-        )
-      ) : (
-        // 没有本轮更新时：不显示空 hint——重点标注直接来自历史（下面时间线）。
-        // 用户核心诉求：进页面就要看到重点标注，而不是一句"点更新"。
-        null
-      )}
+      {/* 本轮更新结果区（B17⑤：五层嵌套三元 → 平铺提前 return 示范。
+          状态分支互斥且有清晰顺序：非 git → 错误 → 无结果 → 已最新 →
+          降级 → 正常。提前 return 让每个分支自成一屏，比嵌套三元可读。 */}
+      <UpdateBody repo={repo} state={state} />
 
       {/* 历史时间线：全部落盘日志（倒序，最新在前）。
           ⭐重点标注是主内容，永远展开——用户最想看的，进页面就可见。
@@ -327,6 +303,47 @@ function RepoDetail({
         </section>
       )}
     </div>
+  );
+}
+
+/** 本轮更新结果区：平铺 if/return（B17⑤），替代五层嵌套三元 */
+function UpdateBody({
+  repo,
+  state,
+}: {
+  repo: RepoStatus;
+  state: UpdateState;
+}) {
+  if (!repo.isGit) {
+    return <p className={styles.hint}>zip 快照（无 git 历史），不支持更新。</p>;
+  }
+  if (state.error) {
+    return <p className={styles.resultError}>{state.error}</p>;
+  }
+  if (!state.result) {
+    // 没有本轮更新时：不显示空 hint——重点标注直接来自历史（下方时间线）。
+    // 用户核心诉求：进页面就要看到重点标注，而不是一句"点更新"。
+    return null;
+  }
+  if (!state.result.updated) {
+    return <p className={styles.hint}>已是最新，无新增提交。</p>;
+  }
+  if (state.result.summary?.degraded) {
+    return (
+      <>
+        <p className={styles.hint}>
+          未生成 LLM 总结（未配置 API key 或调用失败），仅列出提交。
+        </p>
+        <CommitFold commits={state.result.commits} />
+      </>
+    );
+  }
+  return (
+    <SummaryBlock
+      markdown={state.result.summary?.text ?? ""}
+      commits={state.result.commits}
+      label="本轮更新"
+    />
   );
 }
 

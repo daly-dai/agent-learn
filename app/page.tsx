@@ -43,7 +43,7 @@
 //                   人工确认弹框（允许/拒绝），配合 pendingApproval/approve
 // ============================================================
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styles from "./page.module.css";
 import { Nameplate, type Phase } from "./components/nameplate";
 import { Overture } from "./components/overture";
@@ -208,13 +208,14 @@ export default function Home() {
     inputRef.current?.focus();
   }
 
-  // 派生展示数据（都是纯函数，不改状态）：
+  // 派生展示数据（都是纯函数，不改状态；B17③：useMemo 只在依赖变时重算——
+  // 否则每次渲染都全量重跑 foldEvents（O(n²) 重折叠）与 derivePhase/currentTurn）：
   //   phase  状态灯相位（待命/思考中/执行工具/输出中）—— 看最近一条事件推断
   //   turn   当前进行到第几轮 —— 从 turn_start 事件数出来
   //   rows   事件流折叠后的记录条行 —— 给 <TraceRail> 画时间轴
-  const phase = derivePhase(observed, loading);
-  const turn = currentTurn(observed);
-  const rows = foldEvents(observed);
+  const phase = useMemo(() => derivePhase(observed, loading), [observed, loading]);
+  const turn = useMemo(() => currentTurn(observed), [observed]);
+  const rows = useMemo(() => foldEvents(observed), [observed]);
 
   return (
     <div className="app">
@@ -250,15 +251,25 @@ export default function Home() {
               {messages.length === 0 ? (
                 <Overture onPick={pickSeed} />
               ) : (
-                messages.map((msg, i) => (
-                  <MessageRow
-                    key={`${msg.role}-${msg.timestamp}-${i}`}
-                    message={msg}
-                    attached={i > 0 && msg.role === "toolResult"}
-                    live={loading && i === messages.length - 1}
-                    toolOutputs={toolOutputs}
-                  />
-                ))
+                messages.map((msg, i) => {
+                  // B17③：toolOutputs 只下发给"含 toolCall 的 assistant 行"。
+                  // 为什么不能全量传：toolOutputs 是每帧新对象，MessageRow 又
+                  // 是 memo 组件——若每行都收新引用，memo 浅比较全部失效，
+                  // 流式就退回全树重渲。只有渲染 toolCall 的行才消费它
+                  // （bash 实时输出挂在 ToolCallLine 下），其余行传 undefined。
+                  const needsLiveOutput =
+                    msg.role === "assistant" &&
+                    msg.content.some((block) => block.type === "toolCall");
+                  return (
+                    <MessageRow
+                      key={`${msg.role}-${msg.timestamp}-${i}`}
+                      message={msg}
+                      attached={i > 0 && msg.role === "toolResult"}
+                      live={loading && i === messages.length - 1}
+                      toolOutputs={needsLiveOutput ? toolOutputs : undefined}
+                    />
+                  );
+                })
               )}
               {/* 上下文压缩进行中（B2）：后端在调模型生成摘要，给用户明确反馈，
                   而不是让 transcript 停在原地像卡住 */}
@@ -298,9 +309,12 @@ export default function Home() {
 
           {/* 任务面板（Phase 5）：钉在输入台上方，与输入框同列宽（830 居中）。
               只读展示（todo 唯一写者是模型）；头部常驻显示进度，展开看明细；
-              sessionId 用于关闭状态按会话隔离（Reasonix 式，纯前端 localStorage） */}
+              sessionId 用于关闭状态按会话隔离（Reasonix 式，纯前端 localStorage）。
+              B17②：key={currentId} —— dismissed 是 useState 初始值，只在挂载时
+              读 localStorage；切会话不重挂载会停留在旧会话的关闭标记（A 关了
+              面板 B 也被藏掉）。key 变 = 强制重挂载 = 重新读。 */}
           <div className={styles.todoBar}>
-            <TaskPanel todos={todos} sessionId={currentId} />
+            <TaskPanel key={currentId} todos={todos} sessionId={currentId} />
           </div>
 
           {/* 错误横幅：提到提问卡/输入框之外，两种状态下都可见 */}
@@ -311,24 +325,33 @@ export default function Home() {
             </div>
           )}
 
-          {/* 底部决策区三选一（Reasonix 式）：
-              pendingApproval → 工具审批卡（用户决定允许/拒绝）
-              pendingAsk      → 模型提问卡（用户逐题作答）
-              否则 → 输入控制台
-              "模型需要你"时，输入框隐藏，对应卡片占据输入框的位置——
-              钉在底部永远可见，不用滚动去找（2026-08-26：审批卡从消息流
-              挪到这里，与 askUser 同款）。共用 .decisionBar/.console 列宽 */}
-          {pendingApproval ? (
-            <div className={styles.decisionBar}>
-              <ApprovalDialog request={pendingApproval} onApprove={approve} />
-            </div>
-          ) : pendingAsk ? (
-            <div className={styles.decisionBar}>
-              <AskUserCard ask={pendingAsk} onAnswer={answerAsk} />
-            </div>
-          ) : (
+          {/* 底部决策区（B17④：输入框常驻 + 覆盖层，替换原三选一）。
+              B17④ 动机：原结构 pendingApproval ? 审批卡 : pendingAsk ?
+              提问卡 : 输入框——审批/提问出现时输入框整个卸载，卡关闭后
+              重建 → 焦点/IME/滚动丢失（输入框虽是 loading 禁用的，命令
+              面板也随 console 一起卸载）。
+              改法：输入框永远在 DOM；审批/提问卡需要时文档流占位（视觉
+              与改造前完全一致——卡片仍占决策区、上面内容被推挤），输入框
+              absolute + visibility:hidden 藏起（DOM/ref 保留，卡关闭即恢复）。
+              两卡天然互斥（串行 run 同时只会等一个请求）→ && 各自独立，
+              无需优先级判断。 */}
+          <div className={styles.decisionHost}>
+            {pendingApproval && (
+              <div className={styles.decisionBar}>
+                <ApprovalDialog request={pendingApproval} onApprove={approve} />
+              </div>
+            )}
+            {pendingAsk && (
+              <div className={styles.decisionBar}>
+                <AskUserCard ask={pendingAsk} onAnswer={answerAsk} />
+              </div>
+            )}
             <form
-              className={styles.console}
+              className={`${styles.console}${
+                pendingApproval || pendingAsk
+                  ? ` ${styles.consoleCovered}`
+                  : ""
+              }`}
               onSubmit={(e) => {
                 e.preventDefault();
                 submit();
@@ -396,7 +419,7 @@ export default function Home() {
                 Enter 发送 · Shift + Enter 换行 · 每次发送开始新的一次 run
               </p>
             </form>
-          )}
+          </div>
         </main>
 
         {/* 轨迹区：rows 是折叠后的行（时间轴），observed 用于耗时计算，

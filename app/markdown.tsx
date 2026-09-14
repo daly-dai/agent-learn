@@ -19,13 +19,20 @@
 // 不变，仍只改这一个文件。
 // ============================================================
 
-import { useRef, useState, type ReactNode } from "react";
+import { memo, useRef, useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import "highlight.js/styles/github.css";
 
-export function Markdown({ children }: { children: string }) {
+// B17③：memo —— react-markdown + rehypeHighlight 是重活（解析 + 语法高亮）。
+// 流式输出时只有正在更新的那行文本在变，其余行 children 引用/值不变 →
+// memo 浅比较直接跳过，不再每帧全量重解析。
+export const Markdown = memo(function Markdown({
+  children,
+}: {
+  children: string;
+}) {
   return (
     <div className="markdown-body">
       <ReactMarkdown
@@ -39,7 +46,7 @@ export function Markdown({ children }: { children: string }) {
       </ReactMarkdown>
     </div>
   );
-}
+});
 
 /** 带"复制"按钮的代码块 */
 function CodeBlock({ children }: { children: ReactNode }) {

@@ -79,6 +79,24 @@
   padding: 0 32px 8px; /* V2：0 26px 6px → 0 32px 8px */
 }
 
+/* B17④：决策区宿主 = 卡片（文档流占位）与常驻输入框的定位容器。
+   卡片出现时卡片独占决策区高度（视觉与 B17④ 前完全一致）；无卡片时
+   高度由 console 撑起。consoleCovered 的 absolute 定位上下文在这里。 */
+.decisionHost {
+  position: relative;
+}
+
+/* B17④：审批/提问卡出现时输入框的隐藏态。
+   absolute + visibility:hidden（而非卸载/display:none）：
+   - 不占文档流 → 卡片独占决策区，视觉与改造前等价
+   - DOM/ref 保留 → 卡关闭即恢复（不重建，命令面板/输入状态不丢）
+   visibility 而非 opacity：隐藏的同时不接收点击（卡片可正常操作） */
+.consoleCovered {
+  position: absolute;
+  inset: 0;
+  visibility: hidden;
+}
+
 /* ---- 指令台（输入） ---- */
 .console {
   padding: 8px 32px 20px; /* V2：6px 26px 18px → 8px 32px 20px */

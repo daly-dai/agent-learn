@@ -5,7 +5,7 @@
 // 以及工具调用行（CALL）和工具结果卡片（可折叠）
 // ============================================================
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import type {
   AgentMessage,
   CompactionSummaryMessage,
@@ -28,7 +28,17 @@ type MessageRowProps = {
   toolOutputs?: Record<string, string>;
 };
 
-export function MessageRow({ message, attached, live, toolOutputs }: MessageRowProps) {
+// B17③：memo —— 流式输出时只有正在更新的行该重渲。
+// 触发重渲的是 message 引用变化（该行被 appendDelta/replaceLast 替换）
+// 或 toolOutputs 变化；其他行的 props 引用稳定 → 浅比较直接跳过。
+// 注意配套要求（page.tsx）：toolOutputs 只传给含 toolCall 的行，其余
+// 行传 undefined——否则 toolOutputs 每帧新对象会让所有行 memo 失效。
+export const MessageRow = memo(function MessageRow({
+  message,
+  attached,
+  live,
+  toolOutputs,
+}: MessageRowProps) {
   if (message.role === "compactionSummary") {
     // 旧上下文压缩摘要（B2）：独立渲染成"压缩卡片"，不是用户气泡/工具行。
     // 为什么独立类型：摘要伪装 user 会被当用户消息渲染（多轮后页面出现
@@ -77,7 +87,7 @@ export function MessageRow({ message, attached, live, toolOutputs }: MessageRowP
       <ToolOutput message={message} />
     </Row>
   );
-}
+});
 
 type RowProps = {
   tone: string;

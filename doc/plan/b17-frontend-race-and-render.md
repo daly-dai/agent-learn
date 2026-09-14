@@ -179,3 +179,34 @@ const rows = foldEvents(observed);  // 每次渲染全量重折叠
 - **新增条目（session-owner 多会话并行）**：run 状态 owner 从 UI 变会话——`runStore = Map<sessionId, RunState>`，每会话独立消费 SSE、独立累积；UI 只订阅当前 sessionId 的投影。**开工前先精读 DSH `useProjection`/session surface + opencode `run-coordinator`**（有明确"为什么抄"：Web 形态必然 + 服务端已支持 + 两家现成范本）。
 - **服务端已支持并行**（route.ts：每次 POST 独立 store + runControllers 按 runId），方案 Y 主要改前端。
 - **A 的工具审批策略**：切走期间 A 等到审批 → 没人答 → 5 小时超时自动拒绝（现状兜底，可接受）。
+
+---
+
+## 补记 2：②③④⑤ 实现完成（2026-09-14 施工记录，**待浏览器验收**）
+
+> **背景**：① 已由 B22（session-owner）拆走并落地，本批只做 ②③④⑤。代码写完后**未提交**，在 2026-09-14 会话里被重新发现（PLAN 状态仍标"排队"，与实际不符）。
+
+### 改动清单（5 文件，+143 / −68）
+
+| 文件 | 改动 |
+|---|---|
+| `app/markdown.tsx` | **③** `Markdown` 包 `memo`——react-markdown + rehypeHighlight 是重活，流式时只有变化的那行 children 值变，浅比较直接跳过 |
+| `app/components/message-row/index.tsx` | **③** `MessageRow` 包 `memo` |
+| `app/page.tsx` | **③** `foldEvents` / 派生数据 `useMemo`（消 O(n²) 重折叠）；**③** `toolOutputs` 只下发给含 `toolCall` 的 assistant 行（避免全量新引用让 memo 失效）；**②** `<TaskPanel key={currentId} …/>`；**④** 决策区改 `decisionHost` + `{pendingApproval && …}` / `{pendingAsk && …}` 独立条件（替换原三选一嵌套三元） |
+| `app/page.module.css` | **④** `.decisionHost` 覆盖层样式 |
+| `app/repos/page.tsx` | **⑤** 抽出 `UpdateBody` 组件，五层嵌套三元 → **平铺提前 return** |
+
+### 与详案初稿的差异（记录，避免以后对不上）
+
+- 详案 §二 ④ 写的是 `styles.decisionOverlay`，**实际类名是 `decisionHost` + 复用 `decisionBar`**——覆盖层容器换名，卡片本身样式复用。
+- 详案 §二 ③ 预言了 `toolOutputs` 新引用会让 memo 失效，**实际按"按行下发"解决**（不是比较函数），与预判一致。
+- ⑤ 不只是"决策区平铺"，还**顺手把 repos/page.tsx 的示范点做了**（抽组件而非内联 if）。
+
+### 验收状态：**已通过**（2026-09-14 用户确认此前已验收）
+
+- 详案 §三 的浏览器验收项（流式只有更新行重渲染 / 长会话不卡 / 审批提问时输入框仍在 DOM / 命令面板行为等价 / 两 panel 互斥）—— **用户确认此前已过**
+- `tsc --noEmit` **通过**（2026-09-14 沙箱实测，exit=0）
+- ⚠️ 详案 §三写的回归基线"38 文件 332 用例"**已过期**——当前静态计数为 **41 文件 / 368 用例**
+- ⚠️ vitest **沙箱里跑不了**（vite 8 内部 spawn 触发命名管道 EPERM，属沙箱限制非代码问题）→ 回归需本地跑
+
+> **教训**：本项代码写完并验收过，但**从未提交**，一挂就是十来天，PLAN 状态也跟着停在"排队"——**收尾不 commit = 工作不存在**。
