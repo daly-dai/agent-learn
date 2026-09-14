@@ -26,7 +26,7 @@ export type StreamFrame =
       runId: string;
       // 会话级累计统计（读数盘）：done 时点由 store 从会话文件算出
       stats: SessionStats;
-      // 任务清单（Phase 5）：叶子回溯取最新 todo 条目，前端面板权威恢复值
+      // 任务清单（Phase 5）：取最新一条 todo 条目，前端面板权威恢复值
       todos: TodoItem[];
       // 当前上下文占用（C13 ContextMeter 数据源）：done 时点的分子/容量
       contextPressure: ContextPressure;

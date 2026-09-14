@@ -63,9 +63,8 @@ export async function runPipeline(params: RunPipelineParams) {
   // 发送用户消息结束事件
   send({ type: "event", event: userEnd });
 
-  // 1b) 多轮记忆的核心：先把用户消息落盘，再从叶子回溯出完整上下文。
+  // 1b) 多轮记忆的核心：先把用户消息落盘，再按文件顺序读出完整上下文。
   await store.appendMessage(userMessage);
-  // 从叶子节点回溯出完整上下文
   const context = store.buildContext();
 
   // 1c) 每请求组装工具注册表（_pipeline/tools.ts）：

@@ -140,11 +140,16 @@ export type TodoItem = {
 };
 
 // --- 会话存储条目（JSONL 会话文件的一行） ---
-// 会话树：id 唯一，parentId 指向前一条（叶子 leafId = 当前最新）。
-// 为什么有 parentId：Phase 2 要做分支切换（一条对话可以岔出多条线），
-// 没有它就只能线性追加，无法回溯到任意历史节点重新分支。
+// **会话是线性日志，不是树**（C18 砍树，2026-09-14）：条目按写入顺序排列，
+// 顺序就是对话顺序，读的时候从头读到尾即可，不需要任何指针。
+// 为什么砍掉原来的 parentId + switchLeaf：那套分支结构**生产代码零调用**、
+// 落盘从不记 leafId、而 loadOrCreate 又假设「最后一行就是叶子」——结构支持分支、
+// 加载不支持，是个自相矛盾的"预挖空壳"（违反不变量 3）。实测 39/39 个会话文件
+// 完全线性、0 悬空 parentId → 砍掉对现存数据是**可证明的 no-op**。
+// 将来真要做「改一条历史消息、重跑」，追加 `{type:"leaf", leafId}` 条目即可
+// （`todo` 就是同款先例：状态变更靠追加条目表达，不靠改历史行）。
 // compaction 条目记录「旧消息摘要」：上下文超窗口时用它替代被压缩的旧消息。
-// todo 条目记录「任务清单快照」：模型每次整表替换，叶子回溯取最新一条。
+// todo 条目记录「任务清单快照」：模型每次整表替换，取最后一条。
 export type SessionEntry =
   | {
       type: "session";
@@ -162,14 +167,12 @@ export type SessionEntry =
   | {
       type: "message";
       id: string;
-      parentId: string | null;
       timestamp: string;
       message: AgentMessage;
     }
   | {
       type: "compaction";
       id: string;
-      parentId: string | null;
       timestamp: string;
       summary: string;
       firstKeptEntryId: string;
@@ -178,7 +181,6 @@ export type SessionEntry =
   | {
       type: "todo";
       id: string;
-      parentId: string | null;
       timestamp: string;
       todos: TodoItem[];
     };

@@ -48,17 +48,19 @@ function apiOf(deps: ReturnType<typeof makeDeps>): CommandApi {
 }
 
 describe("compactNow —— 手动压缩共享逻辑（DSH compactNow 对齐）", () => {
-  it("有历史 → 返回 { entry, summarizedCount, tokensSummarized }，entry 成为新叶子", async () => {
+  it("有历史 → 返回 { entry, summarizedCount, tokensSummarized }，entry 追加到末尾", async () => {
     const deps = makeDeps();
     try {
       await seedMessages(deps.store);
-      const before = deps.store.getLeafId();
+      const before = deps.store.getEntries().length;
       const outcome = await compactNow(deps.store, deps.model, new AbortController().signal);
       expect(outcome).not.toBeNull();
       expect(outcome!.summarizedCount).toBe(2); // 10 条 - 保留 8 条
       expect(outcome!.tokensSummarized).toBeGreaterThan(0); // 本次压掉的 token
-      expect(deps.store.getLeafId()).not.toBe(before);
-      expect(deps.store.getLeafId()).toBe(outcome!.entry.id);
+      // 线性日志：压缩条目就是最后一条（原断言是"成为新叶子"——树已砍，C18 §7.5）
+      const entries = deps.store.getEntries();
+      expect(entries.length).toBe(before + 1);
+      expect(entries.at(-1)!.id).toBe(outcome!.entry.id);
     } finally {
       deps.cleanup();
     }

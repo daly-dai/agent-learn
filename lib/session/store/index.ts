@@ -8,12 +8,14 @@
 //
 // 数据结构：一个会话 = 一个 JSONL 文件，一行一个 SessionEntry：
 //   session   头（版本 / id / cwd）
-//   message   id + parentId + 消息本体
+//   message   消息本体
 //   compaction 旧消息摘要（上下文超窗口时替代被压缩的部分）
+//   todo      任务清单快照
 //
-// id/parentId 构成会话树，叶子（leafId）是当前最新消息。
-// 为什么是树而不是数组：Phase 2 要做分支切换——从任意历史节点可以岔出新线，
-// 数组无法表达"同一条父消息长出两个后续"。
+// **线性日志**（C18 砍树，2026-09-14）：条目按写入顺序排列，顺序即对话顺序。
+// 这里原先是一棵"会话树"（id/parentId + switchLeaf），但它是预挖的空壳——
+// 分支从没被生产代码用过、leafId 落盘从不记录、"最后一行就是叶子"的假设
+// 又与树自相矛盾。详见 lib/types.ts 的说明与 doc/plan/session-compaction-refactor.md §7.5。
 //
 // 对应教学版：how-pi-agent-works/examples/teaching-agent/src/server/agent/sessionStore.ts
 // 差异：sessionId 从构造函数传入（教学版硬编码），其余逻辑保持一致。
@@ -48,12 +50,10 @@ export type CompactionPreparation = {
 };
 
 export class JsonlSessionStore {
-  // 内存态：entries 全量 + byId 索引 + leafId 叶子 + counter 自增 id 计数器。
-  // 为什么内存里也存一份：buildContext() 每次要回溯整条路径，直接从 Map 查
+  // 内存态：entries 全量 + counter 自增 id 计数器。
+  // 为什么内存里也存一份：buildContext() 每次要整条读一遍，从内存数组读
   // 比每次重读文件快得多；磁盘只负责"持久化"，内存才是"工作态"。
   private readonly entries: SessionEntry[] = [];
-  private byId = new Map<string, SessionEntry>();
-  private leafId: string | null = null;
   private counter = 0;
 
   constructor(
@@ -73,10 +73,6 @@ export class JsonlSessionStore {
 
   getEntries(): SessionEntry[] {
     return [...this.entries];
-  }
-
-  getLeafId(): string | null {
-    return this.leafId;
   }
 
   /** 会话级累计统计（读数盘用）：扫描内存态全量 entries。
@@ -100,62 +96,48 @@ export class JsonlSessionStore {
     return { turns, tools, tokens };
   }
 
-  /** 切分支（Phase 2 多会话/回溯用）：把叶子指到任意历史条目 */
-  switchLeaf(leafId: string): void {
-    if (!this.byId.has(leafId)) {
-      throw new Error(`Unknown session entry: ${leafId}`);
-    }
-    this.leafId = leafId;
-  }
-
   /** 清空会话：删文件 + 重置内存态 + 重写头 */
   async reset(): Promise<void> {
     if (existsSync(this.filePath)) {
       await rm(this.filePath);
     }
     this.entries.length = 0;
-    this.byId = new Map();
-    this.leafId = null;
     this.counter = 0;
     this.writeHeader();
   }
 
-  /** 追加一条消息，parentId 指向当前叶子；返回新条目的 id（它成为新叶子） */
+  /** 追加一条消息；返回新条目的 id */
   async appendMessage(message: AgentMessage): Promise<string> {
     const id = this.nextId();
     const entry: MessageEntry = {
       type: "message",
       id,
-      parentId: this.leafId,
       timestamp: new Date().toISOString(),
       message,
     };
     await this.appendEntry(entry);
-    this.leafId = id;
     return id;
   }
 
   /** 追加一条任务清单条目（Phase 5）：todo 是会话事件不是独立存储（DSH 走读 07）。
-   *  与对话同生命周期、可回放；parentId 指向当前叶子，新条目成为叶子。 */
+   *  与对话同生命周期、可回放；取的时候认最后一条。 */
   async appendTodo(todos: TodoItem[]): Promise<string> {
     const id = this.nextId();
     const entry: TodoEntry = {
       type: "todo",
       id,
-      parentId: this.leafId,
       timestamp: new Date().toISOString(),
       todos,
     };
     await this.appendEntry(entry);
-    this.leafId = id;
     return id;
   }
 
-  /** 从叶子回溯找最新一条 todo 条目（没有则 undefined）——前端面板恢复用 */
+  /** 取最新一条 todo 条目（没有则 undefined）——前端面板恢复用 */
   getLatestTodos(): TodoItem[] | undefined {
-    const path = this.pathToLeaf();
-    for (let i = path.length - 1; i >= 0; i -= 1) {
-      const entry = path[i];
+    const entries = this.entriesInOrder();
+    for (let i = entries.length - 1; i >= 0; i -= 1) {
+      const entry = entries[i];
       if (entry.type === "todo") return entry.todos;
     }
     return undefined;
@@ -174,8 +156,8 @@ export class JsonlSessionStore {
     maxApproxTokens: number,
     keepRecentMessages: number,
   ): CompactionPreparation | undefined {
-    // 从叶子回溯到根，把路径上的消息转成 AgentMessage[]。
-    const path = this.pathToLeaf();
+    // 按写入顺序取全部条目，把其中的消息转成 AgentMessage[]
+    const path = this.entriesInOrder();
     // 过滤出消息条目（B2 ②）。
     const messageEntries = path.filter(
       (entry): entry is MessageEntry => entry.type === "message",
@@ -244,7 +226,7 @@ export class JsonlSessionStore {
   }
 
   /**
-   * 【落盘】压缩条目：追加 compaction entry 并成为新叶子。
+   * 【落盘】压缩条目：追加 compaction entry 到会话末尾。
    * 产品层调模型生成摘要后调用（MOCK/失败时传拼贴降级摘要）。
    */
   async commitCompaction(
@@ -254,7 +236,6 @@ export class JsonlSessionStore {
     const entry: CompactionEntry = {
       type: "compaction",
       id: this.nextId(),
-      parentId: this.leafId,
       timestamp: new Date().toISOString(),
       summary,
       firstKeptEntryId: prep.firstKeptEntryId,
@@ -263,13 +244,11 @@ export class JsonlSessionStore {
 
     await this.appendEntry(entry);
 
-    this.leafId = entry.id;
-
     return entry;
   }
 
   /**
-   * 重建发给模型的上下文：从叶子回溯到根，把路径上的消息转成 AgentMessage[]。
+   * 重建发给模型的上下文：按写入顺序读全部条目，把其中的消息转成 AgentMessage[]。
    * 若有压缩条目：用一条 compactionSummary 消息（B2 新增类型）替代被压缩的旧消息，
    * 再拼接 firstKeptEntryId 之后和压缩条目之后的消息。
    *
@@ -279,7 +258,7 @@ export class JsonlSessionStore {
    * 模型侧（deepseekModel 转换时伪装 user）和前端侧（渲染成折叠卡片）各取所需。
    */
   buildContext(): AgentMessage[] {
-    const path = this.pathToLeaf();
+    const path = this.entriesInOrder();
 
     const latestCompactionIndex = findLastIndex(
       path,
@@ -352,11 +331,8 @@ export class JsonlSessionStore {
     for (const entry of parsed) {
       this.entries.push(entry);
 
+      // 从 id 恢复自增计数，保证重启后 id 不重复
       if (entry.type !== "session") {
-        this.byId.set(entry.id, entry);
-        // 文件是追加写的，最后一行就是最新叶子
-        this.leafId = entry.id;
-        // 从 id 恢复自增计数，保证重启后 id 不重复
         this.counter = Math.max(
           this.counter,
           Number(entry.id.replace("entry_", "")) || 0,
@@ -386,32 +362,15 @@ export class JsonlSessionStore {
   /** 追加一条条目：先更新内存态，再落盘。调用方需顺序 await，乱序风险同 trace.ts */
   private async appendEntry(entry: SessionEntry): Promise<void> {
     this.entries.push(entry);
-
-    if (entry.type !== "session") {
-      this.byId.set(entry.id, entry);
-    }
-
     await appendFile(this.filePath, `${JSON.stringify(entry)}\n`, "utf8");
   }
 
-  /** 从叶子沿 parentId 回溯到根，还原成「根 → 叶子」的正序路径 */
-  private pathToLeaf(): SessionEntry[] {
-    if (!this.leafId) return [];
-
-    const path: SessionEntry[] = [];
-    let current = this.byId.get(this.leafId);
-    
-    while (current) {
-      // 为什么 unshift 而不是 push：回溯得到的是「叶子→根」，unshift 到头部
-      // 才能还原「根→叶子」的正序，buildContext 需要按对话先后处理。
-      path.unshift(current);
-      current =
-        "parentId" in current && current.parentId
-          ? this.byId.get(current.parentId)
-          : undefined;
-    }
-    
-    return path;
+  /** 会话文件里除头之外的全部条目，按写入顺序（= 对话顺序）。
+   *  为什么不再沿 parentId 回溯：会话是线性日志，不是树——见 lib/types.ts。
+   *  实测 39/39 个现存会话文件都是干净的线性链，所以这种读法对老文件得到的
+   *  结果与原来的树遍历**逐条相同**（这正是砍树可以不迁移、不重写文件的原因）。 */
+  private entriesInOrder(): SessionEntry[] {
+    return this.entries.filter((entry) => entry.type !== "session");
   }
 
   private nextId(): string {

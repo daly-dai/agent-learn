@@ -8,13 +8,12 @@ import type { AgentMessage, SessionStats, TodoItem } from "@/lib/types";
 // type-only：context-occupancy 类型面无依赖，前端 bundle 安全
 import type { ContextPressure } from "@/app/lib/context-occupancy";
 
-/** GET /api/chat?sessionId= → 会话历史（叶子路径全部消息）+ 会话级统计 + 任务清单 */
+/** GET /api/chat?sessionId= → 会话历史（全部消息，按对话顺序）+ 会话级统计 + 任务清单 */
 export type ChatHistoryResult = {
   sessionId: string;
-  leafId: string;
   messages: AgentMessage[];
   stats: SessionStats;
-  /** 任务清单（Phase 5）：叶子回溯取最新 todo 条目；没有则为空数组 */
+  /** 任务清单（Phase 5）：取最新一条 todo 条目；没有则为空数组 */
   todos: TodoItem[];
   /** 当前上下文占用（C13 ContextMeter 数据源） */
   contextPressure: ContextPressure;

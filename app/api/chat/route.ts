@@ -193,7 +193,7 @@ export async function POST(req: NextRequest) {
 }
 
 // --- GET /api/chat?sessionId=xxx ---
-// 返回会话历史（叶子路径上的全部消息），供前端挂载/切换会话时恢复多轮对话。
+// 返回会话历史（全部消息，按对话顺序），供前端挂载/切换会话时恢复多轮对话。
 export async function GET(req: NextRequest) {
   const sessionId = req.nextUrl.searchParams.get("sessionId") || "default";
   if (!isValidSessionId(sessionId)) {
@@ -202,7 +202,6 @@ export async function GET(req: NextRequest) {
   const store = createSessionStore(sessionId);
   return NextResponse.json({
     sessionId,
-    leafId: store.getLeafId(),
     messages: store.buildContext(),
     stats: store.stats(),
     todos: store.getLatestTodos() ?? [],

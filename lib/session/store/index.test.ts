@@ -288,11 +288,13 @@ describe("prepareCompaction —— B2 ③ LLM 摘要准备（2026-08-25）", () 
 });
 
 // ============================================================
-// 会话树语义（B18 ② 补齐：switchLeaf / appendTodo / getLatestTodos / stats）
-// 这些是 Phase 2 分支切换 + Phase 5 task 面板的地基行为，此前零测试。
+// 会话日志语义（原名"会话树语义"，B18 ② 补齐；C18 砍树后改名）
+// 这是 Phase 5 task 面板 + 统计读数盘的地基行为。
+// ⚠️ 原 3 个 switchLeaf 用例已随树一起删掉——它们测的是一个
+//    **生产代码零调用**的能力，删掉是决策的一部分（C18 详案 §7.5）。
 // ============================================================
-describe("会话树语义 —— 分支 / todo / 统计", () => {
-  it("appendTodo + getLatestTodos：从叶子回溯到最新一条 todo", async () => {
+describe("会话日志语义 —— todo / 统计", () => {
+  it("appendTodo + getLatestTodos：取最后一条 todo", async () => {
     const { store, cleanup } = makeStore();
 
     // 还没有 todo → undefined
@@ -304,7 +306,7 @@ describe("会话树语义 —— 分支 / todo / 统计", () => {
       { content: "任务A", status: "pending" },
     ]);
 
-    // todo 之后再追加消息：getLatestTodos 仍能沿叶子回溯找到（todo 是会话事件）
+    // todo 之后再追加消息：getLatestTodos 仍能取到最后一条 todo（todo 是会话事件）
     await store.appendMessage(createUserMessage("二"));
     expect(store.getLatestTodos()).toEqual([
       { content: "任务A", status: "pending" },
@@ -326,63 +328,6 @@ describe("会话树语义 —— 分支 / todo / 统计", () => {
       { content: "新任务1", status: "in_progress" },
       { content: "新任务2", status: "pending" },
     ]);
-
-    cleanup();
-  });
-
-  it("switchLeaf 切分支后 appendMessage 长在新分支，buildContext 只含新分支", async () => {
-    const { store, cleanup } = makeStore();
-
-    const branchPoint = await store.appendMessage(createUserMessage("主线一"));
-    await store.appendMessage(createUserMessage("主线二"));
-
-    // 切回主线一，岔出支线
-    store.switchLeaf(branchPoint);
-    await store.appendMessage(createUserMessage("支线一"));
-
-    const context = store.buildContext();
-    const texts = context.map((m) => messageText(m));
-    expect(texts).toContain("主线一");
-    expect(texts).toContain("支线一");
-    // 旧分支的"主线二"不在新分支路径上（树的分支语义）
-    expect(texts).not.toContain("主线二");
-
-    cleanup();
-  });
-
-  it("switchLeaf 改变叶子后，getLatestTodos 沿新路径回溯（可见性随分支）", async () => {
-    const { store, cleanup } = makeStore();
-
-    await store.appendMessage(createUserMessage("一")); // entry_1
-    await store.appendTodo([{ content: "任务A", status: "pending" }]); // entry_2
-    const leafAfterTodo = store.getLeafId()!; // 记住 todo 之后的分支点
-    await store.appendMessage(createUserMessage("主线一")); // entry_3
-
-    // 当前叶子在 todo 之后 → 回溯路径含 todo → 可见
-    expect(store.getLatestTodos()).toEqual([
-      { content: "任务A", status: "pending" },
-    ]);
-
-    // 切到 todo 之前的 message（entry_1）→ 新路径不含 todo → undefined
-    const firstMessageId = store
-      .getEntries()
-      .find((e) => e.type === "message")!.id;
-    store.switchLeaf(firstMessageId);
-    expect(store.getLatestTodos()).toBeUndefined();
-
-    // 切回 todo 之后的分支 → todo 恢复可见（叶子决定回溯路径）
-    store.switchLeaf(leafAfterTodo);
-    expect(store.getLatestTodos()).toEqual([
-      { content: "任务A", status: "pending" },
-    ]);
-
-    cleanup();
-  });
-
-  it("switchLeaf 未知 id 抛错（fail-closed：不静默切到不存在的位置）", () => {
-    const { store, cleanup } = makeStore();
-
-    expect(() => store.switchLeaf("no-such-entry")).toThrow(/Unknown session entry/);
 
     cleanup();
   });
@@ -413,7 +358,7 @@ describe("会话树语义 —— 分支 / todo / 统计", () => {
     expect(stats.turns).toBe(1); // assistant 消息数
     expect(stats.tools).toBe(1); // toolResult 消息数
     expect(stats.tokens).toBe(30); // assistant usage.totalTokens 之和
-    // todo 条目不干扰统计（本来就不计，但钉死：即使叶子是 todo 也一样）
+    // todo 条目不干扰统计（本来就不计，但钉死：即使最后一条是 todo 也一样）
 
     cleanup();
   });
@@ -497,6 +442,64 @@ describe("版本校验 —— 读到不认识的格式必须 fail-closed", () =>
       ]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+// ============================================================
+// 线性日志（C18 砍树，2026-09-14）
+// ============================================================
+// ⚠️ **这块没有"先红后绿"的用例，而且不该有**：砍树对真实数据是**可证明的
+//    no-op**——实测 39/39 个会话文件都是干净的线性链，树遍历与顺序读**逐条相同**。
+//    硬造一个"树读法会读错"的夹具，就是在造真实数据里不存在的状态（11.5 ②）。
+//    所以验证靠两样：① **`tsc`** —— 删掉的 API（switchLeaf / getLeafId / parentId）
+//    再也调不出来，编译期就拦住了，这比任何运行时用例都硬；
+//    ② 下面两条**兼容性回归** —— 老文件照常读全、新条目不再写死字段。
+describe("线性日志 —— 老文件照常读，新条目不再写 parentId", () => {
+  it("⭐ 读老格式会话（条目带 parentId）：全部消息一条不少、顺序不变", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "session-linear-test-"));
+    try {
+      const filePath = join(dir, "legacy.jsonl");
+      // 夹具的真实场景（AGENTS 11.5 ②）：**磁盘上现存的 39 个会话文件全都是这个
+      // 形态**——2026-09-14 之前写出的，每条 message/todo 都带 parentId。
+      // 消息本体用真构造函数产出，只手工拼"条目信封"。
+      const stamp = new Date().toISOString();
+      const raw =
+        [
+          JSON.stringify({ type: "session", version: 1, id: "s_legacy", timestamp: stamp, cwd: dir }),
+          JSON.stringify({ type: "message", id: "entry_1", parentId: null, timestamp: stamp, message: createUserMessage("老话一") }),
+          JSON.stringify({ type: "todo", id: "entry_2", parentId: "entry_1", timestamp: stamp, todos: [{ content: "老任务", status: "pending" }] }),
+          JSON.stringify({ type: "message", id: "entry_3", parentId: "entry_2", timestamp: stamp, message: createUserMessage("老话二") }),
+        ].join("\n") + "\n";
+      writeFileSync(filePath, raw, "utf8");
+
+      const store = new JsonlSessionStore(filePath, dir, "s_legacy");
+
+      // parentId 被完全忽略：两条消息都读到，顺序就是文件顺序
+      expect(store.buildContext().map((m) => messageText(m))).toEqual([
+        "老话一",
+        "老话二",
+      ]);
+      expect(store.getLatestTodos()).toEqual([
+        { content: "老任务", status: "pending" },
+      ]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("⭐ 新写的条目不再带 parentId（格式契约：砍干净，不留半拉子字段）", async () => {
+    const { store, cleanup } = makeStore();
+    try {
+      await store.appendMessage(createUserMessage("新话"));
+
+      const messageEntry = store.getEntries().find((e) => e.type === "message")!;
+
+      // 留着一个没人读的 parentId，就是又一次犯「写了没人读的字段」那个病
+      // （同族：header.version / TraceSnapshot / message_update.message / 出网的 leafId）
+      expect("parentId" in messageEntry).toBe(false);
+    } finally {
+      cleanup();
     }
   });
 });
