@@ -58,6 +58,8 @@ export type TraceRecord = {
 
 export type TraceTurn = {
   turn: number;
+  /** 该轮属于哪一次 run —— 轮次号在每个 run 内从 1 重新开始，所以「第几轮」不唯一 */
+  runIndex: number;
   /** 该轮 turn_start 的会话级坐标 —— 跳转锚点 */
   id: string;
   /** 首条人类指令的封顶预览 */
@@ -175,7 +177,7 @@ function openTurn(
 ): void {
   state.turn = event.turn;
   state.model = undefined;
-  state.turnItem = { turn: event.turn, id, prompt: "", response: "" };
+  state.turnItem = { turn: event.turn, runIndex: state.runIndex, id, prompt: "", response: "" };
   state.turns.push(state.turnItem);
 }
 

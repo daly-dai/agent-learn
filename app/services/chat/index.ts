@@ -27,6 +27,8 @@ import type {
   CommandsResult,
   ExecuteCommandParams,
   ExecuteCommandResult,
+  TraceRunsResult,
+  TraceRunResult,
 } from "./types";
 
 /** GET /api/chat?sessionId= —— 会话历史 + 会话级统计（挂载/切换时恢复） */
@@ -104,6 +106,28 @@ export function executeCommand(
   params: ExecuteCommandParams,
 ): Promise<ExecuteCommandResult> {
   return api("/api/chat/command", { method: "POST", body: params });
+}
+
+/** GET /api/traces?sessionId= —— 列某个会话的全部 run（A3 轨迹视图的列表侧） */
+export function fetchTraceRuns(
+  sessionId: string,
+  opts?: { signal?: AbortSignal },
+): Promise<TraceRunsResult> {
+  return api(`/api/traces?sessionId=${encodeURIComponent(sessionId)}`, {
+    signal: opts?.signal,
+  });
+}
+
+/** GET /api/traces/<runId>?sessionId= —— 读一个 run 的 meta + 全部条目（详情侧） */
+export function fetchTraceRun(
+  sessionId: string,
+  runId: string,
+  opts?: { signal?: AbortSignal },
+): Promise<TraceRunResult> {
+  return api(
+    `/api/traces/${encodeURIComponent(runId)}?sessionId=${encodeURIComponent(sessionId)}`,
+    { signal: opts?.signal },
+  );
 }
 
 /** GET /api/chat/export —— 下载会话 JSONL（/export 门面模式的下载侧：

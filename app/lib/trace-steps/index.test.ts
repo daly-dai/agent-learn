@@ -79,7 +79,7 @@ describe("foldTrace：用户与模型记录", () => {
       tokens: 42,
     });
     expect(outline).toEqual({
-      turns: [{ turn: 1, id: "0:2", prompt: "你好", response: "你好" }],
+      turns: [{ turn: 1, runIndex: 0, id: "0:2", prompt: "你好", response: "你好" }],
       steps: 2,
       errors: [],
     });
@@ -248,7 +248,7 @@ describe("foldTrace：轮次大纲", () => {
     ]);
 
     expect(outline.turns).toEqual([
-      { turn: 1, id: "0:1", prompt: "原始指令", response: "最终回答" },
+      { turn: 1, runIndex: 0, id: "0:1", prompt: "原始指令", response: "最终回答" },
     ]);
     // 记录行 = 2 条人类消息 + 2 条助手输出：message_end 是「助手消息」边界，
     // 不是「轮次」边界——没有待封口的流式记录时，每条 message_end 各开一条。

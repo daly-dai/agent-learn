@@ -1,0 +1,432 @@
+/* ============================================================
+   trace-viewer —— A3 轨迹视图
+   ============================================================
+   形态基准：workspace/prototype-a3-trace-viewer.html（已确认的静态原型）。
+   token 全部取自 app/globals.css —— 本文件不新增任何色值 / 字号 / 圆角。
+
+   与原型的三处结构差异（详案 §3.2 补记，逐条有理由）：
+     1. 轴线改成「每行自己画一段」：相邻行首尾相接 → 仍是一条连续的线；
+        run 分隔行**不画** → 轴在 run 边界处自然断开。
+       （原型只有一个 run，没有"边界"这个概念；A3 决策 e 要求多次 run 拼成
+        一条连续时间线，所以必须有边界形态。选"断开"而不是加新颜色：
+        连续性属于 run——同一进程内不断，换一次请求就是断的。）
+     2. 新增：run 分隔行 / 信号空心环 / 「进行中·中断」态。
+       （原型是静态手写值：`9 字 · 340 tok`、`85ms` 都是理想值；真实数据里
+        流式中的输出还没有 tokens、正在跑的工具还没有耗时。）
+     3. `--rail` 是本组件专属的几何常量，声明在 `.viewer` 上，**不进 globals
+        令牌表**——那里放的是跨组件共享的东西（globals.css 头部的拆分约定）。
+
+   列宽 880 与转录稿一致，切 tab 时列不跳。
+   ============================================================ */
+
+.viewer {
+  --rail: 28px; /* 竖轴的横向位置：内容整体右移这么多，轴落在左侧留白里 */
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--paper);
+}
+
+/* ---------- 工具栏：读数 + 两个动作（只留与「定位」直接相关的） ---------- */
+/* 横向 padding 用 max() 算：窄的时候是 32px，列一宽就把内容收进 880 列居中——
+   与下面的记录表（.sheet 的 max-width:880 + margin:auto）严格对齐。
+   ⚠️ 别写成 `padding: 0 32px` + 全宽：那是"880 从未生效"时代的等价写法，
+   中间列变宽后工具栏会比记录表宽出一大截。 */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px max(32px, calc((100% - 880px) / 2)) 10px;
+}
+
+.read {
+  margin-right: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-mid);
+}
+
+.errRead {
+  font-style: normal;
+  color: var(--pen-error);
+}
+
+.btn {
+  height: var(--hit);
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--plate);
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--ink-faint);
+}
+
+.btn:disabled {
+  color: var(--ink-faint);
+  cursor: default;
+}
+
+.btn[aria-pressed="true"] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: #fff;
+}
+
+.primary {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: #fff;
+}
+
+.primary:disabled {
+  border-color: var(--line);
+  background: var(--plate);
+  color: var(--ink-faint);
+}
+
+.k {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+/* ---------- 卷筒（滚动容器）+ 880 列 ---------- */
+.reel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px 32px 24px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+.reel::-webkit-scrollbar {
+  width: 9px;
+}
+
+.reel::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 99px;
+}
+
+.sheet {
+  max-width: 880px;
+  margin: 0 auto;
+  padding-left: var(--rail);
+}
+
+/* ---------- 竖轴：每个行元素自己画一段 ----------
+   轴线位于各行左边缘之左 14px（.sheet 的 padding-left 把内容推到轴右侧）。
+   节点大小不一，所以 left 各自微调，保证都**居中在轴线上**。 */
+.rec,
+.turn {
+  position: relative;
+}
+
+.rec::before,
+.turn::before {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--rail) + 14px);
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--line);
+}
+
+/* 默认节点：3px 实心小圆点（原型口径） */
+.rec::after {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--rail) + 12px);
+  top: 17px;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+}
+
+/* ---------- run 分隔：轴在这里**断开**（本行不画轴线） ---------- */
+.runHead {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 26px 0 14px;
+}
+
+.runHead:first-child {
+  margin-top: 6px;
+}
+
+.runHead .runLabel {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.runHead .runRule {
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.runHead .runState {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-mid);
+}
+
+.runHead .runState[data-broken="true"] {
+  color: var(--pen-error);
+}
+
+/* ---------- 轮次刻度：轴上的大节点 ---------- */
+.turn {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 26px 0 8px;
+  padding-right: 2px;
+}
+
+.turn::after {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--rail) + 9px);
+  top: 6px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--ink);
+  box-shadow: 0 0 0 4px var(--paper);
+}
+
+.turn .n {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+}
+
+/* 该轮的首条指令预览：让「这是哪一轮」一眼可读（outline 这层数据的唯一用途） */
+.turn .preview {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- 单条记录 ---------- */
+.rec {
+  display: block;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  gap: 0 14px;
+  padding: 7px 8px 7px 0;
+  border-radius: var(--r);
+  cursor: pointer;
+  list-style: none;
+}
+
+.row::-webkit-details-marker {
+  display: none;
+}
+
+.row:hover {
+  background: var(--plate);
+}
+
+.label {
+  padding-top: 1px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-mid);
+}
+
+.body {
+  min-width: 0;
+}
+
+.data {
+  padding-top: 1px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+
+/* 通道色 = 语义（沿用原型的五支笔，不新增编码） */
+.pen-user .label {
+  color: var(--pen-user);
+}
+
+.pen-model .label {
+  color: var(--pen-model);
+}
+
+.pen-tool .label {
+  color: var(--pen-tool);
+}
+
+.pen-error .label {
+  color: var(--pen-error);
+}
+
+.pen-signal .label {
+  color: var(--pen-signal-ink);
+}
+
+/* 正文：用户指令 / 模型输出。折叠时夹到 4 行——真实输出可能几百字，
+   不夹的话一条记录就能占满整屏（原型里的文案是手写短句，没这个问题）。 */
+.text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.rec[open] .text {
+  display: block;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+}
+
+/* 没有正文时的占位：说明"这里本来就该是空的"，而不是让行看起来坏了 */
+.quiet {
+  font-size: 13px;
+  color: var(--ink-faint);
+}
+
+/* 工具名：它是标识符不是散文 —— 用等宽 */
+.tool {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pen-tool);
+}
+
+.pen-error .tool {
+  color: var(--pen-error);
+}
+
+/* 入参/出参摘要：**常驻**，不展开也能看到关键值（根因往往就在这） */
+.io {
+  display: flex;
+  gap: 8px;
+  margin-top: 3px;
+  min-width: 0;
+}
+
+.io .k {
+  flex: none;
+  /* 26px：`入参`/`出参` 是全角字符，11px 字号下两个正好 22px——原型写的
+     22px 卡在边界上，浏览器一舍入就折成两行（2026-09-14 落地时抓到；
+     原型是静态 HTML，没人渲染过，所以那里的同一个值也没暴露）。
+     nowrap 是第二道保险：给再窄也不折。 */
+  width: 26px;
+  white-space: nowrap;
+  padding-top: 1px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+.io .v {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-mid);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.io.err .v {
+  color: var(--pen-error);
+}
+
+/* ---------- 轴上的形状编码：错误换方形，信号换空心环 ---------- */
+.pen-error::after {
+  left: calc(-1 * var(--rail) + 10px);
+  top: 15px;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--pen-error);
+}
+
+.pen-signal::after {
+  left: calc(-1 * var(--rail) + 10px);
+  top: 15px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--paper);
+  box-shadow: inset 0 0 0 2px var(--pen-signal-ink);
+}
+
+/* ---------- 展开态：完整入参 / 出参 ---------- */
+.more {
+  margin: 6px 0 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--plate);
+  overflow: hidden;
+}
+
+.more .hd {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line-soft);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+.more pre {
+  margin: 0;
+  padding: 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--ink-mid);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.more pre + .hd {
+  border-top: 1px solid var(--line-soft);
+}
+
+/* ---------- 空态：不是"没有数据"，是"还没开始" ---------- */
+.empty {
+  margin: 24px 0 0;
+  font-size: 13px;
+  color: var(--ink-mid);
+}
+
+.empty .quiet {
+  color: var(--ink-faint);
+}

@@ -24,10 +24,10 @@
 //                          send(text), stats }。
 //                   （2026-08-26：reset 已删——清空会话功能移除，
 //                    见 nameplate 头注释）
-//   foldEvents()    app/lib/trace-fold.ts（纯函数）
-//                   把原始 AgentEvent 流折叠成记录条行：连续 message_update
-//                   收成一条墨线、工具 start/end 配成一段跨度（105 条事件
-//                   实测塌成 2 行），结果喂给 <TraceRail> 渲染。
+//   useTraces()     app/lib/use-traces.ts（A3）
+//                   拉某个会话的轨迹文件（列表 → 按同序逐个 run）→ foldTrace
+//                   折叠 → buildTraceView 排层次，交给 <TraceViewer> 渲染。
+//                   （旧的 trace-rail + trace-fold 留在仓库作回滚，页面不再渲染）
 //   derivePhase()   本文件底部（纯函数）—— 根据最近一条事件推断状态灯相位
 //   currentTurn()   本文件底部（纯函数）—— 从 turn_start 事件数出当前轮次
 //   <Nameplate>     app/components/nameplate/ —— 页头：标志/标题/run 信息/
@@ -37,8 +37,8 @@
 //   <Overture>      app/components/overture/ —— 空态引导 + 例句按钮
 //   <MessageRow>    app/components/message-row/ —— 转录稿单条消息
 //                   （用户/Agent 文本/工具调用行/工具结果卡片）
-//   <TraceRail>     app/components/trace-rail/ —— 右侧时间轴记录条
-//                   （时间轴 + 底部轮次/工具/token 统计）
+//   <TraceViewer>   app/components/trace-viewer/ —— 轨迹 tab：竖轴记录表
+//                   （A3；顶部 tab 与它一起把原来的右侧轨迹栏收进了中间）
 //   <ApprovalDialog> app/components/approval-dialog/ —— 写/改/删工具的
 //                   人工确认弹框（允许/拒绝），配合 pendingApproval/approve
 // ============================================================
@@ -48,7 +48,7 @@ import styles from "./page.module.css";
 import { Nameplate, type Phase } from "./components/nameplate";
 import { Overture } from "./components/overture";
 import { MessageRow } from "./components/message-row";
-import { TraceRail } from "./components/trace-rail";
+import { TraceViewer } from "./components/trace-viewer";
 import { SessionList } from "./components/session-list";
 import { ApprovalDialog } from "./components/approval-dialog";
 import { ApprovalModeSwitch } from "./components/approval-mode-switch";
@@ -61,7 +61,8 @@ import { useRunStore } from "./lib/run-store";
 import { useCommandMenu } from "./lib/use-command-menu";
 import { useSessions } from "./lib/use-sessions";
 import { useStickyScroll } from "./lib/use-sticky-scroll";
-import { foldEvents } from "./lib/trace-fold";
+import { useTraces } from "./lib/use-traces";
+import { formatTokens } from "./lib/format";
 import type { ObservedEvent } from "./lib/sse";
 import type { ApprovalMode } from "./services/chat/types";
 import { getApprovalMode, setApprovalMode } from "./services/chat";
@@ -81,8 +82,8 @@ export default function Home() {
   //   runId     本次 run 的唯一 id（铭牌展示，来自 run 帧）
   //   model     本次用的模型名（铭牌展示）
   //   send(text)  发送一次 run：fetch → readStream 逐帧消费 → applyFrame
-  //   stats       会话级累计统计（轮次/工具/token）：服务端从会话文件算出，
-  //               切换会话/run 结束时更新，读数盘直接展示
+  //   stats       会话级累计统计（轮次 / 工具 / token 数，服务端从会话文件算出）
+  //               A3 起显示在输入台底栏（原先长在 <TraceRail> 底部）
   //   pendingApproval  挂起的工具确认（写/改/删弹框用）；approve(allow) 回传决定
   //   toolOutputs  bash 命令的实时输出（toolCallId → 文本）；stop(runId) 停止当前 run
   //   todos        任务清单（Phase 5）：模型 todo_write 更新，前端只读展示
@@ -156,7 +157,6 @@ export default function Home() {
   }, []);
   
   const transcriptRef = useRef<HTMLDivElement>(null); // 转录稿容器，新消息到达时滚到底
-  const traceRef = useRef<HTMLDivElement>(null); // 轨迹容器，新事件到达时滚到底
 
   // ---- 滚动跟随（吸底）----
   // 2026-08-26 修：原来每次 messages/observed 更新都强制 scrollToEnd——
@@ -164,16 +164,13 @@ export default function Home() {
   // 现在用 useStickyScroll 判定"用户是否停靠底部"：停靠才自动滚，
   // 用户滚上去看历史就停止跟随，滚回底部自动恢复（标准聊天 UX）。
   // 判定逻辑封装在 hook（阈值 48px 也在里面），这里只剩两行组装。
+  // （轨迹那一份跟随随 <TraceRail> 一起搬进了 <TraceViewer>——它自己持有
+  //   滚动容器，自己用同一个 hook，页面不必再管。）
   const followTranscript = useStickyScroll(transcriptRef);
-  const followTrace = useStickyScroll(traceRef);
 
   useEffect(() => {
     if (followTranscript) scrollToEnd(transcriptRef.current);
   }, [messages, followTranscript]);
-
-  useEffect(() => {
-    if (followTrace) scrollToEnd(traceRef.current);
-  }, [observed, followTrace]);
 
   // 列表保鲜（2026-08-26 修，2026-09-02 B22 升级）：
   // 会话列表只在 挂载/新建/重命名/删除 时刷新，聊天后不刷 → 停在旧快照：
@@ -208,14 +205,21 @@ export default function Home() {
     inputRef.current?.focus();
   }
 
+  // A3：顶部 tab（对话 / 轨迹）。轨迹只在 tab 打开时才拉数据——没打开就
+  // 不请求（useTraces 的 enabled）；`live` 让它在本轮 run 进行中轮询，
+  // run 一结束 effect 重跑，自动补一次完整加载。
+  const [tab, setTab] = useState<"chat" | "trace">("chat");
+  const traces = useTraces(currentId, {
+    enabled: tab === "trace",
+    live: loading,
+  });
+
   // 派生展示数据（都是纯函数，不改状态；B17③：useMemo 只在依赖变时重算——
-  // 否则每次渲染都全量重跑 foldEvents（O(n²) 重折叠）与 derivePhase/currentTurn）：
+  // 否则每次渲染都全量重跑 derivePhase/currentTurn）：
   //   phase  状态灯相位（待命/思考中/执行工具/输出中）—— 看最近一条事件推断
   //   turn   当前进行到第几轮 —— 从 turn_start 事件数出来
-  //   rows   事件流折叠后的记录条行 —— 给 <TraceRail> 画时间轴
   const phase = useMemo(() => derivePhase(observed, loading), [observed, loading]);
   const turn = useMemo(() => currentTurn(observed), [observed]);
-  const rows = useMemo(() => foldEvents(observed), [observed]);
 
   return (
     <div className="app">
@@ -243,6 +247,33 @@ export default function Home() {
         />
 
         <main className={styles.stage}>
+          {/* A3 顶部 tab：对话 / 轨迹。指令台在 .stage 的最后一行，两个 tab
+              共用它——切到轨迹也照样能发消息（B17④ 的常驻输入框）。 */}
+          <div className={styles.tabs} role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "chat"}
+              className={`${styles.tab}${tab === "chat" ? ` ${styles.tabOn}` : ""}`}
+              onClick={() => setTab("chat")}
+            >
+              对话
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === "trace"}
+              className={`${styles.tab}${tab === "trace" ? ` ${styles.tabOn}` : ""}`}
+              onClick={() => setTab("trace")}
+            >
+              轨迹
+            </button>
+          </div>
+
+          {/* 两个 tab 共用同一个 1fr 槽位——所以这里必须二选一。
+              代价：切走再回来，转录稿的滚动位置会丢（组件卸载了）。
+              一期先接受；要保住就得两个都挂着用 visibility 藏，不值当。 */}
+          {tab === "chat" ? (
           <div className={styles.transcript} ref={transcriptRef}>
             <div className={styles.reel}>
               {/* 空态 → 起手式引导；有消息 → 逐条渲染。
@@ -297,6 +328,13 @@ export default function Home() {
                   用户要求"像 askUser 悬浮在输入框位置"）——见下方 decisionBar */}
             </div>
           </div>
+          ) : (
+            <TraceViewer
+              fold={traces.fold}
+              runs={traces.runs}
+              loading={traces.loading}
+            />
+          )}
 
           {/* 审批模式切换（B1-②）：运行时切信任档位（建议/YOLO/禁止），
               参考项目都有此入口；默认 suggest 不动它即可 */}
@@ -415,16 +453,21 @@ export default function Home() {
                   )}
                 </div>
               </div>
-              <p className={styles.consoleHint}>
-                Enter 发送 · Shift + Enter 换行 · 每次发送开始新的一次 run
-              </p>
+              {/* 输入台底栏（A3，参考 DSH）：左 = 会话级读数，右 = 操作提示。
+                  读数原本长在 <TraceRail> 底部，轨迹栏下线后搬到这里——
+                  这样"会话跑了多少"在任何 tab 下都看得见。 */}
+              <div className={styles.statusBar}>
+                <span className={styles.statusStats}>
+                  {stats.turns} 轮 · {stats.tools} 工具 ·{" "}
+                  {formatTokens(stats.tokens)} token
+                </span>
+                <span className={styles.statusHint}>
+                  Enter 发送 · Shift + Enter 换行 · 每次发送开始新的一次 run
+                </span>
+              </div>
             </form>
           </div>
         </main>
-
-        {/* 轨迹区：rows 是折叠后的行（时间轴），observed 用于耗时计算，
-            stats 是会话级累计统计（读数盘，服务端算出） */}
-        <TraceRail rows={rows} observed={observed} stats={stats} reelRef={traceRef} />
       </div>
     </div>
   );

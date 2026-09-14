@@ -110,8 +110,9 @@ pre,
 }
 
 /* ============ 骨架 ============
-   整页是一个不滚动的外壳，滚动只发生在两个「卷筒」里：
-   .transcript（转录稿，page.module.css）和 .trace-reel（记录条，trace-rail）。
+   整页是一个不滚动的外壳，滚动只发生在「卷筒」里：
+   .transcript（转录稿，page.module.css）和 trace-viewer 的 .reel（轨迹 tab）。
+   两者互斥——同一个 1fr 槽位按 tab 换内容。
 
    每一层都要显式写行轨道 + min-height:0，缺一层就会被内容顶破：
    隐式的 auto 行按 max-content 撑开，而滚动容器的 max-content
@@ -127,8 +128,10 @@ pre,
 
 .deck {
   display: grid;
-  /* V2：侧栏 240 → 264、轨迹 348 → 384，三栏都更透气 */
-  grid-template-columns: 264px minmax(0, 1fr) 384px;
+  /* A3（2026-09-14）：三列 → **两列**。轨迹原本是右侧 384px 栏（<TraceRail>，
+     与 <main> 平级的第三个 grid 子项），现在改成中间那栏的顶部 tab
+     （对话 / 轨迹）——所以轨迹栏这一列消失，中间阅读面变宽。 */
+  grid-template-columns: 264px minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   min-height: 0;
 }
@@ -345,10 +348,15 @@ pre,
 
 /* ============ 响应式（骨架级） ============ */
 @media (max-width: 900px) {
-  /* 窄屏：三列变两行——对话面在上，轨迹变底部抽屉 */
+  /* 窄屏：单列堆叠。A3 之前这里是"三列变两行（轨迹降级成底部抽屉）"——
+     轨迹改成 tab 之后没有第二个面板了。
+     ⚠️ **必须给第一行一个高度**：两个子项 + 只有一行显式轨道时，
+     会话栏会吃掉整条 1fr、阅读面被挤进隐式的 auto 行（高度塌掉）。
+     所以会话栏固定 30vh、阅读面吃剩余（沿用这里原本就用 vh 的口径）。
+     窄屏不是这个工具的主场景，先保证不塌。 */
   .deck {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) 42vh;
+    grid-template-rows: 30vh minmax(0, 1fr);
   }
 }
 

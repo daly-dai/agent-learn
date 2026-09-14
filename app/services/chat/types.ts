@@ -70,3 +70,19 @@ export type ExecuteCommandParams = { line: string; sessionId: string };
 export type ExecuteCommandResult = { result: CommandResult };
 
 export type { CommandDescriptor, CommandResult };
+
+// ---- A3 轨迹（GET /api/traces + GET /api/traces/<runId>）----
+// type-only import：`import type` 编译期整体擦除，所以哪怕 lib/trace 依赖 node:fs
+// 也不会被拖进客户端 bundle。**别改成值导入**——那会把 node:fs 带进浏览器。
+import type { TraceEntry, TraceMeta } from "@/lib/trace";
+
+/** GET /api/traces?sessionId= → 该会话的全部 run（按时间升序，下标即 runIndex） */
+export type TraceRunsResult = { sessionId: string; runs: TraceMeta[] };
+
+/** GET /api/traces/<runId>?sessionId= → 一个 run 的元信息 + 全部条目 */
+export type TraceRunResult = {
+  sessionId: string;
+  runId: string;
+  meta: TraceMeta;
+  entries: TraceEntry[];
+};
