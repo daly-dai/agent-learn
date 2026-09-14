@@ -43,9 +43,9 @@
 
 会话级 run 所有权（`Map<sessionId, RunState>`）：切换会话**不会中断正在跑的 run**，A 在后台跑、UI 切到 B、回来还能接上实时流。前端用 zustand + selector 订阅，保证 A 的每帧更新不触发 B 重渲染。
 
-**⑥ 41 个测试文件 / 368 个用例**
+**⑥ 全量单测覆盖内核与适配层**
 
-覆盖引擎循环（含工具报错不崩循环、block → isError 进上下文、maxTurns 护栏）、模型适配（SSE 坏 JSON、tool_call_id 配对、流式参数分片累积）、会话树语义、审批决策、路径沙箱……**FakeModel 测试基建**支持断言"模型第 N 轮看到了什么"。
+覆盖引擎循环（含工具报错不崩循环、block → isError 进上下文、maxTurns 护栏）、模型适配（SSE 坏 JSON、tool_call_id 配对、流式参数分片累积）、会话日志语义（线性追加 + 压缩折叠）、审批决策、路径沙箱……**FakeModel 测试基建**支持断言"模型第 N 轮看到了什么"。
 
 ---
 
@@ -105,7 +105,7 @@ pnpm dev                              # → http://localhost:3000
 接真实模型：把 `.env.local` 改成 `MOCK_MODE=false` 并填 `DEEPSEEK_API_KEY`。
 
 ```bash
-pnpm test        # vitest：41 文件 / 368 用例
+pnpm test        # vitest 全量单测
 pnpm build       # 生产构建
 ```
 
@@ -129,7 +129,7 @@ pnpm build       # 生产构建
 | **路径沙箱**：所有文件工具经 `resolveInsideWorkspace` 圈定工作区 | `lib/tools/path-utils.ts` |
 | **终端执行**：流式输出 + 两级终止 + run 级取消（Windows 编码已根治） | `lib/tools/bash/bash-runner.ts` |
 | **审批治理**：只读放行 / 分级模式 / 会话记忆 / JSONL 审计日志 | `lib/permission/` |
-| **会话与记忆**：JSONL 会话树 + `buildContext()` 回溯 + LLM 结构化摘要压缩 | `lib/session/` |
+| **会话与记忆**：JSONL 线性日志 + `buildContext()` 顺序重建 + LLM 结构化摘要压缩 | `lib/session/` |
 | **多会话并行 run**（切会话不中断） | `app/lib/run-store.ts` |
 | **事件与轨迹**：引擎产事件 → SSE 推前端 → `.traces/*.jsonl` 落盘 | `lib/types.ts` · `lib/trace.ts` |
 | **斜杠命令**：`/compact` `/clear` `/export` + 上下文占用圆环 | `lib/commands/` · `app/components/command-menu/` |
@@ -144,7 +144,7 @@ pnpm build       # 生产构建
 lib/                        ← 内核（稳定，几乎不改）
   agent/                    ← 引擎循环（红线：改动需人工确认）
   tools/                    ← 一工具一目录：11 个工具 + 注册表
-  session/                  ← JSONL 会话树 + 压缩三步
+  session/                  ← JSONL 线性日志 + 压缩三步
   permission/               ← 只读分析 / 审批记忆 / 审计日志
   commands/                 ← 斜杠命令注册表（一命令一目录）
   summarize/  config/       ← 结构化摘要 / 唯一配置入口
@@ -175,8 +175,10 @@ doc/                        ← 设计文档
 **为什么引擎必须"纯净"？**
 最初业务回调（todo、提问）是作为引擎参数传进去的，导致引擎逐渐认识了一堆业务概念。改造后走"工厂参数 + 闭包烙"：业务在**组装期**注入工具，引擎只搬运运行时参数。收益是加功能不用碰内核——而内核是全项目最贵的代码。
 
-**为什么会话存储用 JSONL 树而不是数据库？**
-"内存 = 磁盘"：上下文永远从会话文件重建（`buildContext()`），进程重启不丢状态。树形结构（`id` / `parentId` + `switchLeaf`）让历史可回溯，压缩只追加不删原文——被压的消息仍在文件里，随时可查。
+**为什么会话存储用 JSONL 而不是数据库？**
+"内存 = 磁盘"：上下文永远从会话文件重建（`buildContext()`），进程重启不丢状态。压缩只追加不删原文——被压的消息仍在文件里，随时可查。
+
+> **一次被砍掉的"预挖"**：这里原本是一棵**会话树**（`id` / `parentId` + `switchLeaf` 支持分支）。审计发现它是**空壳**——`switchLeaf` 生产代码零调用、`leafId` 落盘从不记录、而加载逻辑又假设"最后一行就是叶子"，与树结构自相矛盾。实测 39/39 个会话文件都是干净的线性链 → **砍成线性日志**：少 37 行，而且读的结果**只取决于文件内容**（不再取决于一个永远等于"最后一条"的内存指针）。详见 [`doc/plan/session-compaction-refactor.md`](doc/plan/session-compaction-refactor.md) §7.5。
 
 **审批为什么先做"只读放行"而不是"更漂亮的弹框"？**
 弹框的体验问题是表象，真正的成本在**每次 `ls` 都要人点一下**。所以先做命令静态分析：只读命令直接放行，把人的注意力留给真正危险的操作。这也是"治理层收益最高、改动最小"的典型例子。
@@ -199,7 +201,7 @@ doc/                        ← 设计文档
 
 | 参考 | 拿走了什么 |
 |---|---|
-| **pi** | 三层分层纪律、会话树、压缩三步（prepare → summarize → commit）、引擎纯净性 |
+| **pi** | 三层分层纪律、压缩三步（prepare → summarize → commit）、引擎纯净性 |
 | **DeepSeek Harness** | 压缩的审计字段与上下文压力指标、一能力一模块的粒度 |
 | **codex** | 审批引擎（execpolicy）、沙箱分层、轨迹记录 |
 | **Reasonix / CodeWhale** | 命令静态分析审批、审批分级与日志、面板交互 |
