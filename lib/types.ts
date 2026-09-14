@@ -148,7 +148,10 @@ export type TodoItem = {
 export type SessionEntry =
   | {
       type: "session";
-      version: 1;
+      /** 落盘格式版本。读取端只接受已知版本（见 `lib/session/store` 的版本校验）。
+       *  为什么是 number 而不是字面量 `1`：字面量等于在**类型层**宣称"世上只有 v1"，
+       *  读取端的校验就退化成同义反复——而版本号的意义恰恰是"文件可能来自别的版本"。 */
+      version: number;
       id: string;
       timestamp: string;
       cwd: string;

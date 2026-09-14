@@ -11,11 +11,14 @@
 // 本模块无内存态，方法直接打文件系统，所以可以作为模块级单例使用。
 // ============================================================
 
-import { readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { readFile, readdir, rename as renameFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { AgentMessage, SessionEntry } from "../../types";
 import { messageText } from "../../message";
 import { JsonlSessionStore } from "../store";
+// 审批侧车（<id>.approval.jsonl）的路径定义在权限层——delete 要连它一起删，
+// 所以这里复用那份定义，不自己再拼一次文件名（拼法只有一处，改也只会改一处）。
+import { approvalLogPath } from "../../permission/approval-log";
 
 export type SessionSummary = {
   id: string;
@@ -87,10 +90,23 @@ export class SessionManager {
     lines[0] = JSON.stringify(
       title.trim() ? { ...header, title: title.trim() } : { ...header, title: undefined },
     );
-    await writeFile(filePath, lines.join("\n"), "utf8");
+
+    // 原子替换（C18 A 档 ②）：先写同目录临时文件，再 rename 覆盖。
+    // 为什么必须原子：本函数是「全量读 → 改首行 → **全量写回**」，实测最大会话
+    // 124KB。直接 writeFile 到目标路径时，若进程在写回中途被杀——**dev server
+    // 随改代码反复重启，这个窗口天天出现**——文件会被截断成半截 JSON，会话永久
+    // 损坏。同一目录内的 rename 在同一文件系统上是原子的：任何时刻崩溃，要么
+    // 看到完整旧内容、要么看到完整新内容，最坏只留一个 .tmp 残骸。
+    const tmpPath = `${filePath}.tmp`;
+    await writeFile(tmpPath, lines.join("\n"), "utf8");
+    await renameFile(tmpPath, filePath);
   }
 
-  /** 删除整个会话文件 */
+  /** 删除整个会话：主文件 + 审批侧车。
+   *  为什么连侧车一起删：删会话的语义是"这个会话不存在了"，而原来只 rm 主文件——
+   *  审批日志会留成孤儿（实测存量里已有 3 个：会话早删了、日志还躺在 .sessions/）。
+   *  轨迹文件**不在这里删**：轨迹是独立的一层（TRACE_DIR 可配、且是调试黑匣子），
+   *  会话层不该知道它的布局。 */
   async delete(id: string): Promise<void> {
     const filePath = this.sessionPath(id);
     try {
@@ -98,6 +114,8 @@ export class SessionManager {
     } catch {
       throw new Error(`会话不存在：${id}`);
     }
+    // force: 侧车不存在时静默返回——多数会话从没触发过审批，这是常态不是异常
+    await rm(approvalLogPath(this.sessionDir, id), { force: true });
   }
 }
 

@@ -28,6 +28,7 @@ import { createCompactionSummaryMessage, isTextContent, text } from "../../messa
 type MessageEntry = Extract<SessionEntry, { type: "message" }>;
 export type CompactionEntry = Extract<SessionEntry, { type: "compaction" }>;
 type TodoEntry = Extract<SessionEntry, { type: "todo" }>;
+type SessionHeader = Extract<SessionEntry, { type: "session" }>;
 
 /**
  * 压缩准备结果（B2 ③）：prepareCompaction 的产出，供产品层调模型生成摘要。
@@ -332,13 +333,23 @@ export class JsonlSessionStore {
       return;
     }
 
-    const lines = readFileSync(this.filePath, "utf8")
+    const parsed = readFileSync(this.filePath, "utf8")
       .split("\n")
-      .filter(Boolean);
+      .filter(Boolean)
+      .map((line) => JSON.parse(line) as SessionEntry);
 
-    for (const line of lines) {
-      const entry = JSON.parse(line) as SessionEntry;
+    // 防御：文件存在但没有 session 头（可能是坏文件），丢弃重写
+    const header = parsed.find((entry): entry is SessionHeader => entry.type === "session");
+    if (!header) {
+      this.writeHeader();
+      return;
+    }
 
+    // 版本校验（C18 A 档 ①）。**顺序很关键**：必须在上面那条"当坏文件重写"的
+    // 防御**之前**——否则一个来自未来版本的文件会被当成坏文件静默清空。
+    assertSupportedVersion(header);
+
+    for (const entry of parsed) {
       this.entries.push(entry);
 
       if (entry.type !== "session") {
@@ -351,12 +362,6 @@ export class JsonlSessionStore {
           Number(entry.id.replace("entry_", "")) || 0,
         );
       }
-    }
-
-    // 防御：文件存在但没有 session 头（可能是坏文件），丢弃重写
-    if (!this.entries.some((entry) => entry.type === "session")) {
-      this.entries.length = 0;
-      this.writeHeader();
     }
   }
 
@@ -416,6 +421,30 @@ export class JsonlSessionStore {
 }
 
 // --- 模块级纯函数（无状态，便于理解与测试） ---
+
+/** 本代码能读的会话格式版本。读到别的版本一律拒绝（见 assertSupportedVersion）。 */
+const SUPPORTED_SESSION_VERSIONS: number[] = [1];
+
+/**
+ * 版本校验（C18 A 档 ①）：读到不认识的版本**必须 fail-closed**。
+ *
+ * 为什么必须抛、且绝不能"当坏文件重写"：这是**降级**防线——git 切回旧 commit
+ * 就会读到新版本写出的文件。重写 = 静默清空用户会话；硬读 = 按错字段解释出脏消息。
+ * **抛错是唯一"数据不丢"的选项。**
+ *
+ * 版本号的职责是拦「**来自未来的格式**」，不是给每次历史变更记账——所以砍树
+ * （新条目不再写 parentId）**不升版本号**：线性读对 v1 文件结果完全相同，
+ * 升了也没人分辨，那就是又一次"写了没人读的字段"。
+ */
+function assertSupportedVersion(header: SessionHeader): void {
+  if (!SUPPORTED_SESSION_VERSIONS.includes(header.version)) {
+    throw new Error(
+      `会话格式版本不支持：读到 version=${header.version}，本代码只支持 ` +
+        `${SUPPORTED_SESSION_VERSIONS.join(" / ")}。（多半是「降级」——这个文件` +
+        `由更新的版本写出；请用新版打开，不要用旧版覆盖它。）`,
+    );
+  }
+}
 
 function entryToMessage(entry: SessionEntry): AgentMessage[] {
   if (entry.type !== "message") return [];

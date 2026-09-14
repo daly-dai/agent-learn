@@ -10,7 +10,7 @@
 // ============================================================
 
 import { describe, expect, it } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { JsonlSessionStore, summarizeEntries } from ".";
@@ -416,5 +416,87 @@ describe("会话树语义 —— 分支 / todo / 统计", () => {
     // todo 条目不干扰统计（本来就不计，但钉死：即使叶子是 todo 也一样）
 
     cleanup();
+  });
+});
+
+// ============================================================
+// 版本校验（C18 A 档 ①）：读到不认识的格式必须 fail-closed
+// ============================================================
+// 夹具的真实场景（AGENTS 11.5 ②）：**git 切回旧 commit 跑新格式文件**。
+// 本项目天天在切 checkout——新版写出的 v2 文件，旧代码一定会读到。
+// 那时只有两种正确反应：按 v2 的规则读，或者**明确拒绝**。
+// 绝不能落进「文件存在但没有合法头 → 当坏文件重写」那条防御分支：
+// 那等于把用户的会话**静默清空**，而且报警信息指向的是"坏文件"，不是真因。
+describe("版本校验 —— 读到不认识的格式必须 fail-closed", () => {
+  /** 造一个"未来版本写出的会话文件"（当前代码只认 v1） */
+  function writeFutureSession(
+    dir: string,
+    version: number,
+  ): { filePath: string; raw: string } {
+    const filePath = join(dir, "future.jsonl");
+    const raw =
+      [
+        JSON.stringify({
+          type: "session",
+          version,
+          id: "s_future",
+          timestamp: new Date().toISOString(),
+          cwd: dir,
+        }),
+        JSON.stringify({
+          type: "message",
+          id: "entry_1",
+          parentId: null,
+          timestamp: new Date().toISOString(),
+          message: createUserMessage("未来的消息"),
+        }),
+      ].join("\n") + "\n";
+    writeFileSync(filePath, raw, "utf8");
+    return { filePath, raw };
+  }
+
+  it("version 不认识 → 构造抛错，且错误里点名是哪个版本", () => {
+    const dir = mkdtempSync(join(tmpdir(), "session-version-test-"));
+    try {
+      const { filePath } = writeFutureSession(dir, 2);
+
+      expect(() => new JsonlSessionStore(filePath, dir, "s_future")).toThrow(
+        /version=2/,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("⭐ 拒绝时原文件一字未改（不重写、不清空——降级场景的底线）", () => {
+    const dir = mkdtempSync(join(tmpdir(), "session-version-test-"));
+    try {
+      const { filePath, raw } = writeFutureSession(dir, 2);
+
+      expect(() => new JsonlSessionStore(filePath, dir, "s_future")).toThrow();
+
+      // 断言的正是"最坏情况不是数据丢失"：校验失败 = 只读不写
+      expect(readFileSync(filePath, "utf8")).toBe(raw);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("version 1 照常加载（回归：校验不能拦住自己写出的格式）", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "session-version-test-"));
+    try {
+      const filePath = join(dir, "v1.jsonl");
+      const written = new JsonlSessionStore(filePath, dir, "s_v1");
+      await written.appendMessage(createUserMessage("v1 的消息"));
+
+      // 重新打开（走 loadOrCreate 的读入路径 = 校验真正生效的地方）
+      const reopened = new JsonlSessionStore(filePath, dir, "s_v1");
+
+      expect(reopened.buildContext().map((m) => messageText(m))).toEqual([
+        "v1 的消息",
+      ]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
