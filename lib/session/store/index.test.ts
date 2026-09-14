@@ -10,11 +10,11 @@
 // ============================================================
 
 import { describe, expect, it } from "vitest";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { JsonlSessionStore, summarizeEntries } from ".";
-import { createAssistantMessage, createUserMessage, messageText, text } from "../../message";
+import { createAssistantMessage, createUserMessage, text } from "../../message";
 import type { AgentMessage, SessionEntry } from "../../types";
 
 /** B18：find 类型守卫用（保留区第一条必须是 message 条目） */
@@ -365,129 +365,16 @@ describe("会话日志语义 —— todo / 统计", () => {
 });
 
 // ============================================================
-// 版本校验（C18 A 档 ①）：读到不认识的格式必须 fail-closed
-// ============================================================
-// 夹具的真实场景（AGENTS 11.5 ②）：**git 切回旧 commit 跑新格式文件**。
-// 本项目天天在切 checkout——新版写出的 v2 文件，旧代码一定会读到。
-// 那时只有两种正确反应：按 v2 的规则读，或者**明确拒绝**。
-// 绝不能落进「文件存在但没有合法头 → 当坏文件重写」那条防御分支：
-// 那等于把用户的会话**静默清空**，而且报警信息指向的是"坏文件"，不是真因。
-describe("版本校验 —— 读到不认识的格式必须 fail-closed", () => {
-  /** 造一个"未来版本写出的会话文件"（当前代码只认 v1） */
-  function writeFutureSession(
-    dir: string,
-    version: number,
-  ): { filePath: string; raw: string } {
-    const filePath = join(dir, "future.jsonl");
-    const raw =
-      [
-        JSON.stringify({
-          type: "session",
-          version,
-          id: "s_future",
-          timestamp: new Date().toISOString(),
-          cwd: dir,
-        }),
-        JSON.stringify({
-          type: "message",
-          id: "entry_1",
-          parentId: null,
-          timestamp: new Date().toISOString(),
-          message: createUserMessage("未来的消息"),
-        }),
-      ].join("\n") + "\n";
-    writeFileSync(filePath, raw, "utf8");
-    return { filePath, raw };
-  }
-
-  it("version 不认识 → 构造抛错，且错误里点名是哪个版本", () => {
-    const dir = mkdtempSync(join(tmpdir(), "session-version-test-"));
-    try {
-      const { filePath } = writeFutureSession(dir, 2);
-
-      expect(() => new JsonlSessionStore(filePath, dir, "s_future")).toThrow(
-        /version=2/,
-      );
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  it("⭐ 拒绝时原文件一字未改（不重写、不清空——降级场景的底线）", () => {
-    const dir = mkdtempSync(join(tmpdir(), "session-version-test-"));
-    try {
-      const { filePath, raw } = writeFutureSession(dir, 2);
-
-      expect(() => new JsonlSessionStore(filePath, dir, "s_future")).toThrow();
-
-      // 断言的正是"最坏情况不是数据丢失"：校验失败 = 只读不写
-      expect(readFileSync(filePath, "utf8")).toBe(raw);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  it("version 1 照常加载（回归：校验不能拦住自己写出的格式）", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "session-version-test-"));
-    try {
-      const filePath = join(dir, "v1.jsonl");
-      const written = new JsonlSessionStore(filePath, dir, "s_v1");
-      await written.appendMessage(createUserMessage("v1 的消息"));
-
-      // 重新打开（走 loadOrCreate 的读入路径 = 校验真正生效的地方）
-      const reopened = new JsonlSessionStore(filePath, dir, "s_v1");
-
-      expect(reopened.buildContext().map((m) => messageText(m))).toEqual([
-        "v1 的消息",
-      ]);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
-});
-
-// ============================================================
 // 线性日志（C18 砍树，2026-09-14）
 // ============================================================
-// ⚠️ **这块没有"先红后绿"的用例，而且不该有**：砍树对真实数据是**可证明的
-//    no-op**——实测 39/39 个会话文件都是干净的线性链，树遍历与顺序读**逐条相同**。
-//    硬造一个"树读法会读错"的夹具，就是在造真实数据里不存在的状态（11.5 ②）。
-//    所以验证靠两样：① **`tsc`** —— 删掉的 API（switchLeaf / getLeafId / parentId）
-//    再也调不出来，编译期就拦住了，这比任何运行时用例都硬；
-//    ② 下面两条**兼容性回归** —— 老文件照常读全、新条目不再写死字段。
-describe("线性日志 —— 老文件照常读，新条目不再写 parentId", () => {
-  it("⭐ 读老格式会话（条目带 parentId）：全部消息一条不少、顺序不变", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "session-linear-test-"));
-    try {
-      const filePath = join(dir, "legacy.jsonl");
-      // 夹具的真实场景（AGENTS 11.5 ②）：**磁盘上现存的 39 个会话文件全都是这个
-      // 形态**——2026-09-14 之前写出的，每条 message/todo 都带 parentId。
-      // 消息本体用真构造函数产出，只手工拼"条目信封"。
-      const stamp = new Date().toISOString();
-      const raw =
-        [
-          JSON.stringify({ type: "session", version: 1, id: "s_legacy", timestamp: stamp, cwd: dir }),
-          JSON.stringify({ type: "message", id: "entry_1", parentId: null, timestamp: stamp, message: createUserMessage("老话一") }),
-          JSON.stringify({ type: "todo", id: "entry_2", parentId: "entry_1", timestamp: stamp, todos: [{ content: "老任务", status: "pending" }] }),
-          JSON.stringify({ type: "message", id: "entry_3", parentId: "entry_2", timestamp: stamp, message: createUserMessage("老话二") }),
-        ].join("\n") + "\n";
-      writeFileSync(filePath, raw, "utf8");
-
-      const store = new JsonlSessionStore(filePath, dir, "s_legacy");
-
-      // parentId 被完全忽略：两条消息都读到，顺序就是文件顺序
-      expect(store.buildContext().map((m) => messageText(m))).toEqual([
-        "老话一",
-        "老话二",
-      ]);
-      expect(store.getLatestTodos()).toEqual([
-        { content: "老任务", status: "pending" },
-      ]);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
+// ⚠️ **这块只有一条用例，而且不该多**：砍树对真实数据是**可证明的 no-op**
+//    （实测 39/39 个会话文件都是干净的线性链，树遍历与顺序读逐条相同），
+//    硬造"树读法会读错"的夹具就是在造不存在的状态（AGENTS 11.5 ②）。
+//    **删掉的能力由 `tsc` 兜底**——`switchLeaf` / `getLeafId` / `parentId`
+//    再也调不出来，编译期就拦住了，这比任何运行时用例都硬。
+//    也**不写"读老格式文件"的兼容用例**：2026-09-14 数据已清空、探索期不做兼容；
+//    而"忽略不认识的字段"本来就是 JSON 解析的默认行为（真去读 parentId 反而编译不过）。
+describe("线性日志 —— 新写的条目不再带 parentId", () => {
   it("⭐ 新写的条目不再带 parentId（格式契约：砍干净，不留半拉子字段）", async () => {
     const { store, cleanup } = makeStore();
     try {

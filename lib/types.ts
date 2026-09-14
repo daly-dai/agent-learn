@@ -153,10 +153,10 @@ export type TodoItem = {
 export type SessionEntry =
   | {
       type: "session";
-      /** 落盘格式版本。读取端只接受已知版本（见 `lib/session/store` 的版本校验）。
-       *  为什么是 number 而不是字面量 `1`：字面量等于在**类型层**宣称"世上只有 v1"，
-       *  读取端的校验就退化成同义反复——而版本号的意义恰恰是"文件可能来自别的版本"。 */
-      version: number;
+      // 为什么**没有** version 字段（2026-09-14 删的，别再加回来）：它曾经有
+      // `version: 1`，但全仓库没有任何读取路径——就是 §1.2 诊断出的"预留字段"病。
+      // 中途加过一版校验又撤了：那是**兼容性机制**，而探索期 + 存量数据已清空，
+      // "多版本共存"这个需求不存在（不变量 3）。完整判据见 lib/session/store 的 writeHeader。
       id: string;
       timestamp: string;
       cwd: string;
