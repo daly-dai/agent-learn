@@ -174,7 +174,7 @@ static create(dir: string, model: string, sessionId: string): TraceRecorder
 | **新增** | `lib/trace.ts` 扩展（sessionId + meta + window） |
 | **新增** | `app/api/traces/route.ts`（按 sessionId 列 run 的 meta） |
 | **新增** | `app/api/traces/[runId]/route.ts`（读一个 run 的 entries/window） |
-| **新增** | `app/lib/trace-steps.ts`（纯函数：`TraceEntry[]` → 记录 + 大纲 + 会话级坐标）**← 单测挂这里** |
+| **新增** | `app/lib/trace-steps/`（纯函数：`TraceEntry[]` → 记录 + 大纲 + 会话级坐标）**← 单测挂这里**（`index.ts` + `index.test.ts`，AGENTS.md 6.5 硬规则） |
 | **新增** | `app/components/trace-viewer/`（记录表 + 时间概览 + 检查器） |
 | **删除（阶段 1 就做）** | `TraceSnapshot` 死类型（`lib/trace.ts`）+ 详案里的对应段落 |
 | **保留代码 / 断开接线（阶段 1）** | `app/components/trace-rail/`（整目录）+ `app/lib/trace-fold.ts` **文件留在仓库**，但从 `page.tsx` **移除渲染与它专属的接线**（`import` / `<TraceRail>` / `rows` useMemo / `traceRef` / 吸附滚动）——留作**回滚能力**，不占页面 |
