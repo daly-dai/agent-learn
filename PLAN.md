@@ -247,7 +247,7 @@ todo 是会话事件（非独立存储）；`todo_write` 整表替换幂等；�
 | # | 做什么 | 参考 | 长在哪 | 触发时机 | 状态 |
 |---|---|---|---|---|---|
 | C1 | MCP 接入 | Cline / smolagents mcp_client | ToolRegistry 注册外部工具源 | 需要外部数据源时 | ⏳ |
-| C2 | 沙箱容器 | OpenHands / DSH sandbox | 新 Runner（与 BashRunner 平级） | 安全需求出现时 | ⏳ |
+| C2 | 沙箱容器（**2026-09-14 扩范围：加"网络维度"**——原设计只有文件/进程，网络是空白） | **codex `network-proxy` + Windows MXC**（最新侦察）/ OpenHands / DSH sandbox | 新 Runner（与 BashRunner 平级）+ **权限配置的网络维度**（域名白名单 / 只读模式） | 安全需求出现时 | ⏳ |
 | C3 | 子智能体 / handoffs | DSH subagent（8 种实现） | runAgentLoop 嵌套调用 | Phase 5 任务面板跑稳后 | ⏳ |
 | C4 | 定时任务 | DSH schedule | 产品层新 Runner | 有无人值守需求时 | ⏳ |
 | C5 | 遥测/分析面板 | pi usage-totals / DSH feedback | A3 Trace Viewer 的延伸 | 数据积累后 | ⏳ |
@@ -261,6 +261,7 @@ todo 是会话事件（非独立存储）；`todo_write` 整表替换幂等；�
 | C13 | **斜杠命令面板** | pi `core/slash-commands.ts` / Reasonix `.reasonix/commands/*.md` | `lib/commands/` 注册表 + 前端斜杠输入 | **立即（一步到位）**；详案 `doc/plan/c13-slash-commands.md` | ✅ 已实现（2026-09-01：首批 /compact + ContextMeter 圆环 + 后续 /clear /export 全链路；目录化 + 后端优化 + useCommandMenu 前端重构；详案补记 1-8；**/model /skills 两个纯前端命令 2026-09-01 用户拍板延后 → C8 Skills 一起做**） |
 | C14 | **@ 文件匹配**（file mention）：输入 `@` 触发文件模糊搜索（文件+文件夹）→ 选中注入模型上下文（代码编写时点名要读的代码/配置；用户 08-27 提，**排在 C13 之后做**） | Codex `mention_codec`/`fuzzy_file_search` + pi `file-processor`（已实读） | `app/lib/mentions.ts`（纯函数）+ `app/api/file-search/` + `ui/mention-picker/` + 发送注入 | ⏳ 排队（详案 `doc/plan/c14-file-mention.md`：**含 A/B/C 方案对比与选 A 理由 + 效率实测（379 文件 7ms / 17k 文件 81ms，按真实工作区场景，**排除依赖是必须项**）+ debounce + 文件夹支持**；符号 @ 可配置不写死） |
 | C15 | **开源仓库更新面板**（用户 08-31 提）：`/repos` 页面（**左右布局**：左项目边栏 + 右详情）列出 `E:\agents-read` 7 个参考项目 → 手动点击更新 = git fetch + pull + LLM 总结新增 commit + ⭐重点标注（结合导航手册"我们拿走什么"）；基线 `.repo-updates/<项目>.json` 增量总结，落盘 `workspace/更新日志/<日期>-<项目>.md`。**分支是数据不是探测**（命令固定 fetch/log/pull，分支写进 registry：pi/codex=main，DSH=master）；**状态 = 进页面实时 `git ls-remote` 检查**（毫秒级，有更新才显示 tag，不误导） | git 标准 CLI + 复用本项目 B2 模型管道（`selectModel`+`complete`+fail-soft） | `lib/repos/`（registry/git/baseline/summarize）+ `app/api/repos/route.ts` + `app/services/repos/` + `app/repos/page.tsx`（首个独立路由页） | ✅ 完成（2026-09-01 单测落地：5 文件 36 用例全绿；修了 3 个根因——vitest.config 缺 `@/` alias / vi.mock TDZ / git 测试缺裸远端；summarize.ts 截断提示死代码被测试逮住已修） |
+| C16 | **六个月跳槽计划（跳槽为主线）**：主目标 = 学会 agent → 跳槽 → **两条线一条流水线**：② 开源技术（pi/DSH）发文章（内部 + 公开双投）③ 参考上游最新变化 + 汲取好设计，持续完善 agent-learn；**⓪ 阶段 1 = 先包装 + 开源 agent-learn**（原清单漏项，杠杆最大——作品没包装等于没作品）。**线 ①「参与公司 agent」2026-09-14 关闭**（领导明确不让前端参与）→ 只剩自有资产这一条路 | 自身经验 + `sop-新增参考项目.md` | 详案 `doc/plan/六个月跳槽计划.md`（**唯一执行文档**：决策依据 + 两条线 + 排期 + 验收 + 砍掉清单 + 上游变化侦察 §八） | **立即**（本周：发文章 + README；上游变化已侦察） | ⏳ 进行中 |
 
 > **非核心/可选（暂不排期，条件触发）**：**LSP 代码智能**（重型依赖——要起语言服务器进程，教学项目收益低；真需要代码智能时再评估）和 **tool_search 工具发现**（工具超过 20 个才需要，现在 12 个；等工具膨胀时再评估）。这两项不是"不学"，是"条件触发"。
 

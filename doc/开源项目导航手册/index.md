@@ -22,6 +22,8 @@
 | langchainjs | [langchainjs.md](langchainjs.md) | LangChain JS：新一代 agent 框架 + middleware 生态 |
 | opencode | [opencode.md](opencode.md) | 终端 Agent 完整实现（TS，dev 分支） |
 
+> **2026-09-14 更新**：codex 这半个月（617 commits）的重心是 **app-server（~1010 文件改动）/ 扩展体系 ext / 远程执行 exec-server / Guardian 评审 / Windows 沙箱 / 网络策略**——上表的 codex 行按这次侦察重排，入口详见 [codex.md](codex.md) 的「最新动向」一节。
+
 > **新增项目流程**：见 [sop-新增参考项目.md](sop-新增参考项目.md)（确认项目存在 → 架构解析 → 填导航卡 → 回填 → 验收）。
 
 ---
@@ -32,7 +34,14 @@
 |---|---|---|
 | 架构纪律 / 分层 / 会话树 / 压缩 | **pi** | `pi/packages/agent/src/harness/` |
 | 产品层（bash 执行 / 会话管理 / 斜杠命令） | **pi** | `pi/packages/coding-agent/src/core/` |
-| 工业级 Rust 实现 / 审批引擎 / 沙箱 | **codex** | `codex/codex-rs/core/src/` + `execpolicy/` + `sandboxing/` |
+| 工业级 Rust 实现 / 审批引擎 | **codex** | `codex/codex-rs/core/src/` + `execpolicy/` |
+| **沙箱（进程 / 文件隔离）** | **codex** | `codex-rs/{sandboxing,linux-sandbox,windows-sandbox-rs,mxc-sandbox}/` |
+| **网络策略沙箱** ⭐（域名白名单 / 只读模式 / 内网保护） | **codex** | `codex-rs/network-proxy/`（README 即教程） |
+| **远程执行主机**（命令在别的机器上跑） | **codex** | `codex-rs/exec-server/` + `exec-server-protocol/` |
+| **LLM 审批评审**（Guardian：带预算的评审会话） | **codex** | `codex-rs/core/src/guardian/` + `guardian-context/` |
+| 提权 / 逃逸出沙箱 | **codex** | `codex-rs/shell-escalation/` |
+| 服务端形态（run 脱离请求生命周期） | **codex** | `codex-rs/app-server*/` |
+| 外部扩展 / 插件体系 | **codex** | `codex-rs/ext/` + `core-plugins/` |
 | 功能全景 / 一能力一包 / 插件化 | **DSH** | `deepseek-harness/packages/` + `docs/` |
 | 前端 UI / 面板 / 交互设计 | **Reasonix** | `DeepSeek-Reasonix-main-v2/desktop/frontend/` |
 | 轻量 Python agent / 代码执行器 | smolagents | `smolagents-main/src/smolagents/` |
