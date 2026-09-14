@@ -2,7 +2,8 @@
 
 > 触发：PLAN 7.3 A5 行「web_search / web_fetch」——唯一完全没有的能力族（工具全景 2.4 表）。
 > 调研：五家源码精读（DSH 亲自读 + codex/CodeWhale/smolagents 子代理 + Reasonix 亲自读），走读 19-22。
-> 状态：**方案已确认（2026-08-26），待用户本地验证端点后开工**。
+> 状态：**⏳ 进行中（2026-09-14 重开）**——方案仍以 §一~§六 为准；**重开的原因、三条纪律、结构重排、以及一处矛盾拍板见 §七**。
+> 历史：08-26 方案定稿 → 开工 → 卡住并整体回退（本文件曾存于 `doc/plan-archive/`）；09-14 C18 收口后选为"下一块大功能"，重新启用。
 
 ---
 
@@ -121,3 +122,55 @@ curl.exe -s -X POST "https://api.deepseek.com/anthropic/v1/messages" `
 - **国内多模型**：SearchProvider 接口留好，加 Kimi/千问/GLM = 加 provider 文件（见第二节）
 - 缓存 / 引用注册表 / 后端链（CodeWhale）：暂缓，等真需要
 - web_search 多查询合并的 round-robin 去重：DSH 实现直接参考（search.ts mergeSearchResults）
+
+---
+
+## 七、重开补记（2026-09-14）
+
+> **触发**：C18 收口后用户选"下一块大功能" → A5 —— 它是**阶段 A 唯一没做的项**。
+> **重开不是从零**：§一~§六 的方案（五家精读结论 + 三个已确认决策）**全部仍然有效**，08-26 已拍板。
+
+### 7.1 上次为什么失败（两层，**第二层才是真问题**）
+
+- **技术层**：卡在 web_fetch 的「dev 里 `fetchUrl` 30s 超时，但终端/沙箱里 `https.request` 与原生 fetch 都 HTTP 200」这个谜团上，**没定位就回退了**。根因大概率是自定义 `lookup` 钉 IP 的写法——Node v22 的 Happy Eyeballs 会以 `all: true` 调 lookup，回调**必须返回 `[{address, family}]` 数组**（返回字符串会被按字符解构）。
+- **心理层**（归档原话）："走了大量弯路（IPv6 理论、缓存理论、UA、timeout 理论全被实测证伪），**用户失去掌控感、对功能不了解**，明确要求回退。"
+
+⇒ 本次重开立**三条纪律**（2026-09-14 用户确认）：
+
+1. **绕开老谜团，不试图解开它** —— 第一笔就用**原生 fetch（undici）**，自定义 lookup 直接不要。
+2. **每一步都能看到东西** —— 不再"铺开一大片再验收"。
+3. **先在纯 node 里跑通，再进 dev** —— 上次最要命的是**环境差异**（终端成功 / dev 失败）。
+
+### 7.2 结构重排（§二 的平铺文件 → 模块目录）
+
+原 §二 的文件是**平铺**的（`search.ts` / `fetch.ts` / `ssrf.ts` / `html-to-text.ts` + 一个 `index.test.ts`）。这与 **AGENTS 6.5 硬规则**冲突（有单测的实现必须 `<模块>/index.ts` + `index.test.ts`），也对不上 `lib/tools/` 现有约定（先例 `bash/bash-runner/`）。改为：
+
+```
+lib/tools/web-fetch/
+├── index.ts  / index.test.ts            工具定义（薄包装）
+├── fetcher/  index.ts / index.test.ts    HTTP GET + 限额 + 截断（纯 node 可测）
+├── ssrf/     index.ts / index.test.ts    地址闸门（纯函数）
+└── html-to-text/ index.ts / index.test.ts turndown 包装
+lib/tools/web-search/
+├── index.ts  / index.test.ts
+└── provider/ index.ts / index.test.ts    DeepSeek Anthropic 端点
+```
+
+### 7.3 ⭐ 拍板：`web_fetch` **拦 loopback**（原方案自相矛盾，已统一）
+
+§二 写「loopback **允许**（agent 已能 bash 到 localhost）」，§三 验收 5 写「`127.0.0.1` **被拒**」——**两处直接打架**。2026-09-14 用户拍板：**拦**。
+
+**为什么 §二 的论证不成立**：bash 到 localhost **要弹框批准**，而 web_fetch 是只读、**走放行档不弹框**——所以"bash 也能做到"**不是等价能力**。放行 loopback 等于给模型开一条**没有人把关**的本地服务通道（内网面板 / 本地数据库 HTTP 接口 / dev server 调试端点）。
+⇒ 验收 5 按"两种地址都拒"执行。
+
+### 7.4 SSRF 的**诚实边界**（写进代码注释，别当成"万无一失"）
+
+本期用 **DNS 预解析 → 校验全部地址 → 用域名发请求**。校验与实际连接之间理论上存在 **TOCTOU 窗口**（DNS rebinding：先返回公网 IP 骗过校验，再在真正连接时返回内网 IP）。彻底堵住要"把校验过的 IP 钉进连接"= 自定义 lookup = **上次死掉的那条路**。所以本期**刻意选简单做法**，把残余风险明写出来，而不是用一个没跑通的机制假装安全。
+
+### 7.5 进度
+
+| 步 | 状态 |
+|---|---|
+| **`ssrf/`**（地址闸门，**46 用例**） | ✅ 完成（2026-09-14）——含经典绕过：IPv4-mapped / IPv4-compatible / NAT64 / **多地址只看第一个** / fail-closed |
+| 端点验证（§四） | ⏳ **等用户本地跑** `node scripts/verify-websearch.mjs`（脚本已写好；沙箱无外网，实测） |
+| `fetcher/` → `html-to-text/` → 两个工具定义 → 注册 → 提示词 | ⏳ 排队 |
