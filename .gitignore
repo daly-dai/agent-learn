@@ -2,6 +2,8 @@
 
 # dependencies
 /node_modules
+# DSH 运行 pnpm 时会在项目根建本地 store（机器用，不提交）
+/.pnpm-store/
 /.pnp
 .pnp.*
 .yarn/*
