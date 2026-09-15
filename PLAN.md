@@ -159,7 +159,7 @@ todo 是会话事件（非独立存储）；`todo_write` 整表替换幂等；�
 | agent-loop 纯净性改造 | `doc/plan/agent-loop-purity.md` + `doc/01-*.md` | ✅ 已实现 |
 | A2 vitest 测试框架 | `doc/plan/a2-vitest.md` | ✅ 已实现 |
 | A4 ask_user_question | `doc/plan/a4-ask-user.md` | ✅ 已实现 |
-| A5 web_search / web_fetch | `doc/plan/a5-web-search.md`（五家精读走读 19-22 + **§七 重开补记**） | ⏳ **进行中（09-14 重开）**：`ssrf/` ✅ 46 用例 |
+| A5 web_search / web_fetch | `doc/plan/a5-web-search.md`（五家精读走读 19-22 + **§七 重开补记** + **§7.6~§7.13 施工/复核补记**：DSH 全量复核、非 2xx 拍板、两轮真机 bug 修复、四家 web 能力一手复核 + codex 决策边界落地 + 配置收口） | ⏳ **代码完成（09-14），未 commit，待用户本地复跑端到端验收** |
 | B2 真摘要压缩（三步） | `doc/plan/b2-compaction.md` + `doc/02-*.md`（四家对照） | ✅ 已实现 |
 | C7 配置整合 | `doc/plan/c7-config.md` | 骨架 ✅，设置页 UI ⏳ |
 | C13 斜杠命令面板 | `doc/plan/c13-slash-commands.md` | ✅ 已实现（2026-09-01，首批 /compact 全链路；/model /skills /export 排队） |
@@ -214,7 +214,7 @@ todo 是会话事件（非独立存储）；`todo_write` 整表替换幂等；�
 | A2 | **测试框架 vitest** | smolagents / DSH test-support | `lib/tools/` 先补单测（纯函数+fs） | tools 全测过，`pnpm test` 绿 | ✅（23 文件 188 用例） |
 | A3 | **L3 Trace Viewer** | pi export-html / OpenHands 泳道（v2 参考 DSH `client/ui-trajectory`） | `app/components/trace-viewer/` + `app/lib/trace-steps/` + `app/lib/trace-layout/` + `app/lib/use-traces.ts` + `lib/trace/` + `lib/trace-files/` + `app/api/traces/` | ✅ 完成（2026-09-14，8 条验收全过——第 3 条的"轮次前后跳转"经用户确认**删掉**：原型里从没有过这个控件；第 5 条经实测改判：1149KB 轨迹折叠后只有 11 行，瓶颈在读解析 12ms 不在渲染）。**v2（密列表 + 检查器）见 C20** | ✅ |
 | A4 | **ask_user_question** | DSH tool-ask-user / codex request_user_input | 新工具 + SSE 帧 + 前端弹层 | 模型提问 → 弹层 → 回答 → 继续 | ✅ |
-| A5 | **web_search / web_fetch** | DSH tool-web / CodeWhale Web 聚合 | 新工具（独立） | 模型能搜索并抓取网页；搜不到时 isError | ⏳ **进行中（2026-09-14 重开）**：`ssrf/` ✅ 46 用例（含 IPv4-mapped / NAT64 等经典绕过）；**端点验证待用户本地跑** `node scripts/verify-websearch.mjs`；详见详案 `doc/plan/a5-web-search.md` **§七** |
+| A5 | **web_search / web_fetch** | DSH tool-web / CodeWhale Web 聚合 / codex web.run（**决策边界提示词**）/ opencode `webfetch.ts`（**复核漏掉的第五家，见 §7.14.5**） | 新工具（独立） | 模型能搜索并抓取网页；搜不到时 isError | ⏳ **代码完成 + 两轮真机 bug 修完 + 抄了 codex 决策边界 + 配置收口 + 补抄 DSH 的不可见内容规则（2026-09-14），未 commit**：**52 文件 613 用例**绿 + `next build` 通过；已修 ①**模型不知道今天几号** ②**非 UTF-8 乱码**；已加 ③**"什么时候必须联网"决策边界 + 引用规范** ④**端点/上限收进 config**（并修好 `.env.local.example` 里那个死开关）⑤**丢弃不可见内容**（turndown 默认会保留隐藏元素的文字）。**待用户复跑确认**。详见详案 `doc/plan/a5-web-search.md` **§7.11 / §7.12 / §7.13 / §7.14** |
 
 **阶段 B：工程化补齐（中期，从"能跑"到"好用"）**
 
