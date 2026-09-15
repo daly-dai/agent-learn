@@ -46,10 +46,26 @@ function num(name: string, fallback: number): number {
 export type ProviderConfig = {
   /** 显示名（SSE run 帧 / 轨迹用） */
   label: string;
-  /** OpenAI 兼容 API 地址 */
+  /** OpenAI 兼容 API 地址（主对话，走 `${baseUrl}/chat/completions`） */
   baseUrl: string;
   /** 模型 id */
   model: string;
+  /**
+   * 服务端搜索端点（Anthropic 兼容，走 `${search.baseUrl}/messages`）。
+   *
+   * ⚠️ **和上面的 `baseUrl` 不是一个路径，绝不能复用**：`baseUrl` 随
+   * `AI_PROVIDER` 变，一旦搜索读了它，切到别家就会把搜索请求发到那家的
+   * 地址上。而 DeepSeek 对**不认识**的模型名是**静默映射**的
+   * （`claude-opus*` → `deepseek-v4-pro`，按 V4 Pro 收费）——
+   * 发错不会报错，只会悄悄变贵。`index.test.ts` 里有一条断言钉这件事。
+   *
+   * 为什么 `model` 也在这里、而不是复用上面的 `model`：同理。搜索模型
+   * 只对**这个搜索端点**有意义。
+   */
+  search: {
+    baseUrl: string;
+    model: string;
+  };
   /** 上下文窗口（token）——压缩阈值按它算：窗口 - 预留 */
   contextWindow: number;
   /** 压缩触发时预留的 token（给摘要 prompt + 输出） */
@@ -67,8 +83,16 @@ const PROVIDERS: Record<string, ProviderConfig> = {
   // 想快速触发压缩，设 CONTEXT_WINDOW=3000 之类的小值即可（改 .env.local 后重启 dev）。
   deepseek: {
     label: "deepseek",
-    baseUrl: "https://api.deepseek.com",
-    model: "deepseek-v4-flash",
+    // ⚠️ 这两个**曾经是字面量**，而 `.env.local.example` 里已经写着
+    //    "可选：覆盖默认值"——文档承诺了一个不存在的开关（2026-09-14 修）。
+    baseUrl: env("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
+    model: env("DEEPSEEK_MODEL", "deepseek-v4-flash"),
+    // 搜索走 Anthropic 兼容端点（`/anthropic/v1/messages`），
+    // 和上面的 OpenAI 兼容端点**不是一条路**。见 ProviderConfig.search 的说明。
+    search: {
+      baseUrl: env("DEEPSEEK_SEARCH_BASE_URL", "https://api.deepseek.com/anthropic/v1"),
+      model: env("DEEPSEEK_SEARCH_MODEL", "deepseek-v4-flash"),
+    },
     contextWindow: num("CONTEXT_WINDOW", 1_000_000),
     reserveTokens: num("RESERVE_TOKENS", 16_384),
     keepRecentTokens: 20_000,
@@ -135,6 +159,35 @@ export const config = {
   bash: {
     timeoutMs: num("BASH_TIMEOUT_MS", 30_000),
     maxOutputChars: num("BASH_MAX_OUTPUT_CHARS", 64 * 1024),
+  },
+
+  /**
+   * 联网工具（web_search / web_fetch）的行为旋钮。
+   *
+   * ⭐ 为什么这些在这里、而**端点**在 `provider` 段：
+   *   判据是「换个厂商会不会变」——**会变**的（在哪、跟谁说）归 provider，
+   *   **不会变**的（我们允许它做多少）归这里。`maxResults = 8` 换哪家都是 8。
+   */
+  web: {
+    search: {
+      /** 一次搜索请求的生成 token 上限（只要一小段，不需要大） */
+      maxTokens: num("WEB_SEARCH_MAX_TOKENS", 4096),
+      /** 一次请求内允许模型用几次服务端搜索 */
+      maxUses: num("WEB_SEARCH_MAX_USES", 5),
+      /** 返回来源数上限（超了砍掉并标记截断） */
+      maxResults: num("WEB_SEARCH_MAX_RESULTS", 8),
+      /** 一次工具调用接受的查询条数上限（模型可以给多条，并发搜） */
+      maxQueries: num("WEB_SEARCH_MAX_QUERIES", 4),
+    },
+    fetch: {
+      timeoutMs: num("WEB_FETCH_TIMEOUT_MS", 15_000),
+      /** 读进来的字节上限（1 MiB）；到顶就断开，不把整个响应下完再扔 */
+      maxBytes: num("WEB_FETCH_MAX_BYTES", 1024 * 1024),
+      /** 重定向跳数上限；每跳都要重新过 SSRF 闸门 */
+      maxRedirects: num("WEB_FETCH_MAX_REDIRECTS", 3),
+      /** 给模型的完整输出（头 + 声明 + 正文 + 截断提示）字符上限 */
+      maxOutputChars: num("WEB_FETCH_MAX_OUTPUT_CHARS", 200_000),
+    },
   },
 } as const;
 

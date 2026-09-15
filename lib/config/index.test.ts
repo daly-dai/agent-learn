@@ -15,6 +15,10 @@ function smallWindowProvider(): ProviderConfig {
     label: "test-provider",
     baseUrl: "https://example.com",
     model: "test-model",
+    search: {
+      baseUrl: "https://example.com/anthropic/v1",
+      model: "test-search-model",
+    },
     contextWindow: 128_000,
     reserveTokens: 16_384,
     keepRecentTokens: 20_000,
@@ -54,4 +58,36 @@ describe("config.provider —— provider 可扩展结构", () => {
   // 构造的 smallWindowProvider() 字面量（16_384 > 0 恒真），测自己造的数据
   // 没有失败可能，是无效断言。结构完备性已由 shouldCompact 的行为测试
   // （上面第二个 it：110K 不触发 / 115K 触发）间接覆盖——能驱动判断才是真的完备。
+});
+
+describe("config.provider.search —— 服务端搜索端点", () => {
+  it("⭐ 搜索端点与主对话端点**不是同一个路径**（这条是守卫，不是描述）", () => {
+    // 为什么必须钉：搜索是 Anthropic 兼容的 `/messages`，主对话是 OpenAI 兼容的
+    // `/chat/completions`。两者混用**不会报错**——只会在切换 AI_PROVIDER 后
+    // 把搜索请求发到别家的地址上，而且 DeepSeek 对不认识的模型名是静默映射的。
+    // 把代码里那句"绝不能复用 baseUrl"的注释，变成一条会红的断言。
+    expect(config.provider.search.baseUrl).not.toBe(config.provider.baseUrl);
+    expect(config.provider.search.baseUrl).toContain("/anthropic/");
+    expect(config.provider.search.baseUrl).toContain("/v1");
+  });
+
+  it("搜索模型与主模型各自独立（换主模型不该顺手换掉搜索模型）", () => {
+    expect(config.provider.search.model.length).toBeGreaterThan(0);
+    // 不写死具体值：它可以用 DEEPSEEK_SEARCH_MODEL 覆盖。
+    // 这里钉的是「这是一个独立字段」，不是「它等于某串字符」。
+    expect(config.provider.search).toHaveProperty("model");
+  });
+});
+
+describe("config.web —— 联网工具的行为旋钮", () => {
+  it("默认值就是工具实际使用的值（改了这里就等于改了线上行为）", () => {
+    expect(config.web.search.maxTokens).toBe(4096);
+    expect(config.web.search.maxUses).toBe(5);
+    expect(config.web.search.maxResults).toBe(8);
+    expect(config.web.search.maxQueries).toBe(4);
+    expect(config.web.fetch.timeoutMs).toBe(15_000);
+    expect(config.web.fetch.maxBytes).toBe(1024 * 1024);
+    expect(config.web.fetch.maxRedirects).toBe(3);
+    expect(config.web.fetch.maxOutputChars).toBe(200_000);
+  });
 });
