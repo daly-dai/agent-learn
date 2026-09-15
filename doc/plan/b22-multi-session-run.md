@@ -172,7 +172,7 @@ export function useAgentRun(sessionId: string) {
 
 ## 六、已知边界（决策记录）
 
-- **刷新丢实时观察**（用户暂不接受、记未来项）：runStore 内存态，刷新丢；服务端 run 继续跑完落盘，回 A 拉历史看结果。补实时需 run 脱离请求生命周期（opencode Session Runtime 形态），见 PLAN 7.3 衍生项锚点。
+- **刷新丢实时观察**（用户暂不接受、记未来项）：runStore 内存态，刷新丢；服务端 run 继续跑完落盘，回 A 拉历史看结果。补实时需 run 脱离请求生命周期（opencode Session Runtime 形态）——**2026-09-14 已升为排期项 `C27`**（见 `PLAN.md` 排期表）。
 - **服务端 per-session 串行**（并发 POST 同会话）归 B11 会话级运行锁，本详案只做前端"loading 禁发送"门控（保持现状）。
 - **多 run 并行上限**：用户拍板不限，但浏览器并发 fetch 有浏览器自身限制（~6 连接/域），超出排队由浏览器处理，非本项目逻辑。
 - **B22 不动 route.ts**：done 帧已是权威值；如未来要"刷新重连"，先做"run 状态服务端可查"再谈 seq 裁决（精读结论：现在不需要）。

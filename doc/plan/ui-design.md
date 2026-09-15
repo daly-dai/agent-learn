@@ -76,7 +76,7 @@ PLAN 九节写着"漂亮动画 / 复杂 UI"暂缓。这次只做了排版与信�
 | ② 组件 | 组合 > 发明，新原语必须走评审 | `app/components/ui/menu/`（B3 原语库） |
 | ③ 文档 | 身份 + 硬约束（对比度 ≥4.5:1、等宽 ≥12px、命中区 ≥34px） | 本文件 |
 | ④ 代码即约束 | 违反 = 编译错误，不是口头提醒 | `tsc --noEmit` 每步可运行、CSS Modules、类型系统 |
-| ⑤ 流程 | 人审兜底：提交前展示清单、确认后执行 | AGENTS.md 第 9 条、PLAN 7.3 排期（范围约束） |
+| ⑤ 流程 | 人审兜底：提交前展示清单、确认后执行 | AGENTS.md 第 9 条、`PLAN.md` 排期表（范围约束） |
 
 **硬规则（组件组合 > 发明）**：UI 改动默认只允许动令牌 / 既有组件 / 既有样式；需要新视觉元素或新原语时，必须说明"为什么现有原语库不够"，并对照 Radix/DSH 行为清单，经确认后再做。
 
@@ -154,7 +154,7 @@ PLAN 九节写着"漂亮动画 / 复杂 UI"暂缓。这次只做了排版与信�
 4. **props 收数据**：组件收 props 与回调，不碰全局/服务（DSH "ctx discipline" 简化版）；行内状态互斥时提父级（SessionRow 教训）。
 5. **测试**：纯函数/工具逻辑抽到 `app/lib/` 写单测（B8 ①）；组件层测试等冻结信号（B8 ②），到时**断言用户可见行为，不断言 class name/hook 内部**（DSH 同款）。
 6. **验收**：`tsc --noEmit` + `pnpm test` 绿；code-review 双轴（11.5 ⑦）。
-7. **沉淀**：ui-design.md 补记 + PLAN 7.3 状态 + 过程日志（commit 时带 hash）。
+7. **沉淀**：ui-design.md 补记 + `PLAN.md` 排期表的状态 + 过程日志（commit 时带 hash）。
 
 > 与 DSH 版的差异：DSH 有"非平凡改动必须带 Agent Note 进同 PR"——我们已有等价物（过程日志，AGENTS.md 11.5 ⑧），故合入第 7 步；DSH 的"Component tests feed props directly"我们留到 B8 落地。
 
