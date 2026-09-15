@@ -1,4 +1,4 @@
-# Agent 学习项目：整体评估与长期方案（骨架版）
+# Agent Harness 项目：整体评估与长期方案（骨架版）
 
 > 本文件是"做中学"的长期路线图**骨架**：只放核心规则与计划列表，
 > 各阶段/功能的详细施工方案在 `doc/plan/*.md`（开工对应项时才读）。
@@ -10,53 +10,57 @@
 > | 详案 | `doc/plan/*.md` | **开工某个阶段/功能时**才读对应文件 |
 > | 归档 | `doc/plan-archive/*.md` | 考古：查已完成阶段的历史决策 |
 >
-> 项目定位：**做中学的 Agent Harness 学习项目**，站在多个成熟开源项目肩上——参考系是 **pi / DSH / codex / smolagents / CodeWhale / Reasonix** 等 + 理论框架（《Agent Harness Engineering: A Survey》的 ETCLOVG 七层）。完整参考坐标系见 `ARCHITECTURE.md` 第 0 节；"每个阶段抄谁"见 7.2 六项目各取所长表。
+> 项目定位：**做中学的 Agent Harness 项目** —— **不是生产系统**（不需要多租户 / SLA / 合规），**但是作品**（判据见 §一），站在多个成熟开源项目肩上——参考系是 **pi / DSH / codex / smolagents / CodeWhale / Reasonix** 等 + 理论框架（《Agent Harness Engineering: A Survey》的 ETCLOVG 七层）。完整参考坐标系见 `ARCHITECTURE.md` 第 0 节；"每个阶段抄谁"见 7.2 六项目各取所长表。
 >
 > 目标不是复制某一个项目，而是用 **Next.js + TypeScript** 写出一个保留各家核心思想、可一步步长成的 Agent。
 
 ---
 
-## 〇、历史归档（已完成阶段的评估 / 答疑 / 施工单）
+## 一、当前前提与目的变更（**变了就改这里**）
 
-Phase 0-5 + B2 ③ 已全部完成并提交。当时的评估、架构答疑、Phase 0 施工单已归档（不再占主文件）：
+> 这一章是**全文的前提** —— 下面所有判断都从它推。**前提变了先改这里，再改别处。**
 
-- `doc/plan-archive/01-当前状态评估.md`（起步时"骨架已立好，缺记忆和真实大脑"的评估）
-- `doc/plan-archive/02-四个直接问题回答.md`（sse.js / openai SDK / Next.js 能力 / 换架构——结论全部兑现：不换架构、不用 SDK、手写 SSE）
-- `doc/plan-archive/07-phase0-实现要点.md`（DeepSeek 适配器施工单：消息转换/流式分片累积/错误收尾）
+### ⚠️ 目的变更（2026-09-14）
+
+**原来**：目的是**学习** → 项目是**玩具**（功能存在即可 —— "按需"、"非核心"、"顺手件"、"刻意不开工" 都是这个前提下的合理判断）。
+**现在**：目标是**作品** → 要求随之改变。
+
+**判据**：**玩具** = 「我能跑通」；**作品** = 「**别人能跑通** + **知道它什么时候会失败**」。
+**推论**：① 能力面不能有洞（阶段 C 从"按需" → **必须**）② 每个核心能力要有一条别人能复现的验证路径 ③ 包装是交付物的一部分。
+
+**因此 PLAN 里一切「按需 / 非核心 / 顺手件 / 刻意不开工 / 推迟到…」的判词，全部作废**，按 §7.3 排期表重排。
+
+### 当前前提
+
+- **目的**：学习 / 玩具 → **作品**（2026-09-14 变更）
+- **判据**：别人能跑通 + 知道它什么时候会失败
+- **优先级轴**：功能面 > 质量与可信 > 包装与形态
+- **章节改版（2026-09-14）**：原 §二「功能 → 模块 → 阶段 映射」已删（内容被 §7.3 完全覆盖）；原 §三「分阶段路线图」已并入 §7.3 —— Phase 0–5 进了排期表开头的「地基」块，Phase 6 的 4 条子项 → **B3** / **B8** / **A3 ✅** / monorepo 抽包（§7.3.5）。**两处内容现在都只有一份，在 §7.3**；章节编号随之重排为**连续**（**四/五/六/七 不动** —— 它们被外部引用，`§7.x` 更是全库高频）
+- **已否掉的方案**（连理由记下来，免得下个会话重提）：
+  - **模块地图重构**（按模块 × 前置/核心/优化 重排）—— 改动太大；收益用"功能 / 优化"两桶就拿到了
+  - **迭代工作流**（功能迭代 ⇄ 技改迭代 + 收口清单）—— 是包装，且**不可查**
+  - **V 层 benchmark 体系** —— 形态过重；改用小形态："每个核心能力有一条别人能跑的验证路径"
+  - **删掉 A/B/C 编号** —— 文档 ~1200 处 + 48 条 commit message 引用，**不可逆**；改为"字母无含义"
+- **落地判据**（提新机制前先回答）：**它的"检查方式"是什么？** 答不出 → 必然变形，别写进规则
 
 ---
 
-## 一、目标架构（高维度）——核心规则
+## 二、历史归档（早期评估 / 答疑 / 施工单 —— **考古用**）
+
+> 目录 `doc/plan-archive/`，**已决定的事都在结论里，别重新讨论**：
+> `01-当前状态评估.md`（起步评估）· `02-四个直接问题回答.md`（**不换架构 / 不用 SDK / 手写 SSE** —— 结论全部兑现）· `07-phase0-实现要点.md`（DeepSeek 适配器施工单）
+> 另：`.a5-notes-dsh.md`（A5 当时的 DSH 笔记，点文件）—— **保留**（2026-09-14 定）。
+
+---
+
+## 三、目标架构（高维度）——核心规则
 
 对齐 pi 的三层架构（源头，`how-pi-agent-works/docs/concepts/pi-architecture.md`；DSH/smolagents/CodeWhale/Reasonix 同构，只是切分粒度不同，见 `ARCHITECTURE.md` 第 0 节）：
 
-```mermaid
-flowchart TB
-  subgraph P["产品运行层（app/ + 会话/终端/面板）"]
-    UI["React UI：对话面板 / 会话列表 / 终端面板 / task 面板"]
-    API["Route Handlers（SSE）"]
-    Store["SessionStore（JSONL 会话树 + compaction）"]
-    Runner["BashRunner / TaskRunner"]
-  end
-  subgraph C["Agent 内核层（lib/ 引擎，稳定不变）"]
-    Loop["runAgentLoop"]
-    Types["types.ts 统一协议"]
-    Tools["ToolRegistry"]
-  end
-  subgraph A["模型适配层（lib/ 的 model 接缝）"]
-    TeachingModel["TeachingModel 接口"]
-    DeepSeek["DeepSeekModel（真实）"]
-    Mock["MockModel（离线教学）"]
-  end
-  UI --> API --> Store --> Loop
-  API --> Loop
-  Loop --> TeachingModel
-  TeachingModel --> DeepSeek
-  TeachingModel --> Mock
-  Loop --> Tools --> Runner
-```
+> **三层架构图与完整分层见 `ARCHITECTURE.md` 第 0 节。**
+> 本文件**不再重复画图** —— 一条信息只在一处（原图 2026-09-14 移出）。
 
-- **模型适配层**：provider 差异关在这里。DeepSeek 的 OpenAI 兼容字段只在 `deepseekModel.ts` 里出现，`runAgentLoop` 永远只看 `AssistantMessage`。
+- **模型适配层**：provider 差异关在这里。DeepSeek 的 OpenAI 兼容字段只在 `lib/deepseekModel/index.ts` 里出现，`runAgentLoop` 永远只看 `AssistantMessage`。
 - **Agent 内核层**：越稳定越小越好。**agent-loop 是红线**：改引擎必须先精读 pi → 对比 → 展示 → 用户判断（AGENTS.md）。
 - **产品运行层**：会话、终端、task、面板这些"麻烦但关键"的事都长在这里，是可替换、可迭代的部分。
 
@@ -64,52 +68,6 @@ flowchart TB
 1. **LLM 边界**：进模型前把 `AgentMessage` 转成 provider 格式，出模型后把 provider 事件转回 `AssistantMessage`。
 2. **副作用边界**：模型不能直接读写文件/执行命令，只能提 tool call；副作用发生在工具里，可被审批和权限拦截。
 3. **可观测性边界**：引擎只负责产出事件，不负责展示和存储；展示（Event Timeline）和落盘（轨迹 Trace）由外部消费者完成。详案见 `doc/plan/observability.md`。
-
----
-
-## 二、功能 → 模块 → 阶段 映射（计划列表）
-
-| 你想做的功能 | 落在哪一层 | 对应阶段 |
-| --- | --- | --- |
-| 对接真实大模型 | 模型适配层 | **Phase 0** ✅ |
-| 单个会话（多轮记忆） | 产品层 SessionStore | Phase 1 ✅ |
-| 会话记忆 / 压缩 | 产品层 compaction | Phase 1 ✅ → **B2 真摘要** ✅ |
-| 多个会话 | 产品层 SessionManager + UI | Phase 2 ✅ |
-| 文件增删改查 | 内核层 ToolRegistry 扩展 | Phase 3 ✅ |
-| 终端运行 | 产品层 BashRunner | Phase 4 ✅ |
-| 执行 task 面板 | 产品层 TaskRunner + UI | Phase 5 ✅ |
-| 对话面板（完整） | 产品层 UI | Phase 6 ⏳ |
-| 选择 / 切换多个工作区 | 产品层 SessionManager/API/UI + 内核层沙箱参数化 | 暂缓（详案 `doc/plan/future-plans.md`） |
-
----
-
-## 三、分阶段路线图（骨架；施工详案在 `doc/plan/`，开工时读）
-
-> 每完成一个阶段就 `git commit`。Agent 项目的 bug 常跨协议/loop/工具/存储，阶段提交能帮你回到最近的可用点。
-
-### Phase 0：接入 DeepSeek（真实大脑）—— ✅ 完成
-`lib/deepseekModel.ts`（流式 + 真实 token）+ MockModel 开关（`.env.local` `MOCK_MODE`）+ 轨迹打地基（L2）。施工单已归档：`doc/plan-archive/07-phase0-实现要点.md`。
-
-### Phase 1：单个会话 + 记忆 —— ✅ 完成
-JSONL 会话树 + `buildContext()` 回溯 + `compactIfNeeded`。详案：`doc/plan/phase-1-session.md`（含"真摘要"优化前史 → B2 落地）。
-
-### Phase 2：多个会话 —— ✅ 完成
-SessionManager + 前端会话列表；sessionId 校验防路径越界；清空 ≠ 删除。详案：`doc/plan/phase-2-sessions.md`。
-
-### Phase 3：文件增删改查 —— ✅ 完成
-read/write/edit/delete/grep/find + 路径沙箱 + 写操作全量弹框审批（60s 超时自动拒绝）。详案：`doc/plan/phase-3-tools.md`。
-
-### Phase 4：终端运行 —— ✅ 完成
-BashRunner（spawn 流式 + 两级终止 + run 级取消）+ bash 全量弹框。**2026-08-26 乱码根治**：受限语言模式下 cmd+chcp+EncodedCommand。详案：`doc/plan/phase-4-bash.md`。
-
-### Phase 5：task 面板 —— ✅ 完成
-todo 是会话事件（非独立存储）；`todo_write` 整表替换幂等；面板只读展示；Reasonix 式关闭交互（未完成强制可见）。详案：`doc/plan/phase-5-todo.md`。
-
-### Phase 6：对话面板打磨 + 架构加固 —— ⏳ 排队
-- UI 打磨（消息渲染、工具调用卡片、事件时间线、终端面板、task 面板整合成统一布局）
-- 补测试（已完成大半：23 文件 188 用例）
-- 实现 L3 Trace Viewer（轨迹回放，参考 pi `export-html`）→ **A3**
-- 若出现"内核要被多个入口复用"的需求，把 `lib/` 抽成共享包（monorepo），这是"换架构"的正确时机
 
 ---
 
@@ -132,64 +90,60 @@ todo 是会话事件（非独立存储）；`todo_write` 整表替换幂等；�
 
 ---
 
-## 五、原则与"不要做的事"（核心规则）
+## 五、原则（核心规则）
 
-（摘自教学路线 `build-00-roadmap.md` 的"暂缓事项"，加上 pi 的教训）
+> **原 §五 的「暂缓 / 不要做」表已于 2026-09-14 清空** —— 目的从「学习 / 玩具」改为「作品」后逐条重审，**5 条全部有去向**（§五 不再另起一张与 §7.3 平行的表）：
 
-| 现在不要做 | 原因 |
+| 原条 | 去向 |
 | --- | --- |
-| 同时接多家模型 | 先跑通 DeepSeek，provider 差异留到需要时再抽适配层 |
-| 完整权限审批系统 | 先用路径沙箱 + 工具白名单打底 |
-| 漂亮动画 / 复杂 UI | 先让事件时间线和消息准确，视觉最后升级（视觉语言见 `doc/plan/ui-design.md`） |
-| 交互式 TTY 终端 | 先做"执行命令 → 流式输出 → 终止" |
-| 一步到位做多 agent | 先把单 agent + 会话 + 工具跑扎实 |
+| 同时接多家模型 | ✅ **翻为「要做」** → `C25 多模型支持`（§7.3.2） |
+| 完整权限审批系统 | ✅ **已完成**（B1 审批四步，2026-08-26） |
+| 漂亮动画 / 复杂 UI | **就是 `B3`**（UI V2 尺度升级 + 原语库）—— 不是「不做」 |
+| 交互式 TTY 终端 | ✅ **翻为「低优先级要做」** → `C26 交互式 TTY 终端`（§7.3.2） |
+| 一步到位做多 agent | **就是 `C3`**（子智能体，现为「大功能 · 必选」）—— 不是「不做」 |
+
+> **判据（以后往这里加「不做」之前先过一遍）**：不做的理由是「**学习项目没必要**」→ **重审**；理由是「**工程上不划算**」→ 保留（→ 记进 **§7.3.5 条件触发**）。
+> （原表摘自教学路线 `build-00-roadmap.md` 的「暂缓事项」+ pi 的教训）
 
 **核心心法**：模型会变、工具会变、UI 会变，但 Agent Loop 相对稳定。让"稳定的内核"和"不稳定的外部"分离，你后面每一步都是在往对的位置加东西，而不是推倒重来。
 
 ---
 
-## 六、设计 / 规划详案索引（渐进式加载，开工时读对应文件）
+## 六、横切文档（不属于任何单项，但开工会读到）
 
-| 主题 | 文件 | 状态 |
-|---|---|---|
-| 界面设计语言（走纸记录仪） | `doc/plan/ui-design.md` | ✅ 已实现 |
-| 可观测性与轨迹（L1/L2/L3） | `doc/plan/observability.md` | L2 ✅，L3 ✅ A3（v2 见 C20） |
-| 远期功能地图（Top5 + 五规律） | `doc/plan/far-map.md` | 很后期 |
-| 未来规划（暂缓项设计） | `doc/plan/future-plans.md` | ⏳ 暂缓 |
-| agent-loop 纯净性改造 | `doc/plan/agent-loop-purity.md` + `doc/01-*.md` | ✅ 已实现 |
-| A2 vitest 测试框架 | `doc/plan/a2-vitest.md` | ✅ 已实现 |
-| A4 ask_user_question | `doc/plan/a4-ask-user.md` | ✅ 已实现 |
-| A5 web_search / web_fetch | `doc/plan/a5-web-search.md`（五家精读走读 19-22 + **§七 重开补记** + **§7.6~§7.13 施工/复核补记**：DSH 全量复核、非 2xx 拍板、两轮真机 bug 修复、四家 web 能力一手复核 + codex 决策边界落地 + 配置收口） | ⏳ **代码完成（09-14），未 commit，待用户本地复跑端到端验收** |
-| B2 真摘要压缩（三步） | `doc/plan/b2-compaction.md` + `doc/02-*.md`（四家对照） | ✅ 已实现 |
-| C7 配置整合 | `doc/plan/c7-config.md` | 骨架 ✅，设置页 UI ⏳ |
-| C13 斜杠命令面板 | `doc/plan/c13-slash-commands.md` | ✅ 已实现（2026-09-01，首批 /compact 全链路；/model /skills /export 排队） |
-| **开源项目导航手册**（参考系速查 + 新增项目机制） | `doc/开源项目导航手册/index.md` | ✅ 2026-08-31 |
-| C15 仓库更新面板（手动更新 + LLM 变更总结） | `doc/plan/c15-repo-updater.md` | ⏳ 进行中（代码完成，待测） |
+> **单项的详案在 §7.3 的「详细设计」列** —— 本节只放跨多项、或不属于任何单项的文档。
+> （原 §六 是第二份详案索引，2026-09-14 收窄 —— 见「当前前提」）
+
+| 文档 | 讲什么 |
+| --- | --- |
+| `doc/plan/far-map.md` | 远期功能地图（Top5 + 五规律）—— 很后期 |
+| `doc/plan/agent-loop-purity.md`（+ `doc/01-*.md`） | agent-loop 纯净性改造（历史） |
+| `doc/开源项目导航手册/index.md` | 参考项目导航卡 —— **参考项目唯一列表** |
 
 ---
 
 ## 七、综合长远规划（综述分类法 × 6 个项目）
 
 > 来源：《Agent Harness Engineering: A Survey》（110+ 论文 / 23 系统的 harness 分类法，本地中文版 `E:\agents-read\Agent-Harness-Survey-ZH-main\`）+ 本地 6 个参考项目（pi / DSH / smolagents / CodeWhale / Reasonix / how-pi-agent-works）。详细版见 `workspace/综合长远规划.md`。
-> 原则：**架构好的学架构，功能丰富的学功能**。每项标注"参考谁、长在哪、怎么验收"——落地意义 = 每步都知道做什么、为什么、跟谁学。
-> 定位：我们的项目 = mini-harness（综述分类法的实践投影）。三阶段：**主线收尾 → 工程化补齐 → 功能丰富**。
+> 原则：**架构好的学架构，功能丰富的学功能**。每项标注"参考谁、详细设计在哪、怎么验收"——落地意义 = 每步都知道做什么、为什么、跟谁学。
+> 定位：我们的项目 = mini-harness（综述分类法的实践投影）。**计划只有两桶：功能待办（必选）· 工程优化（可选）** —— 见 §7.3。
 > 学术背书（binding-constraint thesis，综述第 1 章）：实证显示——只改进 harness（不碰模型）就能让基准提升 **10 倍**（改编辑工具格式）、+13.7 个百分点（Terminal-Bench 2.0 纯 harness 优化）。结论：**执行环境（harness）比模型本身更能决定现实世界的可靠性**（OpenAI 2026-02 已把 harness engineering 确立为独立学科）。我们做的正是 harness——方向有学术背书。
 
 ### 7.1 综述对照表（官方 ETCLOVG 七层 ↔ 我们 ↔ 差距）
 
 > 分类法出处：综述第 2.3 节。**E/T/C/L 是结构性骨架，O/V/G 是控制平面**——综述把可观测性（O）和治理（G）提为独立层，因为它们"藏在工业系统商业平台里、开源生态最稀疏"，而这恰是我们的主战场（轨迹 + 审批）。
 
-| 层 | 全称（回答的问题） | 我们现状 | 差距 | 参考 | 规划期 |
-|---|---|---|---|---|---|
-| **E** | Execution Environment & Sandbox（代码在哪运行、什么沙箱约束） | 路径沙箱 + 人工确认 | bash 一行 `cd ..` 出围栏；无容器隔离 | OpenHands / DSH sandbox | C |
-| **T** | Tool Interface & Protocol（工具如何描述/发现/调用） | 12 工具 + ToolRegistry | 无 MCP 外部工具源；edit 无 diff/模糊匹配 | Cline / smolagents mcp_client | B、C |
-| **C** | Context & Memory Management（模型能看到什么） | JSONL 会话树 + **B2 ③ 真摘要压缩** ✅ | 无记忆分层（回忆/遗忘/新鲜度） | pi compaction / Reasonix memory | B、C |
-| **L** | Lifecycle & Orchestration（步骤如何组织、简单循环→复杂编排） | 单 agent ReAct 循环 + task 面板 | 无子智能体、handoffs、issue-to-PR 流程 | DSH todo/subagent / CodeWhale todo_snapshot | A、C |
-| **O** | Observability & Operations（如何测量追踪/成本/可靠性） | 事件流 + L2 轨迹落盘 | L3 回放没有；无成本跟踪 | pi export-html / OpenHands 泳道 | A、B |
-| **V** | Verification & Evaluation（轨迹→反馈/护栏/回归） | vitest 23 文件 188 用例 | 无 benchmark | smolagents / DSH test-support | A |
-| **G** | Governance & Security（权限/身份/策略/审计） | 全量弹框 + 5h 超时 | 无分级、无记忆、无审批日志；bash 不做危险分析 | CodeWhale 四档 / Reasonix 静态分析 | **B（最快见效）** |
+| 层 | 全称（回答的问题） | **差距**（这层缺什么 → 对应项） | 参考 |
+|---|---|---|---|
+| **E** | Execution Environment & Sandbox（代码在哪运行、什么沙箱约束） | bash 一行 `cd ..` 出围栏；无容器隔离 → **C2** | OpenHands / DSH sandbox |
+| **T** | Tool Interface & Protocol（工具如何描述/发现/调用） | 无 MCP 外部工具源 → **C1**；edit 无 diff / 模糊匹配 → **B4** | Cline / smolagents mcp_client |
+| **C** | Context & Memory Management（模型能看到什么） | 无记忆分层（回忆 / 遗忘 / 新鲜度）→ **B6**；无工作区记忆注入 → **B10** | pi compaction / Reasonix memory |
+| **L** | Lifecycle & Orchestration（步骤如何组织、简单循环→复杂编排） | 无子智能体 / handoffs → **C3**；无 goal 三件套 → **C10** | DSH todo/subagent / CodeWhale todo_snapshot |
+| **O** | Observability & Operations（如何测量追踪 / 成本 / 可靠性） | 无成本跟踪 → **C5**；轨迹视图还是 v1（密列表 / 检查器）→ **C20** | pi export-html / OpenHands 泳道 |
+| **V** | Verification & Evaluation（轨迹→反馈 / 护栏 / 回归） | 无 benchmark；无「别人能跑的验证路径」（作品判据） | smolagents / DSH test-support |
+| **G** | Governance & Security（权限 / 身份 / 策略 / 审计） | bash 不做危险分析 → **B7**；无沙箱容器 → **C2** | CodeWhale 四档 / Reasonix 静态分析 |
 
-注：模型适配（TeachingModel 接口）与配置集中化不在七层内——综述把"模型本身"排除在研究范围外、配置属横切关注点（第 10 章），归入阶段 B/C 单独处理。
+注：模型适配（TeachingModel 接口）与配置集中化不在七层内——综述把"模型本身"排除在研究范围外、配置属横切关注点（第 10 章），另设模块处理（见 §7.3）。
 
 ### 7.2 六项目各取所长
 
@@ -204,93 +158,132 @@ todo 是会话事件（非独立存储）；`todo_write` 整表替换幂等；�
 
 > **工具全景参考源（2026-08-24）**：开工任何"工具"相关项（B1/B7/新工具），查 `workspace/工具全景对比-7项目.md`（7 项目工具全景 + 缺口三档）与 `workspace/三项目横向对照-施工决策表.md` 第五节（工具参考源 + 裁决增补）——那里已把 7 个项目的工具名实读核对完毕，含 ask_user_question / web_search / 后台任务三件套 / 只读放行等新缺口与抄谁。
 
-### 7.3 三阶段规划（带验收标准；施工详案在 `doc/plan/`）
+### 7.3 计划（**唯一的排期与状态表**）
 
-**阶段 A：主线收尾（近期）**
+> **本表是「做完没」的唯一权威。** 详案 / §六 索引 / 「会话检查点.md」 都不写状态。
+> **状态位**：`💡 讨论中`（方案未定）· `⏳ 排队`（定案未做）· `⏳ 进行中（X ✅ / Y ⏳）`（**子项部分完成必须这么写，不许写全 ✅**）· `✅`。
+> **开工门禁**：从 `💡` 进 `⏳` 必须补齐三样 —— **依据 · 详案 · 验收**。验收格为 `—` = 未定案 = **不许开工**。
+> **编号**（`A5` / `B19` / `C24`）仅为稳定引用符，**字母无含义**（历史残留）；不复用、不重编。
 
-| # | 做什么 | 参考 | 长在哪 | 验收标准 | 状态 |
+**地基（Phase 0–5，已完成 · 无编号）** —— 早于 A 阶段，装的是「一个 agent 从零长出来」的骨架（**原「分阶段路线图」一节，2026-09-14 并入此处**）：
+
+- **Phase 0 · 接入 DeepSeek（真实大脑）**（✅ 完成）：`lib/deepseekModel/index.ts`（流式 + 真实 token）+ MockModel 开关（`.env.local` `MOCK_MODE`）+ 轨迹打地基（L2）。施工单已归档：`doc/plan-archive/07-phase0-实现要点.md`。
+- **Phase 1 · 单个会话 + 记忆**（✅ 完成）：JSONL 会话树 + `buildContext()` 回溯 + `compactIfNeeded`。详案：`doc/plan/phase-1-session.md`（含"真摘要"优化前史 → B2 落地）。
+- **Phase 2 · 多个会话**（✅ 完成）：SessionManager + 前端会话列表；sessionId 校验防路径越界；清空 ≠ 删除。详案：`doc/plan/phase-2-sessions.md`。
+- **Phase 3 · 文件增删改查**（✅ 完成）：read/write/edit/delete/grep/find + 路径沙箱 + 写操作全量弹框审批（60s 超时自动拒绝）。详案：`doc/plan/phase-3-tools.md`。
+- **Phase 4 · 终端运行**（✅ 完成）：BashRunner（spawn 流式 + 两级终止 + run 级取消）+ bash 全量弹框。**2026-08-26 乱码根治**：受限语言模式下 cmd+chcp+EncodedCommand。详案：`doc/plan/phase-4-bash.md`。
+- **Phase 5 · task 面板**（✅ 完成）：todo 是会话事件（非独立存储）；`todo_write` 整表替换幂等；面板只读展示；Reasonix 式关闭交互（未完成强制可见）。详案：`doc/plan/phase-5-todo.md`。
+
+> 每完成一个阶段就 `git commit` —— Agent 项目的 bug 常跨协议 / loop / 工具 / 存储，阶段提交能帮你回到最近的可用点。
+
+#### 7.3.1 功能待办 · 大功能（**必选**）
+
+> **顺序规则**：**已完成在前**（作为基础与历史，按完成时间）→ **未完成在后**（按优先级）；**有依赖关系的，前置在前**（依赖关系写在状态格末尾）。
+> ⚠️ **顺序是默认指引，不是硬约束** —— 想先做后面的，完全可以（2026-09-14 用户明示）。
+> **开工门禁**：三个格子（依据 / 详细设计 / 验收）齐了才算定案 —— 验收格为 `—` = 未定案 = **不许开工**，状态应是 `💡 讨论中`。
+
+| # | 做什么 | 依据 | 详细设计 | 验收（怎么算做完） | 状态 |
 |---|---|---|---|---|---|
-| A1 | **Phase 5 task 面板** | DSH todo / CodeWhale todo_snapshot | 协议（todo 数组存会话）+ `app/components/task-panel/` | 模型产出任务清单，前端显示进度，刷新不丢 | ✅ |
-| A2 | **测试框架 vitest** | smolagents / DSH test-support | `lib/tools/` 先补单测（纯函数+fs） | tools 全测过，`pnpm test` 绿 | ✅（23 文件 188 用例） |
-| A3 | **L3 Trace Viewer** | pi export-html / OpenHands 泳道（v2 参考 DSH `client/ui-trajectory`） | `app/components/trace-viewer/` + `app/lib/trace-steps/` + `app/lib/trace-layout/` + `app/lib/use-traces.ts` + `lib/trace/` + `lib/trace-files/` + `app/api/traces/` | ✅ 完成（2026-09-14，8 条验收全过——第 3 条的"轮次前后跳转"经用户确认**删掉**：原型里从没有过这个控件；第 5 条经实测改判：1149KB 轨迹折叠后只有 11 行，瓶颈在读解析 12ms 不在渲染）。**v2（密列表 + 检查器）见 C20** | ✅ |
-| A4 | **ask_user_question** | DSH tool-ask-user / codex request_user_input | 新工具 + SSE 帧 + 前端弹层 | 模型提问 → 弹层 → 回答 → 继续 | ✅ |
-| A5 | **web_search / web_fetch** | DSH tool-web / CodeWhale Web 聚合 / codex web.run（**决策边界提示词**）/ opencode `webfetch.ts`（导航卡订正后才查到的，见 §7.14.5 / §7.15） | 新工具（独立） | 模型能搜索并抓取网页；搜不到时 isError | ✅ **完成（2026-09-14 收口）**：**52 文件 613 用例**绿 + `tsc` 0 + `next build` 0 + 6.5 违规 0；**真机验收通过**——用户确认网络搜索可用，且**两个真机 bug 的回归都验了**（①「今年」不再算成 2025 ② GBK 页面不再乱码）。共 10 个 commit。已做：①**当前时间注入**（模型原来不知道今天几号）②**按声明字符集解码**（GBK 乱码）③**"什么时候必须联网"决策边界 + 引用来源**（抄 codex 的判断标准、不抄它的服务端机制）④**端点/上限收进 config**（并修好 `.env.local.example` 里两个不存在的开关）⑤**丢弃不可见内容**（turndown 默认会保留隐藏元素的文字）。**未做的降噪 → 转到 C24**。详见详案 `doc/plan/a5-web-search.md` **§7.11~§7.15** |
+| A1 | **Phase 5 task 面板** | DSH todo / CodeWhale todo_snapshot | — | 模型产出任务清单，前端显示进度，刷新不丢 | ✅ |
+| B1 | **审批升级四步**：① 只读命令放行（Reasonix `bash_readonly.go` + `shellsafe/*.go`）② 分级模式（CodeWhale `approval_mode.rs`，suggest/bypass/never + 运行时切换）③ 审批日志（CodeWhale `approval_log.rs`，JSONL 成对校验）④ 前端面板 + 记忆（Reasonix 内嵌卡片布局 + 本会话/一直允许） | Reasonix / CodeWhale / pi | `doc/plan/b1-approval.md` | — | ✅（详案 `doc/plan/b1-approval.md`） |
+| B2 | **真摘要压缩**：拼贴 → 调模型生成结构化摘要（pi 六段 + DSH Files/Errors 两段；增量 previousSummary；经济性检查；MOCK 降级拼贴） | pi compaction + DSH + Reasonix | `doc/plan/b2-compaction.md` + `doc/02-*.md`（四家对照） | — | ✅（详案 `doc/plan/b2-compaction.md`） |
+| B22 | **多会话并行 run（session-owner 架构）**（2026-09-01 讨论、09-02 拆分自 B17①，方案 Y）：run 状态的 owner 从 UI 变会话——切会话**不取消正在跑的 run**（A 继续后台跑，UI 切到 B 看别的，回 A 看进度/结果；DSH/opencode 成熟 Web agent 标配）。现状缺口：`use-agent-run` 单份 useState 装多 run 帧 → 切会话时旧 run 帧污染新会话（四家里只有我们这样）。**架构**：`runStore = Map<sessionId, RunState>`（模块级），每会话独立消费 SSE、独立累积（审批/提问/压缩/ContextMeter 全按会话隔离）；UI 只订阅当前 sessionId 的投影（切会话 = 换订阅 key，run 不动）；刷新页面仍走 fetchHistory 恢复；服务端已支持并行（route.ts 每 POST 独立 store + runControllers 按 runId），**主要改前端**。**需求澄清结论（2026-09-02 用户拍板）**：① 并发不限制 ② 会话列表状态点（执行中 loading 动效 / 结束绿点 / 等审批·askUser 黄点）——**只显示非当前会话**（当前会话的主体界面已有状态展示，不重复）③ 切回：跑完看完整结果、还在跑实时流式接上 ④ 停止按钮只停当前选中会话（停其他会话先切过去）。**状态管理选型（2026-09-02）**：**zustand v5**（用户已熟练 zustand/valtio，"手写学机制"不成立；selector 订阅模型 = DSH useProjection 同构，且能保证 A 后台每帧更新不触发 B 视图重渲）。**开工前先精读 DSH `ui-conversation` useProjection/session surface + opencode `packages/core/src/session/run-coordinator`**（导航手册定位：DSH 走读 18 / opencode core 未读）。决策与四家对照见 `doc/plan/b17-frontend-race-and-render.md` 补记 1 | DSH useProjection / opencode run-coordinator | `doc/plan/b22-multi-session-run.md` | — | ✅ 完成（2026-09-02 施工、09-04 浏览器验收通过：`app/lib/run-fold.ts`（纯折叠 26 用例新绿）+ `run-store.ts`（zustand 桶 + 消费循环）+ `run-fold.test.ts`（新）+ `use-agent-run.ts` 变薄 366→99 行投影层 + `sse.ts`/`services/chat` 加 signal abort + `page.tsx` 列表保鲜升级任一会话收尾即 refresh + `session-row` 状态点（只非当前会话）；全套 39 文件 358 用例全绿 + tsc 绿；详案补记见 `doc/plan/b22-multi-session-run.md` §八） |
+| A3 | **L3 Trace Viewer** | pi export-html / OpenHands 泳道（v2 参考 DSH `client/ui-trajectory`） | `doc/plan/observability.md` | — | ✅ 完成（2026-09-14，8 条验收全过 —— 第 3 条「轮次前后跳转」经用户确认**删掉**：原型里从没有过这个控件；第 5 条经实测改判：1149KB 轨迹折叠后只有 11 行，瓶颈在读解析 12ms 不在渲染）。**v2（密列表 + 检查器）见 C20** |
+| A5 | **web_search / web_fetch** | DSH tool-web / CodeWhale Web 聚合 / codex web.run（**决策边界提示词**）/ opencode `webfetch.ts`（导航卡订正后才查到的，见 §7.14.5 / §7.15） | `doc/plan/a5-web-search.md` | 模型能搜索并抓取网页；搜不到时 isError | ✅ **完成（2026-09-14 收口）**：**52 文件 613 用例**绿 + `tsc` 0 + `next build` 0 + 6.5 违规 0；**真机验收通过**——用户确认网络搜索可用，且**两个真机 bug 的回归都验了**（①「今年」不再算成 2025 ② GBK 页面不再乱码）。共 10 个 commit。已做：①**当前时间注入**（模型原来不知道今天几号）②**按声明字符集解码**（GBK 乱码）③**"什么时候必须联网"决策边界 + 引用来源**（抄 codex 的判断标准、不抄它的服务端机制）④**端点/上限收进 config**（并修好 `.env.local.example` 里两个不存在的开关）⑤**丢弃不可见内容**（turndown 默认会保留隐藏元素的文字）。**未做的降噪 → 转到 C24**。详见详案 `doc/plan/a5-web-search.md` **§7.11~§7.15** |
+| C1 | MCP 接入 | Cline / smolagents mcp_client | — | — | 💡 讨论中 |
+| C8 | Skills（**联动 /model /skills 命令**）：DSH skill / pi .pi/skills；**2026-09-01 用户拍板**：C13 遗留的 `/model`（模型选择/展示，config 驱动）、`/skills`（技能列表）两个纯前端命令**挂到本项一起做**——当前无 skill 体系支撑，单独做没意义 | DSH skill / pi .pi/skills | — | — | 💡 讨论中 |
+| C2 | 沙箱容器（**2026-09-14 扩范围：加"网络维度"**——原设计只有文件/进程，网络是空白） | **codex `network-proxy` + Windows MXC**（最新侦察）/ OpenHands / DSH sandbox | — | — | 💡 讨论中 |
+| C3 | 子智能体 / handoffs | DSH subagent（8 种实现） | — | — | 💡 讨论中 ⚠️ **动红线文件** `lib/agent/index.ts`（改动前须精读 pi → 对比 → 展示 → 用户拍板） |
+| B6 | **记忆分层**：会话 + 摘要已有，补"主动回忆/新鲜度" | Reasonix memory | — | — | 💡 讨论中 |
+| C6 | 工作区选择 | future-plans 已有设计 | `doc/plan/future-plans.md` | — | 💡 讨论中（有 `doc/plan/future-plans.md` 设计稿，缺验收） |
+| C27 | **刷新后重连正在跑的 run**（2026-09-14 从「条件触发」**升为排期项**）：刷新页面后**接上仍在跑的 run 的实时流**。现状：runStore 是内存态，刷新即丢（服务端 run 会跑完落盘，但过程中看不到实时）—— **在作品里是明显短板** | opencode `Session Runtime` 形态（run 与 POST 连接**解耦** + 可重连订阅）；对照我们的 `app/lib/run-store.ts`（内存态 zustand） | — | — | 💡 讨论中 |
 
-**阶段 B：工程化补齐（中期，从"能跑"到"好用"）**
+#### 7.3.2 功能待办 · 小功能（**必选**，按成本）
 
-| # | 做什么 | 参考 | 长在哪 | 状态 |
-|---|---|---|---|---|
-| B1 | **审批升级四步**：① 只读命令放行（Reasonix `bash_readonly.go` + `shellsafe/*.go`）② 分级模式（CodeWhale `approval_mode.rs`，suggest/bypass/never + 运行时切换）③ 审批日志（CodeWhale `approval_log.rs`，JSONL 成对校验）④ 前端面板 + 记忆（Reasonix 内嵌卡片布局 + 本会话/一直允许） | Reasonix / CodeWhale / pi | `lib/permission/`（readonly / approval-log / approval-memory）+ `lib/approvalMode.ts` + `app/api/chat/route.ts` + approve/approval-mode 接口 + `app/components/approval-dialog` + `approval-mode-switch` | ✅（详案 `doc/plan/b1-approval.md`） |
-| B2 | **真摘要压缩**：拼贴 → 调模型生成结构化摘要（pi 六段 + DSH Files/Errors 两段；增量 previousSummary；经济性检查；MOCK 降级拼贴） | pi compaction + DSH + Reasonix | `lib/session/store.ts` + `lib/summarize.ts` | ✅（详案 `doc/plan/b2-compaction.md`） |
-| B2.1 | **压缩打磨三件套**（DSH 走读 24 触发）：① compaction entry 补审计字段（被压消息 id 列表 + 摘要模型名）② "摘要必须更小" fail-closed 检查（摘要 ≥ 被压区域不落盘）③ tool-pairing balance 升级（替代"第一条不是 toolResult"单点修正）；B 类不抄（锁/KV cache/影子价格/错误分类/接口抽象——场景不需要） | DSH compaction（走读 24 施工单） | `lib/session/store.ts` + `app/api/chat/_pipeline/compact.ts` | 💡 讨论中（条件触发：① 长期会话复盘时 ② 下次动 compact.ts 时 ③ 遇孤儿工具坑时）。⚠️ **若 C18 开工则并入 C18**（本项是"够用版打磨"，C18 是"重构级"——同一处别改两遍） |
-| B3 | **UI V2：尺度升级 + 原语库**（2026-08-26 用户 UI 反馈触发：按钮太小、小家子气、溢出操作进 dropdown）：① 全面板尺度升级（按钮 ≥34px 命中区、字号上提、留白加大）② 第一个原语 = **下拉菜单 Menu**（溢出操作归集：顶栏「⋯」、会话行「⋯」、面板头部）③ 面板 chrome 统一（头部 = 标题 + 读数 + 操作区）④ dialog/collapse/select/stepper… 后续按需 ⑤ **精读 DSH `packages/client/AGENTS.md`**（约束 AI 写前端的教材；约束纪律见 `doc/plan/ui-design.md` §10.6） | DSH `dsh-client-ui-primitives` + Reasonix 面板族（走读 18） | `app/components/ui/`（新）+ 全部组件样式升级 | ⏳ 进行中（①②落地；08-27：原语评估全出局 + 删除确认行内化 + keys.ts + 等宽 12px 收口 + SessionRow 抽取 + **⑤精读完成**（对照表 `doc/知识点-04` + 新组件 checklist §10.9）） |
-| B4 | **文件 diff 预览**：edit/write 前生成 diff（红绿视图） | Cline / DSH DiffBlock | `lib/tools/edit.ts` + `app/components/ui/diff/` | ⏳ 排队 |
-| B5 | **hooks 注册表**：beforeToolCall 泛化成 onBeforeTool/onAfterTool | CodeWhale / DSH hooks | `lib/hooks.ts` + `lib/agent.ts` 透传 | ⏳ 排队 |
-| B6 | **记忆分层**：会话 + 摘要已有，补"主动回忆/新鲜度" | Reasonix memory | `lib/session/store.ts` + 未来记忆工具 | ⏳ 排队 |
-| B7 | **终端加固**：bash 输出全量落盘 + shell 危险分析（重定向/嵌套检测） | Reasonix shellsafe | `lib/tools/bash-runner.ts` | ⏳ 排队 |
-| B8 | **前端单元测试**（**非核心**，2026-08-26 用户标注"这个倒不是核心"）：① 纯函数层先行（`app/lib/`：trace-fold/messages/format——不随 UI 变，随时可做）② 组件/hooks 层（RTL：Menu/MessageRow/use-sessions）等"冻结信号"：全局令牌与骨架连续 2 轮迭代不改、组件 API 冻结 | vitest + Testing Library（参考 DSH test-support） | `app/lib/*.test.ts` + `app/components/**/*.test.tsx` | ⏳ 排队 |
-| B9 | **模型请求重试与退避**（外部评估 S1）：瞬时错误（429/5xx/超时）指数退避重试 2~3 次（`Retry-After` 头优先）、永久错误（401/400）fail-fast、请求加空闲超时兜底；重试过程发轨迹事件 | Claude Code / pi / DSH | `lib/deepseekModel.ts`（适配层内部，引擎无感） | ⏳ 排队（验收：stub fetch 前两次 429 第三次成功 → complete 正常返回 + 轨迹 2 条 retry；401 不重试） |
-| B10 | **工作区记忆文件注入**（外部评估 S2）：`systemPrompt` 常量 → `createSystemPrompt(workspaceRoot)` 工厂，尾部拼接 `workspace/AGENTS.md`（存在才注入 + 缓存；`@文件` 引用行一期可不做）；配套写种子文件 | Claude Code CLAUDE.md / pi AGENTS.md / Codex | `_pipeline/prompt.ts`（E2 预埋的扩展位，C8 Skills 同落点） | ⏳ 排队（验收：记忆文件写一条规矩 → 新会话模型遵守；文件不存在行为不变） |
-| B11 | **会话级运行锁**（外部评估 S3）：route.ts POST 入口 per-session 占用表（`Map<sessionId, runId>`），占用中返回 409 + 明确文案，finally 释放 | 所有成熟 harness 隐含前提 | `lib/runControl.ts`（run 级取消 → 加会话级互斥，概念同族） | ⏳ 排队（验收：并发两请求同 session → 第二个 409；不同 session 不受影响） |
-| B12 | **中断/崩溃会话自愈**（外部评估 S4）：`buildContext`（或 loadOrCreate 后）扫描尾部未配对 toolCall → **不改文件**，重建上下文时补合成 toolResult（"上次运行被中断，工具未执行"，isError=true）——pi 同款：存储是事实，修复在重建视图时 | Claude Code / pi resume | `lib/session/store.ts`（buildContext 或私有辅助，纯逻辑可单测） | ⏳ 排队（验收：手工构造孤儿 toolCall 会话文件 → 正常发消息不 400；合成结果进上下文且前端可见） |
-| B14 | **上下文余量指示**（外部评估 B 级顺手件）：数据已齐（done 帧 stats.tokens + 压缩阈值在 config），只差读数盘加一格"上下文 X%" | Claude Code /context | UI 读数盘一个格子 | ⏳ 排队（顺手，半小时~一天） |
-| B15 | **自动会话命名**（外部评估 B 级顺手件）：首轮 assistant 回复完成后用首条用户消息（或小模型一句话）生成 title 更新会话（title 字段 + 改名接口都有） | Claude Code / DSH | `app/api/sessions/route.ts` + UI | ⏳ 排队（顺手，半小时） |
-| B16 | **引擎核心零测试补齐**（体检报告行动①③，最高优先级）：补 `lib/agent.ts`（runAgentLoop：block→isError 进 context / rewrite 换参 / 工具抛错不崩循环 / maxTurns guardrail / 事件序列）与 `lib/deepseekModel.ts`（tool_call_id 配对 / compactionSummary 伪装 / SSE 坏 JSON）单测——FakeModel 基建已现成（summarize.test.ts），复用成本低 | pi（引擎测试思想）/ DSH test-support | `lib/agent.test.ts`（新）+ `lib/deepseekModel.test.ts`（新） | ✅ 完成（2026-09-01：agent 11 用例 + deepseekModel 13 用例；FakeModel 提炼为共享 `lib/testing/fake-model.ts`；对照 pi agent-loop.test.ts 六个测试模式；**全套 31 文件 263 用例全绿** + tsc 绿；顺带修了 vitest.config 缺 `@/` alias 的隐性坑——repos 测试第一批用别名全挂） |
-| B17 | **前端渲染优化（收窄版，2026-09-02 拆分）**（体检报告行动⑥，①已拆给 B22）：② TaskPanel dismissed 加 `key={sessionId}` ③ Markdown/MessageRow memo + foldEvents useMemo（消每 delta 全树重渲染 + O(n²) 重折叠）；**④ 面板渲染模式**（2026-08-31 讨论）：底部决策区三选一（pendingApproval ? 审批 : pendingAsk ? 提问 : 输入框）改**输入框常驻 + 覆盖层**（`{pendingApproval && <审批卡/>}` + `{pendingAsk && <提问卡/>}` 独立条件，输入框永远在，面板 absolute 盖住；业务上两 panel 天然互斥——串行 run 同时只会等一个请求，无需优先级判断）；**⑤ 渲染平铺原则**：面板内状态用提前 return 不用嵌套三元（`renderDetailBody` 五层三元 → 平铺 if return 的示范已在 repos 讨论过）。**2026-09-01 联动（C13）**：命令面板逻辑已拆成 `app/lib/use-command-menu.ts`（page.tsx 550+→336 行）——B17 决策区覆盖层改动面变小，且 ④ 的"输入框常驻"正落在 hook 持有的 input/console 上。详案 `doc/plan/b17-frontend-race-and-render.md`（**含补记 1：四家会话模型对照 + 方案 Y 决策，①拆分依据**） | 体检报告前端专项 + Claude Code/Cline 输入框常驻模式 | `app/components/{task-panel,message-row,markdown}.tsx` + `app/page.tsx`（决策区覆盖层）+ `app/repos/page.tsx` | ✅ **完成（2026-09-14 补记收口）** —— ②③④⑤ 全部实现并验收（5 文件 +143/−68，`tsc` 绿；施工记录见详案补记 2）。**验收**：流式时不再全树重渲染；审批/提问时输入框被面板盖住且行为等价；TaskPanel 按会话隔离 |
-| B18 | **测试质量细节**（体检报告行动④⑤⑦）：① 消灭弱断言（grep truncated 未断言 / store.test 条件断言 / config.test 恒真）② 补 store 树语义测试（switchLeaf/appendTodo/getLatestTodos/stats）③ `approval-memory` 显式 reset 接口 + `approval-log.test` 补真实清理 + `store.test` describe 改名 prepareCompaction | 体检报告 2.2 节 | `lib/**/*.test.ts` 各处 | ✅ 完成（2026-09-01，随 B16 一起做：grep 补 truncated 断言 + 去条件断言 / store 8 处早退改 fail-loud + describe 改名 + 新增树语义 6 用例 / config 删恒真 it / approval-memory 加 `resetSessionApprovals()` / approval-log 补 afterAll 真实清理；全套 31 文件 263 用例全绿） |
-| B19 | **bash 工具定义测试补齐**（2026-09-01 检查 tools 目录时发现）：`lib/tools/bash/index.ts`（createBashTool）零测试——其他 10 个工具都有 index.test.ts 测工具定义，唯独 bash 漏（当初只测了 bash-runner 的纯函数，工具定义因依赖执行器被跳过）。做法：vi.spyOn `BashRunner.prototype.run` 返回固定 BashResult → 纯逻辑测 5 个行为（空命令报错 / cancelled 提示 / exitCode≠0 提示 / 无输出占位 / ToolResult 形状），不真 spawn（沙箱受限模式可跑） | 对齐 lib/tools 其他工具 index.test.ts | `lib/tools/bash/index.test.ts`（新） | ⏳ 排队（顺手，半小时；与 B8 前端单测同为测试补齐，非核心） |
-| B20 | **前端状态派生 CSS 化（方法论）**（2026-09-01 学 DSH chatperf 三个 commit 触发，纯知识条目）：DSH 把"纯视觉派生状态"从 React 运行时搬到 CSS，三种形态——① 结构位置关系 → CSS 兄弟选择器（`derive user action reveal`：`data-chat-flow-kind` + `:has(~ 同类)` 表达"非最新一条"，删掉 useChat 全局订阅 + reveal prop）② 布尔状态 → data-\* + 属性选择器（`move reasoning tail alignment`：删 40 行 useThrottledVisualUpdate rAF hook，`data-follow-end` + flex `justify-content:flex-end` + `width:max-content` 等效"滚动到末尾"）③ 尺寸适配 → container query（`move overflow sizing`：ProducedFiles 删探针树 + layout effect + ResizeObserver，`container-type:inline-size` + `@container` 宽度档位选显示几个 chip；决策笔记明写代价：近似换零 JS 布局观察）。**不适用边界**（诚实记录）：消息流每帧文本变化是数据状态（CSS 救不了）；trace-rail 宽度是数据→尺寸映射；键盘焦点是交互状态。方法论先记下，写新 UI 时按此选型，container query 留给 A3/C15 | DSH chatperf（f808112ec8 / 203e2440ac / e5bbee893b + 决策笔记 c11c3f98ad / a718d1f0a1） | 无代码改动，纯知识记录 | ✅ 已记录（2026-09-01，知识点进 B21 施工时引用） |
-| B21 | **前端状态派生 CSS 化（落点实施）**（B20 的两个落点，纯施工条目）：**落点①** command-menu hover 去 JS 化——`.item:hover` 视觉 CSS 已有，删 `onMouseEnter → setCommandActiveIndex`（鼠标划过不再触发整个面板重渲染），React 只留键盘 activeIndex（Enter 执行选中命令需要）**落点②** 布尔类名 → data-\* 语义化：session-row `is-current`、message-row `is-live`/`is-attached` 从字符串拼类名改成 `data-current`/`data-live` + CSS 属性选择器承接（收益是一致性 + 可读性，不是性能） | B20 方法论 | `app/components/{command-menu,session-list,session-row,message-row}/` | ⏳ 排队（落点①半小时；落点②顺手；动手前先读 B20 理解边界） |
-| B22 | **多会话并行 run（session-owner 架构）**（2026-09-01 讨论、09-02 拆分自 B17①，方案 Y）：run 状态的 owner 从 UI 变会话——切会话**不取消正在跑的 run**（A 继续后台跑，UI 切到 B 看别的，回 A 看进度/结果；DSH/opencode 成熟 Web agent 标配）。现状缺口：`use-agent-run` 单份 useState 装多 run 帧 → 切会话时旧 run 帧污染新会话（四家里只有我们这样）。**架构**：`runStore = Map<sessionId, RunState>`（模块级），每会话独立消费 SSE、独立累积（审批/提问/压缩/ContextMeter 全按会话隔离）；UI 只订阅当前 sessionId 的投影（切会话 = 换订阅 key，run 不动）；刷新页面仍走 fetchHistory 恢复；服务端已支持并行（route.ts 每 POST 独立 store + runControllers 按 runId），**主要改前端**。**需求澄清结论（2026-09-02 用户拍板）**：① 并发不限制 ② 会话列表状态点（执行中 loading 动效 / 结束绿点 / 等审批·askUser 黄点）——**只显示非当前会话**（当前会话的主体界面已有状态展示，不重复）③ 切回：跑完看完整结果、还在跑实时流式接上 ④ 停止按钮只停当前选中会话（停其他会话先切过去）。**状态管理选型（2026-09-02）**：**zustand v5**（用户已熟练 zustand/valtio，"手写学机制"不成立；selector 订阅模型 = DSH useProjection 同构，且能保证 A 后台每帧更新不触发 B 视图重渲）。**开工前先精读 DSH `ui-conversation` useProjection/session surface + opencode `packages/core/src/session/run-coordinator`**（导航手册定位：DSH 走读 18 / opencode core 未读）。决策与四家对照见 `doc/plan/b17-frontend-race-and-render.md` 补记 1 | DSH useProjection / opencode run-coordinator | `app/lib/run-store.ts`（新，zustand）+ `app/lib/use-agent-run.ts`（改投影订阅）+ `app/page.tsx` | ✅ 完成（2026-09-02 施工、09-04 浏览器验收通过：`app/lib/run-fold.ts`（纯折叠 26 用例新绿）+ `run-store.ts`（zustand 桶 + 消费循环）+ `run-fold.test.ts`（新）+ `use-agent-run.ts` 变薄 366→99 行投影层 + `sse.ts`/`services/chat` 加 signal abort + `page.tsx` 列表保鲜升级任一会话收尾即 refresh + `session-row` 状态点（只非当前会话）；全套 39 文件 358 用例全绿 + tsc 绿；详案补记见 `doc/plan/b22-multi-session-run.md` §八） |
-
-**阶段 C：功能丰富（远期，按需）**
-
-| # | 做什么 | 参考 | 长在哪 | 触发时机 | 状态 |
+| # | 做什么 | 依据 | 详细设计 | 验收（怎么算做完） | 状态 |
 |---|---|---|---|---|---|
-| C1 | MCP 接入 | Cline / smolagents mcp_client | ToolRegistry 注册外部工具源 | 需要外部数据源时 | ⏳ |
-| C2 | 沙箱容器（**2026-09-14 扩范围：加"网络维度"**——原设计只有文件/进程，网络是空白） | **codex `network-proxy` + Windows MXC**（最新侦察）/ OpenHands / DSH sandbox | 新 Runner（与 BashRunner 平级）+ **权限配置的网络维度**（域名白名单 / 只读模式） | 安全需求出现时 | ⏳ |
-| C3 | 子智能体 / handoffs | DSH subagent（8 种实现） | runAgentLoop 嵌套调用 | Phase 5 任务面板跑稳后 | ⏳ |
-| C4 | 定时任务 | DSH schedule | 产品层新 Runner | 有无人值守需求时 | ⏳ |
-| C5 | 遥测/分析面板 | pi usage-totals / DSH feedback | A3 Trace Viewer 的延伸 | 数据积累后 | ⏳ |
-| C6 | 工作区选择 | future-plans 已有设计 | resolveInsideWorkspace 参数化 | 多工作区需求 | ⏳ |
-| C7 | 设置页 | DSH settings / pi .pi/ | 配置集中化模块（`lib/config.ts` 骨架 ✅） | C6 前后 | ⏳ |
-| C8 | Skills（**联动 /model /skills 命令**）：DSH skill / pi .pi/skills；**2026-09-01 用户拍板**：C13 遗留的 `/model`（模型选择/展示，config 驱动）、`/skills`（技能列表）两个纯前端命令**挂到本项一起做**——当前无 skill 体系支撑，单独做没意义 | DSH skill / pi .pi/skills | systemPrompt 注入处 | 提示词体系稳定后 | ⏳ |
-| C9 | 代码执行器（python） | smolagents local_python_executor | `lib/tools/` 新工具 | "代码即动作"需求出现时 | ⏳ |
-| C10 | goal 三件套 | DSH goal / CodeWhale goal / Reasonix update_goal | 新工具 + 会话事件（仿 todo 模式） | 跨会话长期目标追踪时 | ⏳ |
-| C11 | complete_step 证据签收 | Reasonix complete_step | `lib/tools/` 新工具 + todo 配套 | todo 面板跑稳后 | ⏳ |
-| C12 | move_file / read_image | Reasonix move_file / DSH read_image | `lib/tools/` 两个小工具 | 随做（30 分钟一个） | ⏳ |
-| C13 | **斜杠命令面板** | pi `core/slash-commands.ts` / Reasonix `.reasonix/commands/*.md` | `lib/commands/` 注册表 + 前端斜杠输入 | **立即（一步到位）**；详案 `doc/plan/c13-slash-commands.md` | ✅ 已实现（2026-09-01：首批 /compact + ContextMeter 圆环 + 后续 /clear /export 全链路；目录化 + 后端优化 + useCommandMenu 前端重构；详案补记 1-8；**/model /skills 两个纯前端命令 2026-09-01 用户拍板延后 → C8 Skills 一起做**） |
-| C14 | **@ 文件匹配**（file mention）：输入 `@` 触发文件模糊搜索（文件+文件夹）→ 选中注入模型上下文（代码编写时点名要读的代码/配置；用户 08-27 提，**排在 C13 之后做**） | Codex `mention_codec`/`fuzzy_file_search` + pi `file-processor`（已实读） | `app/lib/mentions.ts`（纯函数）+ `app/api/file-search/` + `ui/mention-picker/` + 发送注入 | ⏳ 排队（详案 `doc/plan/c14-file-mention.md`：**含 A/B/C 方案对比与选 A 理由 + 效率实测（379 文件 7ms / 17k 文件 81ms，按真实工作区场景，**排除依赖是必须项**）+ debounce + 文件夹支持**；符号 @ 可配置不写死） |
-| C15 | **开源仓库更新面板**（用户 08-31 提）：`/repos` 页面（**左右布局**：左项目边栏 + 右详情）列出 `E:\agents-read` 7 个参考项目 → 手动点击更新 = git fetch + pull + LLM 总结新增 commit + ⭐重点标注（结合导航手册"我们拿走什么"）；基线 `.repo-updates/<项目>.json` 增量总结，落盘 `workspace/更新日志/<日期>-<项目>.md`。**分支是数据不是探测**（命令固定 fetch/log/pull，分支写进 registry：pi/codex=main，DSH=master）；**状态 = 进页面实时 `git ls-remote` 检查**（毫秒级，有更新才显示 tag，不误导） | git 标准 CLI + 复用本项目 B2 模型管道（`selectModel`+`complete`+fail-soft） | `lib/repos/`（registry/git/baseline/summarize）+ `app/api/repos/route.ts` + `app/services/repos/` + `app/repos/page.tsx`（首个独立路由页） | ✅ 完成（2026-09-01 单测落地：5 文件 36 用例全绿；修了 3 个根因——vitest.config 缺 `@/` alias / vi.mock TDZ / git 测试缺裸远端；summarize.ts 截断提示死代码被测试逮住已修） |
-| C16 | **六个月跳槽计划（跳槽为主线）**：主目标 = 学会 agent → 跳槽 → **两条线一条流水线**：② 开源技术（pi/DSH）发文章（内部 + 公开双投）③ 参考上游最新变化 + 汲取好设计，持续完善 agent-learn；**⓪ 阶段 1 = 先包装 + 开源 agent-learn**（原清单漏项，杠杆最大——作品没包装等于没作品）。**线 ①「参与公司 agent」2026-09-14 关闭**（领导明确不让前端参与）→ 只剩自有资产这一条路 | 自身经验 + `sop-新增参考项目.md` | 详案 `doc/plan/六个月跳槽计划.md`（**唯一执行文档**：决策依据 + 两条线 + 排期 + 验收 + 砍掉清单 + 上游变化侦察 §八） | 发文章优先（**包装整体推迟到迭代放缓**，见 C17） | ⏳ 进行中 |
-| C17 | **包装与开源**（**2026-09-14 定：快速迭代期先不做**）：README（已有初稿）/ 录屏 GIF / 在线 demo 评估 / 开源准备（剥离 `.env.local` + 许可证 + 敏感信息扫描）。**为什么推迟**：项目还在快速迭代，包装物（README / 录屏 / demo）会随功能变动过期，过早做等于白做。⚠️ **一个例外**：`ARCHITECTURE.md` **已经过期**（还写着 `lib/agent.ts` 平铺 / 9 个工具 / "V 验证层 ❌ 空白"）——那是**已有的错**，不是"还没做的包装"，会误导顺着 README 点进去的人 | 自身经验 | `README.md` + 仓库根 + `ARCHITECTURE.md` | **迭代放缓 / 开始投简历前** | ⏳ 排队 |
-| C18 | **会话 + 压缩 联合重构（产品化前置）**（2026-09-14 **诊断完成、方案未定**）：会话系统是"做中学先有就行"的产物（**当时的选择是对的**——一上来就上 DSH 那套，项目长不到今天），作产品推要大改；**压缩必须跟着改**——`compaction` 就是 `SessionEntry` 的一个类型，两者是同一格式的两面（旁证：DSH `session-format` 四版 + 三迁移包，压缩另成四包）。**诊断**（`doc/plan/session-compaction-refactor.md`，均有证据）：① ⭐ **会话树是"预挖的空壳"**——`switchLeaf` 生产零调用、落盘不记 `leafId`、`loadOrCreate` 假设"最后一行=叶子"（与树结构自相矛盾），违反自家不变量 3；**走读 24 的"我们树形是 DSH 超集"自评需修正** ② ⭐ `header.version` **从不被读**（与 `TraceSnapshot` 同类病：预留字段无使用路径 → 格式演进无路径）③ `readFileSync` 同步 IO + 每请求全量重放 + `list()` 全量读每个文件 ④ `rename` 非原子写（崩中间 = 会话损坏）⑤ 压缩侧：token 粗估 / 只处理最近一次压缩 / **文件只追加不删、无限增长** / B2.1 三件套未做。**分三档**：A 便宜可插队（`list()` 只读文件头 + `version` 校验，各 ~10 行）/ B 要拍方向（**树留还是砍**、格式版本化 + 迁移）/ C 条件触发（增量折叠 + 持久缓存、异步 IO、真实 token、旧原文归档、索引）。**⑥ 新增子项「按工作目录分组」（2026-09-14 用户提："会话也没分组"——分组是迟早的事、优先级提高）**：**目标形状对齐 DSH，精读实证**（`session-persistence-jsonl/src/format.ts`）——DSH 是**两层**：`<root>/<projectKey(cwd)>/<encodeSegment(sessionId)>/session.jsonl`，`sessionDir()` 给每个会话一个**目录**而非文件（注释：available for future session-local artifacts，"代"文件 `session.vN.jsonl` 就住在里面）。**我们要拍的形状**：**甲** `.sessions/<project>/<sessionId>.jsonl`（会话仍是文件，一层）vs **乙** `.sessions/<project>/<sessionId>/`（会话=目录，把审批日志 + 轨迹一起收进去 → **删会话 = 删一个目录**，堵住"删会话留孤儿审批日志/轨迹"这个已知洞）。**待定**。**编码强度判据（值得抄）**：DSH 对项目名用**有损**的 `projectKey`（分隔符→`-`、截断 251 字符，注释明写 intentionally lossy），对会话 id 用**单射**的 `encodeSegment`（`~XXXX` 转义，抗 `../`）——**同一系统两种强度，判据是"撞了的代价"**（项目名撞=混目录，可容忍；会话 id 撞=覆盖别人的会话，不可容忍）。我们现用白名单 `isValidSessionId`（不合法就拒），因为 id 是自家 `generateSessionId()` 生成的——**够用，不是偷懒**。**好消息**：分组所需数据现成——`cwd` 已写在会话头里（`{"type":"session","version":1,"id":...,"cwd":"E:\\..."}`），老会话迁得动，**与格式演进正交、不会白做**。**⚠️ 但实测现存 39 个会话的 cwd 只有 1 个值**（`workspaceRoot` 今日是全局单值）→ **分组做完只会看到一个项目目录**，它的价值要等 **C6 工作区选择**（"会话可属于不同工作目录"先成立）→ **分组与 C6 是一对，排期绑一起**（分组是架子，C6 是第一个使用者）。**分组由它把 A 档打开**（A 档的"`list()` 只读文件头"与分组要"列目录 + 读头拿 cwd"是同一段代码，改两次不如改一次）。轨迹侧跟着分层；**A3 里已把唯一耦合点收进 `lib/trace-files.ts`**（A3 详案 §3.1 ①，`listTraceFiles` 收的是"一个目录"，分组时调用方换目录即可、函数不用改） | DSH `session-format`（v0→v1→v2→v3 + 迁移）/ `session-projection`（增量折叠 + 持久缓存）/ `session-query` / `compaction` 四包 / **DSH `session-persistence-jsonl`（两层的 project/session 目录树 + `projectKey` / `encodeSegment` 两种编码强度）** / C6 工作区选择（分组的第一个使用者） | `lib/session/` + `lib/summarize/` + 会话格式版本与迁移 + **会话存取路径（分组：4 处路径构造点 → 先收成 1 处）** + `lib/trace-files.ts`（轨迹侧跟随） | ⏳ **A 档（含新增的「按工作目录分组」）排 A3 完成后第一批**（2026-09-14 用户定：分组迟早要做、优先级提高）；B/C 档仍排 C 阶段所有功能之后 | 💡 B 档方案未定（**树的去留开工时再讨论**，不前置决策）；A 档可直接开工；**⑥ 的「甲/乙」形状暂不拍板，等 C6 开工时一起定**（2026-09-14 用户定；详见 C18 详案 §6） → **✅ 收口（2026-09-14，代码 3 个 commit）**：**A 档 3 件**——① ~~版本校验~~（**已撤，见后**）② `rename` 原子写 ③ `delete` 清侧车；`list()` 只读头**实测后降级为条件触发**（39 会话 723KB 只省 18ms，且 `list()` 不是轮询接口）；**砍树已落地（`10850dc`）**：会话回到线性日志，删 `parentId` / `switchLeaf` / 出网的 `leafId`，净 −37 行。**随后用户定「探索期不做兼容、旧会话数据已手动清空」→ 版本校验整块撤销（连 `version` 字段一起），2 条兼容用例删除**（判据见详案 §8）；**⛔ B 档因此消解**（树的去留已决 + "迁移机制"无客户）。⇒ **C18 = A 档完成 + B 档消解 + C 档条件触发**。详见详案 **§7**（定案与实测数字）+ **§8**（撤兼容） |
-| C19 | **存量模块「实现与单测同目录」收编**（2026-09-14 AGENTS.md 6.5 升硬规则**必然产生**的旧账）：规则要求"有单测的文件 → `<模块>/index.ts` + `index.test.ts`"，仓库里**当时有 20 处存量违规**（实现平铺 + 同名 `.test.ts` 挂旁边）：`app/lib/` 4（keys / repos-summary / context-occupancy / run-fold）、`app/api/repos/_lib/` 5、`lib/tools/` 3（path-utils / shared / bash-runner）、`lib/permission/` 3、`lib/session/` 2（manager / store）、`lib/commands/parse` + `_pipeline/` 2。**做法**：每个模块搬进同名文件夹改成 `index.ts`，单测跟着进去；**外部 `@/…` 引用不动**（目录 index 解析），只改被移动文件**自己**的相对 import（如 `./types` → `../types`）；一把做完后 `tsc` + 全套测试回归。**为什么不当时做**：迁移会碰 `lib/` 一大片文件（含正在改的 `lib/session/store.ts`），和 A3 的功能改动混在同一个 commit 里会让评审失真 | 自家 `lib/tools/` 已合规的 13 处（read / write / edit / grep / …）+ AGENTS.md 6.5 | `app/lib/`、`app/api/*/_lib/`、`lib/tools/`、`lib/permission/`、`lib/session/`、`lib/commands/` | **A3 完成后一次性做**（2026-09-14 用户拍板：不打断 A3 主线） | ✅ **完成（2026-09-14，`dea7d1b`）**——20 处 / 40 文件全部搬完，32 处相对 import 改写，`tsc` exit 0，git 全部识别为**改名**（R096–R100，历史不断），旧位置零残留。**几乎零手工**：写了一次性脚本（先**干跑**打印每处待改 import 供核对，再执行）——40 个文件的相对路径靠手改必然出错；`tsc` 在这里就是安全网（改错必然报"找不到模块"）。`/…` 别名与目录式引用（`./store` → `store/index.ts`）自动解析、一行未动 |
-| C20 | **轨迹视图 v2：密列表 + 记录检查器**（2026-09-14 用户看过 DSH `ui-trajectory` 后提；**A3 v1 形态保留可用，这是优化项不是返工**）：把 v1 的「竖轴 + 每条记录占两三行」换成**一行一条的密列表**（信息密度大得多），**点某一行 → 该记录的检查器**（概述 / 参数 / 结果 / **Schema** / 计时），顶部再加**泳道时间总览**（输入 / 模型 / 工具 三条色块，可点选定位到行）。**我们已经有、不用重做的**：尾部跟随（上滚暂停）、进行中不虚构耗时、run→会话归属、会话级坐标、错误/信号在轴上的形状编码。**v2 才要新做的**：密列表行高压缩 + 检查器面板（含**工具 Schema 展示**、开始时间 / 时长）+ 泳道总览 + 搜索。**⚠️ 虚拟化降级为条件触发（2026-09-14 实测后改）**：原写"按需加载更早 + 只渲染可见行，和验收里 877KB 不卡是同一件事"——**实测证明不是**。最大那条轨迹（1149KB / 3222 条 entry）**折叠后只有 11 行记录**（857KB→22 行、856KB→26 行），`readTrace` 12ms。真实数据下记录数是**几十行**量级，离虚拟化的场景差两个数量级 → **现在不做，等 v2 真把行数做多了（如每 block 一行、嵌套 subtool 展开）再拿出来**。**现场要定的分歧**：DSH 的记录类型是 User / Assistant / Tool / **nested Subtool** / compaction，**没有独立的"错误"类型**（错误是工具的一种状态）；v1 把 error 单列一类（轴上换方形）。v2 要不要跟着合并，取决于那时错误还需不需要在轴上"一眼跳" | DSH `packages/client/ui-trajectory`：`TrajectoryTable.tsx`（记录表 + **本地**检查器）/ `TrajectoryTimeline.tsx` + `.lanes`（泳道总览）/ `locales.ts`（文案表：概述/参数/结果/Schema/计时）/ `layout.ts` + `trajectory-snapshot-builder.ts`（快照与布局）/ README（**长历史从尾部打开、按需加载更早、只渲染可见行**） | `app/components/trace-viewer/`（改造）+ `app/lib/trace-layout/`（视图行模型要多带检查器要用的字段） | **A3 v1 用一阵之后**（记录数量大起来、或觉得信息密度不够时） | ⏳ 排队（方向已定、方案未设计——按规则 10，开工时再讨论再写详案） |
-| C21 | **轨迹文件瘦身：`message_update` 不重复存整份累积消息**（2026-09-14 实测发现）：每条 `message_update` 都带**完整的累积消息对象**（不是只带增量），而**折叠只用 `event.delta`** → `message_update.message` **无人读**，却让 3266 条 entry 撑成 **1.1MB**（长度 × 条数 ≈ 平方级）。实测最大那条轨迹折叠后只有 **11 条记录**——**文件大小与信息量严重脱钩**。做法（开工时定）：① 只在 update 里存 `delta`（读取端本来就只认 delta，旧文件不需迁移）② 或记录层按事件类型裁剪负载 ③ 或上压缩（DSH 生成 `.jsonl.zstd` 那一路）。**代价与风险**：轨迹是"调试黑匣子"，裁剪会降低保真度 → 要么留开关、要么只裁**已被证明无人读**的那个字段 | DSH `session-persistence-jsonl`（按类型裁剪 + 可选 zstd 压缩 + 分代文件 `session.vN.jsonl`） | `lib/trace/`（记录层）+ 详案 `doc/plan/observability.md` §6（已记实测数字） | 轨迹文件大到有痛感时 / 与 C20 一起 | ⏳ 排队（实测已有，方案未定） |
-| C22 | **工具输出的"超限不丢"两层**（💡 2026-09-14 来自 opencode 工具层补读）：我们现在**截断即丢弃**——`web_fetch` 只提示"换个更具体的 URL"，`bash`/`grep` 直接砍。opencode 是**留一份 + 给路径**：`tool-output-store.ts`（`MAX_LINES=2000` / `MAX_BYTES=50KB` / 保留 **7 天**，目录 `tool-output`），**把 `outputPaths` 回给模型**，模型需要时自己去读回。**同源的第二件（更便宜、先做）**：它把**生产者捕获上限**与**模型输出上限**分成两层（`core/src/tool/AGENTS.md`：*"Producer capture limits are separate."*——捕获层要**如实报告丢了多少**，模型输出层才截断/落盘）；我们现在**一个 `maxOutputChars` 管到底**，出口只有一句"已截断"，**不区分是上游截的还是我们截的**（`bodyTruncated` 内部带了两个来源，但出口合并成一句）。**⚠️ 刻意不开工**：属**增强不是缺陷**，且**没有真机数据**——现在做等于又一次"我觉得更好" | opencode `core/src/tool-output-store.ts` + `core/src/tool/AGENTS.md`（Output 节）／对照 langchain `webbrowser.ts`（"不把全文给模型"的 RAG 路线） | `lib/tools/web-fetch/` + `lib/tools/bash/` + 新增一个输出落盘模块 | A5 真机复跑后看"截断发生的频率有多高"，或 `bash` 输出被砍有痛感时 | ↪ **并入 C24**（网络查询优化整体复查） |
-| C23 | **抽取降噪：把导航/页脚/图片链接从正文里剔掉**（💡 2026-09-14 用户真机复跑给了一个**真实样本**）：读一篇文章，输出里带了一整块 **36氪频道矩阵**——17 个品牌名（36氪Auto / 数字时氪 / 未来消费…），**href 全指向 CDN 图片**（`img.36krcdn.com/..._img_png`），turndown 渲染成「4 空格缩进 + 每项之间空行」的嵌套列表，粗估约 **2000 字符**（文章 5000 字的话占 **40%**）。**⚠️ 关键未知**：那页疑似转载/聚合了 36氪内容，**这堆东西未必在 `<footer>` 里、可能就躺在正文流中间** → 所以"删 footer"**可能根本打不中**。三个候选按「**能不能自证**」排：**A｜链接的 href 指向图片资源**（容器无关，规则自证——链到图片的文字不是正文，风险低）／**B｜删 `nav`/`footer`/`aside`**（我们曾在详案 §7.14.3 撤回它，理由是「opencode 和 DSH 都不做」——**那是权威论证不是数据论证**；用户给了数据后**改回候选**）／**C｜class/id 命中 comment/share/recommend/copyright**（靠"闻味道"，规则不自证，风险最高，**先不做**）。**开工前必须先做的一件事**：拿到那段的**原始 HTML** 确认容器（本地 dev 有外网，可用 bash curl） | 反参照：opencode `core/src/tool/webfetch.ts` 与 DSH `tool-web/fetch.ts` 都**不**按标签删导航（它们只做 §7.14.4 那层"删不可见内容"） | `lib/tools/web-fetch/html-to-text/`（加 turndown 规则） | 有更多"降噪后仍被淹"的实例时 / 与 C22 一起做 | 💡 讨论中 → ↪ **并入 C24**（用户 2026-09-14 指定；样本已留档） |
-| C24 | **网络查询优化 —— web 后端整体复查**（⏳ 2026-09-14 用户提出：「**后端我们单独开一个网络查询优化 task，进行整体的复查**」）：**不是加功能，是把 A5 这一整块从头到尾过一遍**。复查范围（**草稿，开工前定稿**）：**① 契约与语义**——非 2xx=结果 / 空结果明说 / 什么算失败，三处是否一致 **② 限额与截断**——8 个旋钮的真机取值；⚠️ **截断不区分"上游截的"还是"我们截的"**（C22 那条）**③ 内容与编码**——字符集 / content-type 白名单 / **不嗅探 `<meta>` charset 这个已知边界**的代价有多大 **④ 安全**——闸门覆盖面、**重定向策略仍未拍板**、注入防御只有标注、DNS rebinding TOCTOU **⑤ 抽取质量**——降噪（C23 那条）**⑥ 可观测**——失败时轨迹里能不能看出错在哪一步 **⑦ 成本**——搜索一次调用 = 一次模型调用/query，模型乱给 4 条 query 时有没有浪费 **⑧ 对照复查**——DSH / opencode / codex 逐项再对一遍（⚠️ opencode 的工具**有两套并存**，导航卡已订正，这次**两边都要看**）**⑨ 提示词效果**——决策边界与引用规范的真机表现。**⚠️ 本项吸收 C22 + C23**（那两条不再单独排期） | opencode `core/src/tool/`（`webfetch` + `websearch` + `tool-output-store` + **`AGENTS.md`**）/ DSH `packages/web/tool-web/` / codex `web.run` 决策边界 | `lib/tools/web-search/` + `lib/tools/web-fetch/` + `lib/config/` + `app/api/chat/_pipeline/prompt/` | **A5 收口后即可开工，无阻塞**（降噪的真实样本已留档） | ⏳ 排队（用户 2026-09-14 指定） |
+| A4 | **ask_user_question** | DSH tool-ask-user / codex request_user_input | `doc/plan/a4-ask-user.md` | 模型提问 → 弹层 → 回答 → 继续 | ✅ |
+| C13 | **斜杠命令面板** | pi `core/slash-commands.ts` / Reasonix `.reasonix/commands/*.md` | `doc/plan/c13-slash-commands.md` | — | ✅ 已实现（2026-09-01：首批 /compact + ContextMeter 圆环 + 后续 /clear /export 全链路；目录化 + 后端优化 + useCommandMenu 前端重构；详案补记 1-8；**/model /skills 两个纯前端命令 2026-09-01 用户拍板延后 → C8 Skills 一起做**） |
+| B14 | **上下文余量指示**（外部评估 B 级顺手件）：数据已齐（done 帧 stats.tokens + 压缩阈值在 config），只差读数盘加一格"上下文 X%" | Claude Code /context | — | — | ✅ **完成（并入 C13，2026-09-01）** —— ContextMeter 圆环已挂在页面上（`app/page.tsx`），本项无需再做 |
+| C15 | **开源仓库更新面板**（用户 08-31 提）：`/repos` 页面（**左右布局**：左项目边栏 + 右详情）列出 `E:\agents-read` 7 个参考项目 → 手动点击更新 = git fetch + pull + LLM 总结新增 commit + ⭐重点标注（结合导航手册"我们拿走什么"）；基线 `.repo-updates/<项目>.json` 增量总结，落盘 `workspace/更新日志/<日期>-<项目>.md`。**分支是数据不是探测**（命令固定 fetch/log/pull，分支写进 registry：pi/codex=main，DSH=master）；**状态 = 进页面实时 `git ls-remote` 检查**（毫秒级，有更新才显示 tag，不误导） | git 标准 CLI + 复用本项目 B2 模型管道（`selectModel`+`complete`+fail-soft） | `doc/plan/c15-repo-updater.md` | — | ✅ 完成（2026-09-01 单测落地：5 文件 36 用例全绿；修了 3 个根因——vitest.config 缺 `@/` alias / vi.mock TDZ / git 测试缺裸远端；summarize.ts 截断提示死代码被测试逮住已修） |
+| B15 | **自动会话命名**（外部评估 B 级顺手件）：首轮 assistant 回复完成后用首条用户消息（或小模型一句话）生成 title 更新会话（title 字段 + 改名接口都有） | Claude Code / DSH | — | — | ⏳ 排队（顺手，半小时） |
+| C12 | move_file / read_image | Reasonix move_file / DSH read_image | — | — | ⏳ |
+| B10 | **工作区记忆文件注入**（外部评估 S2）：`systemPrompt` 常量 → `createSystemPrompt(workspaceRoot)` 工厂，尾部拼接 `workspace/AGENTS.md`（存在才注入 + 缓存；`@文件` 引用行一期可不做）；配套写种子文件 | Claude Code CLAUDE.md / pi AGENTS.md / Codex | — | 记忆文件写一条规矩 → 新会话模型遵守；文件不存在行为不变 | ⏳ 排队 |
+| C14 | **@ 文件匹配**（file mention）：输入 `@` 触发文件模糊搜索（文件+文件夹）→ 选中注入模型上下文（代码编写时点名要读的代码/配置；用户 08-27 提，**排在 C13 之后做**） | Codex `mention_codec`/`fuzzy_file_search` + pi `file-processor`（已实读） | `doc/plan/c14-file-mention.md` | — | ⏳ 排队（详案 `doc/plan/c14-file-mention.md`：**含 A/B/C 方案对比与选 A 理由 + 效率实测（379 文件 7ms / 17k 文件 81ms，按真实工作区场景，**排除依赖是必须项**）+ debounce + 文件夹支持**；符号 @ 可配置不写死） |
+| B4 | **文件 diff 预览**：edit/write 前生成 diff（红绿视图） | Cline / DSH DiffBlock | — | — | ⏳ 排队 |
+| C4 | 定时任务 | DSH schedule | — | — | ⏳ |
+| C5 | 遥测/分析面板 | pi usage-totals / DSH feedback | — | — | ⏳ ← 延伸自 A3（已完成） |
+| C7 | 设置页 | DSH settings / pi .pi/ | `doc/plan/c7-config.md` | — | ⏳ ← 依赖 C6（工作区） |
+| C9 | 代码执行器（python） | smolagents local_python_executor | — | — | ⏳ ← 依赖 C2（沙箱） |
+| C10 | goal 三件套 | DSH goal / CodeWhale goal / Reasonix update_goal | — | — | ⏳ |
+| C11 | complete_step 证据签收 | Reasonix complete_step | — | — | ⏳ |
+| C25 | **多模型支持**（2026-09-14 目的变更后**从「暂缓」翻为「要做」**）：接入第二家 provider（OpenAI 兼容 / Anthropic 兼容），**验证 `TeachingModel` 接缝真的能换**；provider 差异仍关在适配层，引擎无感 | pi `packages/ai`（pi-ai 包，多 provider 抽象）；我们的 `config.provider` + `TeachingModel` 接缝已留（A5 的两次调用已证明端点可分开） | — | — | 💡 讨论中 |
+| C26 | **交互式 TTY 终端**（2026-09-14 目的变更后**从「不做」翻为「低优先级要做」**）：伪终端（pty）支持 —— 能跑 `vim` / `top` / 交互式命令。⚠️ **Windows 上是难点**（ConPTY），成本明显高于普通命令执行 | pi / DSH 的终端面板；对照我们的 `BashRunner`（一次性 spawn + 流式，**无 pty**） | — | — | 💡 讨论中（低优先级） |
+
+#### 7.3.3 工程优化待办（**可选** —— 想做就挑，按成本）
+
+| # | 做什么 | 依据 | 详细设计 | 验收（怎么算做完） | 状态 |
+|---|---|---|---|---|---|
+| A2 | **测试框架 vitest** | smolagents / DSH test-support | `doc/plan/a2-vitest.md` | tools 全测过，`pnpm test` 绿 | ✅（23 文件 188 用例） |
+| B16 | **引擎核心零测试补齐**（体检报告行动①③，最高优先级）：补 `lib/agent.ts`（runAgentLoop：block→isError 进 context / rewrite 换参 / 工具抛错不崩循环 / maxTurns guardrail / 事件序列）与 `lib/deepseekModel.ts`（tool_call_id 配对 / compactionSummary 伪装 / SSE 坏 JSON）单测——FakeModel 基建已现成（summarize.test.ts），复用成本低 | pi（引擎测试思想）/ DSH test-support | — | — | ✅ 完成（2026-09-01：agent 11 用例 + deepseekModel 13 用例；FakeModel 提炼为共享 `lib/testing/fake-model.ts`；对照 pi agent-loop.test.ts 六个测试模式；**全套 31 文件 263 用例全绿** + tsc 绿；顺带修了 vitest.config 缺 `@/` alias 的隐性坑——repos 测试第一批用别名全挂） |
+| B18 | **测试质量细节**（体检报告行动④⑤⑦）：① 消灭弱断言（grep truncated 未断言 / store.test 条件断言 / config.test 恒真）② 补 store 树语义测试（switchLeaf/appendTodo/getLatestTodos/stats）③ `approval-memory` 显式 reset 接口 + `approval-log.test` 补真实清理 + `store.test` describe 改名 prepareCompaction | 体检报告 2.2 节 | — | — | ✅ 完成（2026-09-01，随 B16 一起做：grep 补 truncated 断言 + 去条件断言 / store 8 处早退改 fail-loud + describe 改名 + 新增树语义 6 用例 / config 删恒真 it / approval-memory 加 `resetSessionApprovals()` / approval-log 补 afterAll 真实清理；全套 31 文件 263 用例全绿） |
+| B20 | **前端状态派生 CSS 化（方法论）**（2026-09-01 学 DSH chatperf 三个 commit 触发，纯知识条目）：DSH 把"纯视觉派生状态"从 React 运行时搬到 CSS，三种形态——① 结构位置关系 → CSS 兄弟选择器（`derive user action reveal`：`data-chat-flow-kind` + `:has(~ 同类)` 表达"非最新一条"，删掉 useChat 全局订阅 + reveal prop）② 布尔状态 → data-\* + 属性选择器（`move reasoning tail alignment`：删 40 行 useThrottledVisualUpdate rAF hook，`data-follow-end` + flex `justify-content:flex-end` + `width:max-content` 等效"滚动到末尾"）③ 尺寸适配 → container query（`move overflow sizing`：ProducedFiles 删探针树 + layout effect + ResizeObserver，`container-type:inline-size` + `@container` 宽度档位选显示几个 chip；决策笔记明写代价：近似换零 JS 布局观察）。**不适用边界**（诚实记录）：消息流每帧文本变化是数据状态（CSS 救不了）；trace-rail 宽度是数据→尺寸映射；键盘焦点是交互状态。方法论先记下，写新 UI 时按此选型，container query 留给 A3/C15 | DSH chatperf（f808112ec8 / 203e2440ac / e5bbee893b + 决策笔记 c11c3f98ad / a718d1f0a1） | — | — | ✅ 已记录（2026-09-01，知识点进 B21 施工时引用） |
+| B17 | **前端渲染优化（收窄版，2026-09-02 拆分）**（体检报告行动⑥，①已拆给 B22）：② TaskPanel dismissed 加 `key={sessionId}` ③ Markdown/MessageRow memo + foldEvents useMemo（消每 delta 全树重渲染 + O(n²) 重折叠）；**④ 面板渲染模式**（2026-08-31 讨论）：底部决策区三选一（pendingApproval ? 审批 : pendingAsk ? 提问 : 输入框）改**输入框常驻 + 覆盖层**（`{pendingApproval && <审批卡/>}` + `{pendingAsk && <提问卡/>}` 独立条件，输入框永远在，面板 absolute 盖住；业务上两 panel 天然互斥——串行 run 同时只会等一个请求，无需优先级判断）；**⑤ 渲染平铺原则**：面板内状态用提前 return 不用嵌套三元（`renderDetailBody` 五层三元 → 平铺 if return 的示范已在 repos 讨论过）。**2026-09-01 联动（C13）**：命令面板逻辑已拆成 `app/lib/use-command-menu.ts`（page.tsx 550+→336 行）——B17 决策区覆盖层改动面变小，且 ④ 的"输入框常驻"正落在 hook 持有的 input/console 上。详案 `doc/plan/b17-frontend-race-and-render.md`（**含补记 1：四家会话模型对照 + 方案 Y 决策，①拆分依据**） | 体检报告前端专项 + Claude Code/Cline 输入框常驻模式 | `doc/plan/b17-frontend-race-and-render.md` | — | ✅ **完成（2026-09-14 补记收口）** —— ②③④⑤ 全部实现并验收（5 文件 +143/−68，`tsc` 绿；施工记录见详案补记 2）。**验收**：流式时不再全树重渲染；审批/提问时输入框被面板盖住且行为等价；TaskPanel 按会话隔离 |
+| C19 | **存量模块「实现与单测同目录」收编**（2026-09-14 AGENTS.md 6.5 升硬规则**必然产生**的旧账）：规则要求"有单测的文件 → `<模块>/index.ts` + `index.test.ts`"，仓库里**当时有 20 处存量违规**（实现平铺 + 同名 `.test.ts` 挂旁边）：`app/lib/` 4（keys / repos-summary / context-occupancy / run-fold）、`app/api/repos/_lib/` 5、`lib/tools/` 3（path-utils / shared / bash-runner）、`lib/permission/` 3、`lib/session/` 2（manager / store）、`lib/commands/parse` + `_pipeline/` 2。**做法**：每个模块搬进同名文件夹改成 `index.ts`，单测跟着进去；**外部 `@/…` 引用不动**（目录 index 解析），只改被移动文件**自己**的相对 import（如 `./types` → `../types`）；一把做完后 `tsc` + 全套测试回归。**为什么不当时做**：迁移会碰 `lib/` 一大片文件（含正在改的 `lib/session/store.ts`），和 A3 的功能改动混在同一个 commit 里会让评审失真 | 自家 `lib/tools/` 已合规的 13 处（read / write / edit / grep / …）+ AGENTS.md 6.5 | — | — | ✅ **完成（2026-09-14，`dea7d1b`）**——20 处 / 40 文件全部搬完，32 处相对 import 改写，`tsc` exit 0，git 全部识别为**改名**（R096–R100，历史不断），旧位置零残留。**几乎零手工**：写了一次性脚本（先**干跑**打印每处待改 import 供核对，再执行）——40 个文件的相对路径靠手改必然出错；`tsc` 在这里就是安全网（改错必然报"找不到模块"）。`/…` 别名与目录式引用（`./store` → `store/index.ts`）自动解析、一行未动 |
+| C28 | **会漂的东西改成「跑一下就报」**（2026-09-14 定，**2026-09-15 扩为两件同源的活**；判据 = **凡是"需要有人定期回头检查"的字段都会烂** —— 实测：§7.3 触发条件现烂 3 处，**旧前提判词在 `AGENTS.md`（铁律、自动加载）里存活到 09-15 才被审计发现**）：**① §7.3 状态列改「生成式」** —— 手写的状态列**必然漂移**（当天实测出 10 处不一致）：状态**不再手写**，由脚本从文件系统派生——**无详案 = `💡 讨论中`；有详案但头部没写状态行 = `⏳ 排队`；详案头部 `> **状态**：…` = 原样透传**。脚本只重写表格每行的**最后一格**，锚点是行首 **ID**（稳定引用符）；`--check` 的退出码就是门禁（`0` 一致 / `1` 漂了），`--write` 收尾时跑一次。**副产品**：开工门禁（三格齐才进排队）从「靠人记得」变成**生成逻辑，不可能违反**。**② 判词扫描** —— 扫活文档（`AGENTS.md` / `PLAN.md` / `会话检查点.md`）里的**旧前提判词**（`学习项目没必要` / `非核心所以不做` / `顺手件` / `按需` / `教学项目收益低` …），**命中即报**；显式标了「留档 / 历史」的段落豁免 | ① ETCLOVG 的 O（可观测）/ G（治理）两层**自用**；当天对账实测（10 处不一致，3 处当天现烂）② **09-15 前提同步审计**（旧前提在铁律文件里活了一整天） | — | — | 💡 讨论中 |
+| B19 | **bash 工具定义测试补齐**（2026-09-01 检查 tools 目录时发现）：`lib/tools/bash/index.ts`（createBashTool）零测试——其他 10 个工具都有 index.test.ts 测工具定义，唯独 bash 漏（当初只测了 bash-runner 的纯函数，工具定义因依赖执行器被跳过）。做法：vi.spyOn `BashRunner.prototype.run` 返回固定 BashResult → 纯逻辑测 5 个行为（空命令报错 / cancelled 提示 / exitCode≠0 提示 / 无输出占位 / ToolResult 形状），不真 spawn（沙箱受限模式可跑） | 对齐 lib/tools 其他工具 index.test.ts | — | — | ⏳ 排队（顺手，半小时；与 B8 前端单测同为测试补齐，非核心） |
+| B21 | **前端状态派生 CSS 化（落点实施）**（B20 的两个落点，纯施工条目）：**落点①** command-menu hover 去 JS 化——`.item:hover` 视觉 CSS 已有，删 `onMouseEnter → setCommandActiveIndex`（鼠标划过不再触发整个面板重渲染），React 只留键盘 activeIndex（Enter 执行选中命令需要）**落点②** 布尔类名 → data-\* 语义化：session-row `is-current`、message-row `is-live`/`is-attached` 从字符串拼类名改成 `data-current`/`data-live` + CSS 属性选择器承接（收益是一致性 + 可读性，不是性能） | B20 方法论 | — | — | ⏳ 排队（落点①半小时；落点②顺手；动手前先读 B20 理解边界） |
+| B11 | **会话级运行锁**（外部评估 S3）：route.ts POST 入口 per-session 占用表（`Map<sessionId, runId>`），占用中返回 409 + 明确文案，finally 释放 | 所有成熟 harness 隐含前提 | — | 并发两请求同 session → 第二个 409；不同 session 不受影响 | ⏳ 排队 |
+| B12 | **中断/崩溃会话自愈**（外部评估 S4）：`buildContext`（或 loadOrCreate 后）扫描尾部未配对 toolCall → **不改文件**，重建上下文时补合成 toolResult（"上次运行被中断，工具未执行"，isError=true）——pi 同款：存储是事实，修复在重建视图时 | Claude Code / pi resume | — | 手工构造孤儿 toolCall 会话文件 → 正常发消息不 400；合成结果进上下文且前端可见 | ⏳ 排队 |
+| B5 | **hooks 注册表**：beforeToolCall 泛化成 onBeforeTool/onAfterTool | CodeWhale / DSH hooks | — | — | ⏳ 排队 ⚠️ **动红线文件** `lib/agent/index.ts` |
+| B9 | **模型请求重试与退避**（外部评估 S1）：瞬时错误（429/5xx/超时）指数退避重试 2~3 次（`Retry-After` 头优先）、永久错误（401/400）fail-fast、请求加空闲超时兜底；重试过程发轨迹事件 | Claude Code / pi / DSH | — | stub fetch 前两次 429 第三次成功 → complete 正常返回 + 轨迹 2 条 retry；401 不重试 | ⏳ 排队 |
+| C24 | **网络查询优化 —— web 后端整体复查**（⏳ 2026-09-14 用户提出：「**后端我们单独开一个网络查询优化 task，进行整体的复查**」）：**不是加功能，是把 A5 这一整块从头到尾过一遍**。复查范围（**草稿，开工前定稿**）：**① 契约与语义**——非 2xx=结果 / 空结果明说 / 什么算失败，三处是否一致 **② 限额与截断**——8 个旋钮的真机取值；⚠️ **截断不区分"上游截的"还是"我们截的"**（C22 那条）**③ 内容与编码**——字符集 / content-type 白名单 / **不嗅探 `<meta>` charset 这个已知边界**的代价有多大 **④ 安全**——闸门覆盖面、**重定向策略仍未拍板**、注入防御只有标注、DNS rebinding TOCTOU **⑤ 抽取质量**——降噪（C23 那条）**⑥ 可观测**——失败时轨迹里能不能看出错在哪一步 **⑦ 成本**——搜索一次调用 = 一次模型调用/query，模型乱给 4 条 query 时有没有浪费 **⑧ 对照复查**——DSH / opencode / codex 逐项再对一遍（⚠️ opencode 的工具**有两套并存**，导航卡已订正，这次**两边都要看**）**⑨ 提示词效果**——决策边界与引用规范的真机表现。**⚠️ 本项吸收 C22 + C23**（那两条不再单独排期） | opencode `core/src/tool/`（`webfetch` + `websearch` + `tool-output-store` + **`AGENTS.md`**）/ DSH `packages/web/tool-web/` / codex `web.run` 决策边界 | — | — | ⏳ 排队（用户 2026-09-14 指定） |
+| C22 | **工具输出的"超限不丢"两层**（💡 2026-09-14 来自 opencode 工具层补读）：我们现在**截断即丢弃**——`web_fetch` 只提示"换个更具体的 URL"，`bash`/`grep` 直接砍。opencode 是**留一份 + 给路径**：`tool-output-store.ts`（`MAX_LINES=2000` / `MAX_BYTES=50KB` / 保留 **7 天**，目录 `tool-output`），**把 `outputPaths` 回给模型**，模型需要时自己去读回。**同源的第二件（更便宜、先做）**：它把**生产者捕获上限**与**模型输出上限**分成两层（`core/src/tool/AGENTS.md`：*"Producer capture limits are separate."*——捕获层要**如实报告丢了多少**，模型输出层才截断/落盘）；我们现在**一个 `maxOutputChars` 管到底**，出口只有一句"已截断"，**不区分是上游截的还是我们截的**（`bodyTruncated` 内部带了两个来源，但出口合并成一句）。**⚠️ 刻意不开工**：属**增强不是缺陷**，且**没有真机数据**——现在做等于又一次"我觉得更好" | opencode `core/src/tool-output-store.ts` + `core/src/tool/AGENTS.md`（Output 节）／对照 langchain `webbrowser.ts`（"不把全文给模型"的 RAG 路线） | — | — | ↪ **并入 C24**（网络查询优化整体复查） ← 并入 C24 |
+| C23 | **抽取降噪：把导航/页脚/图片链接从正文里剔掉**（💡 2026-09-14 用户真机复跑给了一个**真实样本**）：读一篇文章，输出里带了一整块 **36氪频道矩阵**——17 个品牌名（36氪Auto / 数字时氪 / 未来消费…），**href 全指向 CDN 图片**（`img.36krcdn.com/..._img_png`），turndown 渲染成「4 空格缩进 + 每项之间空行」的嵌套列表，粗估约 **2000 字符**（文章 5000 字的话占 **40%**）。**⚠️ 关键未知**：那页疑似转载/聚合了 36氪内容，**这堆东西未必在 `<footer>` 里、可能就躺在正文流中间** → 所以"删 footer"**可能根本打不中**。三个候选按「**能不能自证**」排：**A｜链接的 href 指向图片资源**（容器无关，规则自证——链到图片的文字不是正文，风险低）／**B｜删 `nav`/`footer`/`aside`**（我们曾在详案 §7.14.3 撤回它，理由是「opencode 和 DSH 都不做」——**那是权威论证不是数据论证**；用户给了数据后**改回候选**）／**C｜class/id 命中 comment/share/recommend/copyright**（靠"闻味道"，规则不自证，风险最高，**先不做**）。**开工前必须先做的一件事**：拿到那段的**原始 HTML** 确认容器（本地 dev 有外网，可用 bash curl） | 反参照：opencode `core/src/tool/webfetch.ts` 与 DSH `tool-web/fetch.ts` 都**不**按标签删导航（它们只做 §7.14.4 那层"删不可见内容"） | — | — | 💡 讨论中 → ↪ **并入 C24**（用户 2026-09-14 指定；样本已留档） ← 并入 C24 |
+| C20 | **轨迹视图 v2：密列表 + 记录检查器**（2026-09-14 用户看过 DSH `ui-trajectory` 后提；**A3 v1 形态保留可用，这是优化项不是返工**）：把 v1 的「竖轴 + 每条记录占两三行」换成**一行一条的密列表**（信息密度大得多），**点某一行 → 该记录的检查器**（概述 / 参数 / 结果 / **Schema** / 计时），顶部再加**泳道时间总览**（输入 / 模型 / 工具 三条色块，可点选定位到行）。**我们已经有、不用重做的**：尾部跟随（上滚暂停）、进行中不虚构耗时、run→会话归属、会话级坐标、错误/信号在轴上的形状编码。**v2 才要新做的**：密列表行高压缩 + 检查器面板（含**工具 Schema 展示**、开始时间 / 时长）+ 泳道总览 + 搜索。**⚠️ 虚拟化降级为条件触发（2026-09-14 实测后改）**：原写"按需加载更早 + 只渲染可见行，和验收里 877KB 不卡是同一件事"——**实测证明不是**。最大那条轨迹（1149KB / 3222 条 entry）**折叠后只有 11 行记录**（857KB→22 行、856KB→26 行），`readTrace` 12ms。真实数据下记录数是**几十行**量级，离虚拟化的场景差两个数量级 → **现在不做，等 v2 真把行数做多了（如每 block 一行、嵌套 subtool 展开）再拿出来**。**现场要定的分歧**：DSH 的记录类型是 User / Assistant / Tool / **nested Subtool** / compaction，**没有独立的"错误"类型**（错误是工具的一种状态）；v1 把 error 单列一类（轴上换方形）。v2 要不要跟着合并，取决于那时错误还需不需要在轴上"一眼跳" | DSH `packages/client/ui-trajectory`：`TrajectoryTable.tsx`（记录表 + **本地**检查器）/ `TrajectoryTimeline.tsx` + `.lanes`（泳道总览）/ `locales.ts`（文案表：概述/参数/结果/Schema/计时）/ `layout.ts` + `trajectory-snapshot-builder.ts`（快照与布局）/ README（**长历史从尾部打开、按需加载更早、只渲染可见行**） | `doc/plan/observability.md` | — | ⏳ 排队（方向已定、方案未设计——按规则 10，开工时再讨论再写详案） |
+| C21 | **轨迹文件瘦身：`message_update` 不重复存整份累积消息**（2026-09-14 实测发现）：每条 `message_update` 都带**完整的累积消息对象**（不是只带增量），而**折叠只用 `event.delta`** → `message_update.message` **无人读**，却让 3266 条 entry 撑成 **1.1MB**（长度 × 条数 ≈ 平方级）。实测最大那条轨迹折叠后只有 **11 条记录**——**文件大小与信息量严重脱钩**。做法（开工时定）：① 只在 update 里存 `delta`（读取端本来就只认 delta，旧文件不需迁移）② 或记录层按事件类型裁剪负载 ③ 或上压缩（DSH 生成 `.jsonl.zstd` 那一路）。**代价与风险**：轨迹是"调试黑匣子"，裁剪会降低保真度 → 要么留开关、要么只裁**已被证明无人读**的那个字段 | DSH `session-persistence-jsonl`（按类型裁剪 + 可选 zstd 压缩 + 分代文件 `session.vN.jsonl`） | `doc/plan/observability.md` §6 | — | ⏳ 排队（实测已有，方案未定） ← 与 C20 一起 |
+| B3 | **UI V2：尺度升级 + 原语库**（2026-08-26 用户 UI 反馈触发：按钮太小、小家子气、溢出操作进 dropdown）：① 全面板尺度升级（按钮 ≥34px 命中区、字号上提、留白加大）② 第一个原语 = **下拉菜单 Menu**（溢出操作归集：顶栏「⋯」、会话行「⋯」、面板头部）③ 面板 chrome 统一（头部 = 标题 + 读数 + 操作区）④ dialog/collapse/select/stepper… 后续按需 ⑤ **精读 DSH `packages/client/AGENTS.md`**（约束 AI 写前端的教材；约束纪律见 `doc/plan/ui-design.md` §10.6） | DSH `dsh-client-ui-primitives` + Reasonix 面板族（走读 18） | `doc/plan/ui-design.md` | — | ⏳ 进行中（①②落地；08-27：原语评估全出局 + 删除确认行内化 + keys.ts + 等宽 12px 收口 + SessionRow 抽取 + **⑤精读完成**（对照表 `doc/知识点-04` + 新组件 checklist §10.9）） |
+| B8 | **前端单元测试**（**非核心**，2026-08-26 用户标注"这个倒不是核心"）：① 纯函数层先行（`app/lib/`：trace-fold/messages/format——不随 UI 变，随时可做）② 组件/hooks 层（RTL：Menu/MessageRow/use-sessions）等"冻结信号"：全局令牌与骨架连续 2 轮迭代不改、组件 API 冻结 | vitest + Testing Library（参考 DSH test-support） | — | — | ⏳ 排队 ← 依赖 B3（令牌/骨架冻结信号） |
+| B7 | **终端加固**：bash 输出全量落盘 + shell 危险分析（重定向/嵌套检测） | Reasonix shellsafe | — | — | ⏳ 排队 |
+| C18 | **会话 + 压缩 联合重构（产品化前置）**（**✅ A 档完成 + 树已砍 + B 档消解**，2026-09-14；余 ⑥ 分组等 C6 与 C档条件触发。**原写「诊断完成、方案未定」，是 A 档开工前的快照，已订正**）：会话系统是"做中学先有就行"的产物（**当时的选择是对的**——一上来就上 DSH 那套，项目长不到今天），作产品推要大改；**压缩必须跟着改**——`compaction` 就是 `SessionEntry` 的一个类型，两者是同一格式的两面（旁证：DSH `session-format` 四版 + 三迁移包，压缩另成四包）。**诊断**（`doc/plan/session-compaction-refactor.md`，均有证据）：① ⭐ **会话树是"预挖的空壳"**——`switchLeaf` 生产零调用、落盘不记 `leafId`、`loadOrCreate` 假设"最后一行=叶子"（与树结构自相矛盾），违反自家不变量 3；**走读 24 的"我们树形是 DSH 超集"自评需修正** ② ⭐ `header.version` **从不被读**（与 `TraceSnapshot` 同类病：预留字段无使用路径 → 格式演进无路径）③ `readFileSync` 同步 IO + 每请求全量重放 + `list()` 全量读每个文件 ④ `rename` 非原子写（崩中间 = 会话损坏）⑤ 压缩侧：token 粗估 / 只处理最近一次压缩 / **文件只追加不删、无限增长** / B2.1 三件套未做。**分三档**：A 便宜可插队（`list()` 只读文件头 + `version` 校验，各 ~10 行）/ B 要拍方向（**树留还是砍**、格式版本化 + 迁移）/ C 条件触发（增量折叠 + 持久缓存、异步 IO、真实 token、旧原文归档、索引）。**⑥ 新增子项「按工作目录分组」（2026-09-14 用户提："会话也没分组"——分组是迟早的事、优先级提高）**：**目标形状对齐 DSH，精读实证**（`session-persistence-jsonl/src/format.ts`）——DSH 是**两层**：`<root>/<projectKey(cwd)>/<encodeSegment(sessionId)>/session.jsonl`，`sessionDir()` 给每个会话一个**目录**而非文件（注释：available for future session-local artifacts，"代"文件 `session.vN.jsonl` 就住在里面）。**我们要拍的形状**：**甲** `.sessions/<project>/<sessionId>.jsonl`（会话仍是文件，一层）vs **乙** `.sessions/<project>/<sessionId>/`（会话=目录，把审批日志 + 轨迹一起收进去 → **删会话 = 删一个目录**，堵住"删会话留孤儿审批日志/轨迹"这个已知洞）。**待定**。**编码强度判据（值得抄）**：DSH 对项目名用**有损**的 `projectKey`（分隔符→`-`、截断 251 字符，注释明写 intentionally lossy），对会话 id 用**单射**的 `encodeSegment`（`~XXXX` 转义，抗 `../`）——**同一系统两种强度，判据是"撞了的代价"**（项目名撞=混目录，可容忍；会话 id 撞=覆盖别人的会话，不可容忍）。我们现用白名单 `isValidSessionId`（不合法就拒），因为 id 是自家 `generateSessionId()` 生成的——**够用，不是偷懒**。**好消息**：分组所需数据现成——`cwd` 已写在会话头里（`{"type":"session","version":1,"id":...,"cwd":"E:\\..."}`），老会话迁得动，**与格式演进正交、不会白做**。**⚠️ 但实测现存 39 个会话的 cwd 只有 1 个值**（`workspaceRoot` 今日是全局单值）→ **分组做完只会看到一个项目目录**，它的价值要等 **C6 工作区选择**（"会话可属于不同工作目录"先成立）→ **分组与 C6 是一对，排期绑一起**（分组是架子，C6 是第一个使用者）。**分组由它把 A 档打开**（A 档的"`list()` 只读文件头"与分组要"列目录 + 读头拿 cwd"是同一段代码，改两次不如改一次）。轨迹侧跟着分层；**A3 里已把唯一耦合点收进 `lib/trace-files.ts`**（A3 详案 §3.1 ①，`listTraceFiles` 收的是"一个目录"，分组时调用方换目录即可、函数不用改） | DSH `session-format`（v0→v1→v2→v3 + 迁移）/ `session-projection`（增量折叠 + 持久缓存）/ `session-query` / `compaction` 四包 / **DSH `session-persistence-jsonl`（两层的 project/session 目录树 + `projectKey` / `encodeSegment` 两种编码强度）** / C6 工作区选择（分组的第一个使用者） | `doc/plan/session-compaction-refactor.md` | — | 💡 B 档方案未定（**树的去留开工时再讨论**，不前置决策）；A 档可直接开工；**⑥ 的「甲/乙」形状暂不拍板，等 C6 开工时一起定**（2026-09-14 用户定；详见 C18 详案 §6） → **✅ 收口（2026-09-14，代码 3 个 commit）**：**A 档 3 件**——① ~~版本校验~~（**已撤，见后**）② `rename` 原子写 ③ `delete` 清侧车；`list()` 只读头**实测后降级为条件触发**（39 会话 723KB 只省 18ms，且 `list()` 不是轮询接口）；**砍树已落地（`10850dc`）**：会话回到线性日志，删 `parentId` / `switchLeaf` / 出网的 `leafId`，净 −37 行。**随后用户定「探索期不做兼容、旧会话数据已手动清空」→ 版本校验整块撤销（连 `version` 字段一起），2 条兼容用例删除**（判据见详案 §8）；**⛔ B 档因此消解**（树的去留已决 + "迁移机制"无客户）。⇒ **C18 = A 档完成 + B 档消解 + C 档条件触发**。详见详案 **§7**（定案与实测数字）+ **§8**（撤兼容） |
+| B2.1 | **压缩打磨三件套**（DSH 走读 24 触发）：① compaction entry 补审计字段（被压消息 id 列表 + 摘要模型名）② "摘要必须更小" fail-closed 检查（摘要 ≥ 被压区域不落盘）③ tool-pairing balance 升级（替代"第一条不是 toolResult"单点修正）；B 类不抄（锁/KV cache/影子价格/错误分类/接口抽象——场景不需要） | DSH compaction（走读 24 施工单） | — | — | 💡 讨论中（条件触发：① 长期会话复盘时 ② 下次动 compact.ts 时 ③ 遇孤儿工具坑时）。⚠️ **若 C18 开工则并入 C18**（本项是"够用版打磨"，C18 是"重构级"——同一处别改两遍） ← 并入 C18 |
+
+#### 7.3.4 项目级事项（不属于任何功能/优化）
+
+| # | 做什么 | 依据 | 详细设计 | 验收（怎么算做完） | 状态 |
+|---|---|---|---|---|---|
+| C16 | **六个月跳槽计划（跳槽为主线）**：主目标 = 学会 agent → 跳槽 → **两条线一条流水线**：② 开源技术（pi/DSH）发文章（内部 + 公开双投）③ 参考上游最新变化 + 汲取好设计，持续完善 agent-learn；**⓪ 阶段 1 = 先包装 + 开源 agent-learn**（原清单漏项，杠杆最大——作品没包装等于没作品）。**线 ①「参与公司 agent」2026-09-14 关闭**（领导明确不让前端参与）→ 只剩自有资产这一条路 | 自身经验 + `sop-新增参考项目.md` | `doc/plan/六个月跳槽计划.md` | — | ⏳ 进行中 |
+| C17 | **包装与开源**（**2026-09-14 定：快速迭代期先不做**）：README（已有初稿）/ 录屏 GIF / 在线 demo 评估 / 开源准备（剥离 `.env.local` + 许可证 + 敏感信息扫描）。**为什么推迟**：项目还在快速迭代，包装物（README / 录屏 / demo）会随功能变动过期，过早做等于白做。⚠️ **一个例外**：`ARCHITECTURE.md` **已经过期**（还写着 `lib/agent.ts` 平铺 / 9 个工具 / "V 验证层 ❌ 空白"）——那是**已有的错**，不是"还没做的包装"，会误导顺着 README 点进去的人 | 自身经验 | — | — | ⏳ 排队 |
+| C29 | **整体评价体系**（2026-09-14 用户三次修正：「值得封装成 skill」→「**先考虑有没有，然后再看看好不好**」→「**等我们把大功能做完了之后开始搭建整体评价体系**」；原话「**要不然鬼知道你这玩意到底好不好，也没个标准的**」）：**排期已定 —— 排在 §7.3.1 大功能全部完成之后**。做法：**第一步是调研现成的，不是自造**。已知候选（都要落到一手来源）：① ⭐ **本项目 §7.1 的 ETCLOVG 抄自 `Agent-Harness-Survey-ZH-main` §2.3，而那份 survey 的 §8「Verification and Evaluation」整章就是干这个的——我们只抄了它的分类法** ② `awesome-harness-engineering` 的 Evals & Verification 段 ③ OpenTelemetry GenAI 语义约定 ④ arXiv 2606.10106「harness 的充要条件」 ⑤ Anthropic「Demystifying Evals for AI Agents」 ⑥ 工具：Inspect AI / promptfoo / DeepEval / LangFuse / skillgrade。**有 → 对齐或抄，并写清哪条不适用；确实没有 → 才自造**。产出顺序：调研报告 → 评价维度 → **评一遍 agent-learn 自己（差距清单）** → 固化成 skill + 检查项并纳入收尾流程（← C28 会成为其中一条检查项） | ⭐ 首要依据：`E:\agents-read\Agent-Harness-Survey-ZH-main` §8（**就在我们的参考目录里，只用过它的 2.3 节**）+ `awesome-harness-engineering` Evals 段 + 2026-09-14 用户定「先查有没有」与「排在大功能之后」 | — | — | 💡 讨论中（**排期已定：§7.3.1 大功能全部完成之后开始搭建**） |
+
+#### 7.3.5 条件触发（不排期，但连理由一起记着 —— 免得反复重提）
+
+> **判据（2026-09-14 加）**：不做的理由是「**学习项目没必要**」→ **重审**；理由是「**工程上不划算**」→ 保留。
+
+| 项 | 状态 | 复查结论（目的改为「作品」后） |
+|---|---|---|
+| **LSP 代码智能** | 💡 讨论中 | 原判理由含「**教学项目收益低**」→ 🔴 **该理由已失效**；但"要起语言服务器进程"是**真实的工程成本** → 作为高成本可选项留在讨论中 |
+| **tool_search 工具发现** | ⏳ 条件触发 | 原判「工具超过 20 个才需要，现在 13 个」是**工程理由** → ✅ **仍成立**，等工具膨胀 |
+| **monorepo 抽包**（`lib/` 抽成共享包） | ⏳ 条件触发 | 原 Phase 6：「若出现『内核要被多个入口复用』的需求，这是**换架构的正确时机**」→ **工程理由，仍成立** |
+
+> **已从本表移出**：~~B22 衍生「刷新后重连正在跑的 run」~~ → **已升为排期项 `C27`**（§7.3.1，2026-09-14 定）。
+
+**原判原文留档**（2026-09-14 之前写的，一个字没改）：
 
 > **非核心/可选（暂不排期，条件触发）**：**LSP 代码智能**（重型依赖——要起语言服务器进程，教学项目收益低；真需要代码智能时再评估）和 **tool_search 工具发现**（工具超过 20 个才需要，现在 12 个；等工具膨胀时再评估）。这两项不是"不学"，是"条件触发"。
-
 > **B22 衍生未来项（2026-09-02，用户暂不接受当前方案、记入优化项）**：**刷新后重连正在跑的 run**——B22 一期接受"刷新 = 放弃实时观察，回 A 看落盘结果"（runStore 内存态，刷新丢；服务端 run 仍继续跑完落盘）。要补实时需服务端 run **脱离请求生命周期**（run 与 POST 连接解耦、可重连订阅，opencode Session Runtime 形态），是独立大工程，条件触发（用户明确要时）。
 
 ### 7.4 落地原则（核心规则）
 
 1. **每步标注"参考谁"**：学的是思路不是代码；实现时对照参考项目源码（本地都有）
-2. **一个阶段一个 commit**：阶段内小步提交，每步展示清单等确认
-3. **先补思路再动手**：每个规划项开工前，先在对应 `doc/plan/*.md` 补"实现前补记"（骨架版 PLAN 只留链接）
-4. **验收标准先行**：每项有明确的"怎么算做完"（上表验收列）
-5. **B1 优先**：审批升级改动小、收益大、教学点密（命令分析=新一课），建议阶段 B 先做它
+2. **一次收口一个 commit**：收口时小步提交，每步展示清单等确认
+3. **先补思路再动手**：开工前先在 `doc/plan/<名>.md` 补详案 —— **PLAN 只留指针与一句摘要**
+4. **验收标准先行**：三格（依据 / 详细设计 / 验收）没齐 = **未定案 = 不许开工**（见 §7.3 顶部）
+5. ~~B1 优先~~ → **已完成**（B1 审批四步，2026-08-26）；本条作废
 
-**计划增改与维护流程（2026-08-26 定，操作流程以 AGENTS.md 第 10 条为准）**：
-
-- **新增计划项**：先在 7.3 排期表加一行（状态 `💡 讨论中` 或 `⏳ 排队`）→ 讨论定案后新建 `doc/plan/<名>.md` 详案（功能描述 + 实施方案 + 验收标准）；讨论结论（含"为什么不做"）一并记录。
-- **已有计划升级（完全体）**：在原详案文件**追加补记**（原方案 → 触发原因 → 新方案 → 决策），不新建文件、不覆盖原文——同功能演进记在一个文件，回顾开一个文件全看到。
-- **收尾必做**：① 更新详案（实现细节/坑）② 更新 7.3 状态列（✅）③ 更新 `会话检查点.md` ④ 展示清单等确认再提交。少一步都算没做完。
-- **状态位**：`💡 讨论中`（刚提想法，方案未定）/ `⏳ 排队`（定案未做）/ `⏳ 进行中`（正在做）/ `✅ 完成`。
-- **新想法判定（2026-08-27 定，聊的过程中当场判定，不阻塞主线）**：冒出新功能/想法 → 先判「**核心功能**（影响主线架构/主线体验，如会话记忆、工具、轨迹这类骨架件）or **功能完善**（打磨已有能力，如 UI 细节、快捷键、小修复）」→ 核心排 **A/B 阶段**（近期/中期，插到对应阶段表）；完善排 **C 阶段或当前阶段末尾**；判定不了标 `💡 讨论中` 下轮再定。→ 无论哪种，先在 7.3 排期表加一行 → 回到主线继续开发（捕获即走）。判定与排期流程以 AGENTS.md 第 11.5 条为准。
+> **计划增改与维护流程以 `AGENTS.md` 第 10 条为准** —— 本节不重复。
+> （2026-09-14 去重：原文的「先在 7.3 排期表加一行 / 核心排 A/B 阶段 / 完善排 C 阶段」讲的是**旧结构**，已删。）
+> **位置与状态**见 §7.3 顶部的说明；**「不做」记哪**见 §五。
 
 ### 7.5 外部评估发现问题清单（2026-08-27，另一 agent 客观评估，源文档用完即删）
 
