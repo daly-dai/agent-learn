@@ -138,9 +138,9 @@ prepareCompaction() → 生成摘要 → appendCompaction() → buildContext()
 | **split-turn** | 切穿 turn 后单独压缩前缀，拼在历史摘要后 | 我们的树结构天然不劈轮次，还支持 `switchLeaf` 回退分支，场景不需要 |
 | **overflow 触发 + 重试** | 检测 API overflow → 自动压缩 → 重试 | DeepSeek 1M 窗口 + threshold 触发已经够用，overflow 恢复是成熟系统才需要的 |
 | **文件追踪（details）** | 从 toolCall 提取文件操作清单 | 有价值但属于 A 类差距，已记在 `b2-compaction.md` 待办 |
-| **扩展钩子（session_before_compact）** | 允许 extension 接管压缩 | 学习项目暂无 extension 体系 |
+| **扩展钩子（session_before_compact）** | 允许 extension 接管压缩 | 我们是单用户单会话，暂无 extension 体系 |
 | **多 Lane** | main + 扩展 lane 独立视图 | 单分支够用，Phase 2 多会话走 `switchLeaf` 路线 |
-| **按 token 保留** | 20k tokens 精确保留 | 8 条消息一眼看懂，学习项目先求可读 |
+| **按 token 保留** | 20k tokens 精确保留 | 8 条消息一眼看懂，先求可读 |
 | **防误触发** | 换模型/aborted/旧 compaction 三重检查 | 单触发点 + 简单阈值，暂无复杂误触发场景 |
 
 ### 核心思路

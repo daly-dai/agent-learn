@@ -110,7 +110,7 @@ E:\agents-read\codex\codex-rs\
 | `codex-rs/otel/` + `analytics/` | OTel 遥测标准 | 我们是本地 jsonl 轨迹 |
 | `codex-rs/agent-graph-store/` `agent-identity/` `agent-roles/` | 多 agent / 身份 / 角色 | 对应 C3 子智能体 |
 
-> **明确不抄**：`cloud-tasks`（云端任务）、`voice-host` + `realtime-webrtc`（语音）、`secrets` / `keyring-store` / `aws-auth` / `workload-identity`（企业身份密钥基础设施）——学习项目无收益。
+> **明确不抄**：`cloud-tasks`（云端任务）、`voice-host` + `realtime-webrtc`（语音）、`secrets` / `keyring-store` / `aws-auth` / `workload-identity`（企业身份密钥基础设施）——**我们不需要企业身份体系**。
 
 ---
 
