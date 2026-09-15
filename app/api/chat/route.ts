@@ -29,7 +29,7 @@ import {
 } from "@/lib";
 import type { ToolCallContent, ToolDecision } from "@/lib";
 import type { StreamFrame } from "./_pipeline/frames";
-import { systemPrompt } from "./_pipeline/prompt";
+import { buildSystemPrompt } from "./_pipeline/prompt";
 import { decideToolCall } from "./_pipeline/approval";
 import { selectModelSafe } from "./_pipeline/model";
 import { createRequestContext, createSessionStore } from "./_pipeline/context";
@@ -151,7 +151,9 @@ export async function POST(req: NextRequest) {
         //     落盘/工具组装/loop/压缩/done 都收进编排层；这里只保留
         //     SSE 管道（send/abort/finally）——Next.js 请求生命周期。
         await runPipeline({
-          systemPrompt,
+          // ⭐ 每次请求现取时间：模型需要知道"现在"，否则它会把训练截止
+          // 当今年（2026-09-14 真机验收就是这个问题）。见 _pipeline/prompt/。
+          systemPrompt: buildSystemPrompt(),
           model,
           userMessage,
           store,
