@@ -890,6 +890,12 @@ service.remove(["script", "style", "noscript"]);   // 只认三个标签
 
 #### 7.14.5 顺带发现：**opencode 的 `webfetch.ts`，§7.12 四家复核漏掉了**
 
+> **2026-09-14 订正（重要）**：准确说法**不是"我漏查了"，而是"我被导航卡指错了路径"**。
+> `doc/开源项目导航手册/opencode.md` 当时只写了 `packages/opencode/src/tool/`，
+> 而 `packages/core/src/tool/`（20 文件 + 它自己的 `AGENTS.md`）**卡片里一个字都没有**——
+> 我按卡片去查，就只看到了一半。**一个错的索引比没有索引更糟：没有索引你会去搜，
+> 有错的索引你会相信它。** 卡片已订正，补读结果见 §7.15。
+
 `opencode/packages/core/src/tool/webfetch.ts` 和我们同类（本地自研抓取），
 但有几处不同，全部**记下来备查，暂不改**：
 
@@ -933,5 +939,68 @@ Set-Content $f ($orig.Replace(...)) -NoNewline
    **做危险操作时给自己留一个"能证明恢复了"的检查，不是可选项。**
 
 文件已按原内容完整重建（原 193 行 + 本次改动），`tsc` 与 613 条用例确认无恙。
+
+---
+
+### 7.15 opencode 工具层补读（导航卡订正之后，2026-09-14）
+
+#### 7.15.1 先订正导航卡（**这是缺陷，不是增强**）
+
+| | `packages/opencode/src/tool/` | `packages/core/src/tool/` |
+|---|---|---|
+| 文件数 | **40** | **20** |
+| 形态 | `X.ts` 实现 + **`X.txt` 描述文件**成对 | `Tool.make({ description, input, output, execute, toModelOutput })` |
+| 架构文档 | — | ⭐ **`AGENTS.md`（59 行）** |
+| `webfetch.ts` | 192 行 | 218 行 |
+| `websearch.ts` | 143 行 | 260 行 |
+
+**两套都完整、两套都有 web 工具。** 原卡片只写了左边那个。
+`core/src/tool/AGENTS.md` 自称 **V2 core**，但**哪套是当前主线未核**（两边功能集不同：
+opencode 侧有 `task.ts`（子智能体）/ `lsp.ts`，core 侧有 `http-body.ts` / `builtins.ts`）。
+
+> `index.md` 第 51 行本来就写着 `packages/opencode/src/ + packages/core/src/`，
+> **所以缺陷只在项目卡片里**。已修卡片 + 在 index 的项目速览表补三行入口。
+
+#### 7.15.2 `core/src/tool/AGENTS.md` 里三条**对我们直接有用**的约束
+
+1. **只允许一条执行入口**（原文禁止项）：
+   *"Do not add a second executable entry type, registry-owned executor,
+   authorization callback, output-path callback, or legacy normalization path."*
+2. ⭐ **可见性 ≠ 授权**：*"Definition filtering is catalog visibility, not execution
+   authorization."* —— 把工具从**模型可见的清单**里滤掉，**不等于**阻止它执行。
+   （这条值得记：我们的审批是在**执行时**决定的，"工具清单给不给模型看"是另一件事。）
+3. ⭐ **两套限额是分开的**：*"Producer capture limits are separate."*
+   - **生产者捕获上限**（如 bash 的 `maxOutputBytes`，且要**如实报告丢了多少**）
+   - **模型输出上限 + 托管落盘**（**只在这一层截断、只在这一层产生 `outputPath`**）
+
+   **我们现在是一个 `maxOutputChars` 管到底。**
+
+它是**主**参考里少见的「把工具子系统的架构约束写下来」的文档，还带一节 `Current Gaps` 自曝缺口。
+
+#### 7.15.3 `websearch.ts` —— 我们搜索侧缺的那一家
+
+| opencode 的事实 | 我们的对照 |
+|---|---|
+| **本地工具**，走 **MCP** 调 `mcp.exa.ai/mcp` / `search.parallel.ai/mcp`；文件头明说它与 **provider 托管搜索是两条路** | 我们走 provider 托管（DeepSeek 服务端）。**三种形态凑齐了**：provider 托管（我们）/ 本地自研（DSH）/ **本地转第三方 MCP**（opencode） |
+| ⭐ **工具描述里塞当前年份**：`The current year is ${new Date().getFullYear()}. Use this year when searching…` | **和我们的 bug① 是同一个问题**，但**位置不同**（工具描述 vs 系统提示词），而且它是**模块顶层求值**（`export const description`）→ **长跑进程会拿到过期年份**。**我们每请求现取（`buildSystemPrompt()`），是更稳的那个** |
+| `NO_RESULTS` 明写"没找到，换个查询词" | **独立印证**我们那条「绝不返回空字符串」的判断——两个项目独立得出同一结论 |
+| 返回**一整段 text**：把"给模型的上下文串"交给后端（`contextMaxCharacters`，上限 5 万字符） | 我们**自己解析来源列表 + round-robin 合并 + 排版**。**两条路线**：少写代码、把复杂度交给服务端 vs 自己掌握形状 |
+| `selectProvider` 用 `checksum(sessionID) % 2` **按会话哈希分流** Exa / Parallel | 我们单 provider（配置显式指定） |
+| 搜索也要 `permission.assert` 弹框 | 再次印证它的安全模型是「**人批准**」——所以它**不需要地址闸门** |
+| `MAX_NUM_RESULTS = 20`（默认 8）/ `MAX_RESPONSE_BYTES = 256KB` / 25s 超时 | 我们：来源上限 8、查询上限 4 |
+
+#### 7.15.4 两条**候选**（记着，等真机数据，别现在做）
+
+1. **工具输出超限落盘 + 可回读**（`tool-output-store.ts`：2000 行 / 50KB / 保留 7 天，
+   目录 `tool-output`，把 `outputPaths` 回给模型）。
+   ⚠️ 它是**通用**机制、不只 web —— 我们 `bash` / `grep` / `web_fetch` 现在**截断就是丢了**。
+   属新能力、C 阶段。
+2. ⭐ **"两套限额分离"**（第 7.15.2 条第 3 点）—— 比上一条便宜，而且它顺手解决一个
+   **诚实性**问题：我们现在给模型的"截断提示"**不区分是上游截的还是我们截的**
+   （`bodyTruncated` 内部确实带了两个来源，但出口只有一句提示）。
+
+> **两条都刻意不开工。** 理由同 §7.14.3：它们是**增强**不是缺陷，而且**都还没有真机数据**——
+> 现在做等于又一次"我觉得更好"。
+
 
 

@@ -49,6 +49,9 @@
 | 学术分类法（ETCLOVG 七层） | 综述 | `Agent-Harness-Survey-ZH-main/` |
 | agent 生态 / 中间件体系 | **langchainjs**（新增 08-31） | `langchainjs/libs/langchain/src/agents/` |
 | 终端 Agent 完整实现 | **opencode**（新增 08-31，dev 分支） | `opencode/packages/opencode/src/` + `packages/core/src/` |
+| **工具子系统的架构约束**（单执行入口 / 可见性≠授权 / 捕获上限与模型上限分离） | **opencode** | ⭐ 先读 `opencode/packages/core/src/tool/AGENTS.md` ⚠️ 工具**两套并存**，实现要 `core/src/tool/` + `opencode/src/tool/` 两处都看 |
+| **工具输出超限落盘 + 可回读**（`outputPaths` 回给模型） | **opencode** | `opencode/packages/core/src/tool-output-store.ts`（2000 行 / 50KB / 保留 7 天） |
+| **本地联网搜索**（本地起 HTTP，走 MCP 调 Exa / Parallel） | **opencode** | `opencode/packages/core/src/tool/websearch.ts` |
 
 ---
 
