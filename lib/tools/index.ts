@@ -3,7 +3,7 @@
 // ============================================================
 // 每个工具一个文件（lib/tools/ 下的工厂函数），这里负责：
 //   1. ToolRegistry：注册表（说明书 + 执行函数）
-//   2. createToolRegistry：把 8 个工具工厂组装成一个注册表
+//   2. createToolRegistry：把各工具工厂组装成一个注册表
 //
 // 对外接口不变：route.ts 仍 `import { createToolRegistry } from "@/lib/tools"`，
 // 目录 + index 解析会自动指向本文件。
@@ -22,6 +22,8 @@ import { createFindTool } from "./find";
 import { createBashTool } from "./bash";
 import { createTodoTool } from "./todo";
 import { createAskUserTool } from "./ask-user";
+import { createWebFetchTool } from "./web-fetch";
+import { createWebSearchTool } from "./web-search";
 
 export class ToolRegistry {
   private readonly tools = new Map<string, RegisteredTool>();
@@ -83,6 +85,15 @@ export function createToolRegistry(
   // 但需要业务 hooks——工厂参数接收并闭包烙（贴 pi：context 烙进工具）
   registry.register(createTodoTool(hooks));
   registry.register(createAskUserTool(hooks));
+
+  // web_fetch / web_search：不绑工作区、不需要 hooks，也不进
+  // TOOLS_NEEDING_CONFIRM（只读放行）。
+  //   - web_fetch 自己会拦 loopback——因为放行档下没人把关，详见
+  //     lib/tools/web-fetch/index.ts 头部说明。
+  //   - web_search 每次调用要花一次模型调用的钱（走服务端搜索），
+  //     靠系统提示词约束"只在需要最新信息时才用"。
+  registry.register(createWebFetchTool());
+  registry.register(createWebSearchTool());
 
   return registry;
 }

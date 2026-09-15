@@ -141,3 +141,22 @@ describe("decideToolCall —— 只读工具默认放行", () => {
     }
   });
 });
+
+describe("decideToolCall —— A5 的两个 web 工具不弹框", () => {
+  it("web_fetch / web_search → allow（只读放行，不在 TOOLS_NEEDING_CONFIRM）", async () => {
+    // ⭐ 这不是"顺带断言"，它钉的是一条**设计决策**（A5 详案 §7.3）：
+    // web_fetch 之所以要拦 loopback，正是因为它是**放行档、没人把关**。
+    // 哪天有人把它加进 TOOLS_NEEDING_CONFIRM，那条决策的前提就变了——
+    // 这条用例会红，提醒去重读 §7.3。
+    for (const name of ["web_fetch", "web_search"]) {
+      const r = await decideToolCall(call(name), ctx());
+      expect(r.action).toBe("allow");
+    }
+  });
+
+  it("对照：确认清单里的 bash → request（证明上面的 allow 不是恒真）", async () => {
+    // 没有这条对照，上面那条在"所有工具都放行"的实现下也会绿——等于没测。
+    const r = await decideToolCall(call("bash", { command: "ls" }), ctx());
+    expect(r.action).toBe("request");
+  });
+});
