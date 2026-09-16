@@ -56,7 +56,7 @@ describe("buildSystemPrompt —— 提示词整体", () => {
     // 搬迁 + 加内容时最容易顺手漏掉原来的段落——原文没有单测，
     // 这一条就是它的兜底
     const prompt = buildSystemPrompt(FIXED);
-    expect(prompt).toContain("Teaching Agent");
+    expect(prompt).toContain("statve");
     expect(prompt).toContain("## 工具使用原则");
     expect(prompt).toContain("## 输出要求");
     expect(prompt).toContain("始终用中文回答");

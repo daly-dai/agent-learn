@@ -13,7 +13,7 @@
 //   - 字体语言：项目名/分支/哈希/日期用等宽（代码世界的器物），正文无衬线
 //   - 历史时间线：每次更新落盘一个文件，全部读回；每条重点标注都展开
 //     （用户拍板：上周的重点标注也要可见），概览/提交折叠
-//   - 令牌全部来自 globals.css，与观测台同语言（中性壳 + 五支笔色）
+//   - 令牌全部来自 globals.css，与对话页同语言（中性壳 + 五支笔色）
 // ============================================================
 
 import { useCallback, useEffect, useState } from "react";
@@ -136,7 +136,7 @@ export default function ReposPage() {
           <span className={styles.subtitle}>参考开源项目 · 按天跟进</span>
         </div>
         <Link href="/" className={styles.back}>
-          返回观测台
+          返回对话
         </Link>
       </header>
 

@@ -16,7 +16,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 export async function createFixtureWorkspace(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), "agent-learn-test-"));
+  const root = await mkdtemp(join(tmpdir(), "statve-agent-test-"));
   await writeFile(join(root, "a.txt"), "hello world", "utf8");
   await mkdir(join(root, "notes"), { recursive: true });
   await writeFile(join(root, "notes", "b.md"), "# Title\ncontent line\n", "utf8");

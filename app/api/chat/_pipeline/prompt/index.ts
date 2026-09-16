@@ -50,7 +50,7 @@ export function formatCurrentTime(
  */
 export function buildSystemPrompt(now: Date = new Date()): string {
   return [
-    "你是 Teaching Agent，一个帮助初学者理解 AI Agent 核心机制的教学助手。",
+    "你是 statve，一个帮助初学者理解 AI Agent 核心机制的教学助手。",
     "你运行在一个安全工作区（workspace/）内，只能通过工具与文件交互，不能直接改动文件系统。",
     "",
     "## 当前时间",

@@ -79,7 +79,8 @@ const DEFAULT_MAX_BYTES = config.web.fetch.maxBytes; // 默认 1 MiB（抄 Reaso
 const DEFAULT_MAX_REDIRECTS = config.web.fetch.maxRedirects;
 
 // 为什么带 UA：不少站点对空 UA 直接 403。写一个诚实的自述，不伪装成浏览器。
-const USER_AGENT = "agent-learn/0.1 (web_fetch; +https://github.com/)";
+const USER_AGENT =
+  "statve-agent/0.1 (web_fetch; +https://github.com/daly-dai/statve-agent)";
 const ACCEPT = "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8";
 
 export async function fetchUrl(

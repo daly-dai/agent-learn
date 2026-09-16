@@ -8,7 +8,7 @@ import "./globals.css";
 //   系统等宽/无衬线栈（见 globals.css :root），视觉退化很小、零网络依赖。
 
 export const metadata: Metadata = {
-  title: "Teaching Agent · 观测台",
+  title: "statve · agent harness",
   description: "观察一个 Agent 如何思考、调用工具、给出答案",
 };
 

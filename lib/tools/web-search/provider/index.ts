@@ -105,7 +105,7 @@ export const DEEPSEEK_PROVIDER_ID = "deepseek";
 export const DEFAULT_API_VERSION = "2023-06-01";
 
 // 写一个诚实的自述 UA，不伪装成浏览器
-const USER_AGENT = "agent-learn/0.1 (web_search)";
+const USER_AGENT = "statve-agent/0.1 (web_search)";
 
 // ------------------------------------------------------------
 // provider 侧类型：DeepSeek/Anthropic 的 wire format 只在本文件可见

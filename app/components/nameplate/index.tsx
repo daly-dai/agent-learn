@@ -38,9 +38,7 @@ export function Nameplate({ runId, model, phase, turn }: NameplateProps) {
   return (
     <header className={styles.nameplate}>
       <PenMark />
-      <span className={styles.wordmark}>Teaching Agent</span>
-      <span className={styles.plateRule} />
-      <span className={styles.wordmarkCn}>观测台</span>
+      <span className={styles.wordmark}>statve</span>
 
       <div className={styles.plateRight}>
         {runId && (
