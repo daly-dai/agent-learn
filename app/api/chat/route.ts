@@ -29,7 +29,6 @@ import {
 } from "@/lib";
 import type { ToolCallContent, ToolContext, ToolDecision } from "@/lib";
 import type { StreamFrame } from "./_pipeline/frames";
-import { buildSystemPrompt } from "./_pipeline/prompt";
 import { decideToolCall } from "./_pipeline/approval";
 import { selectModelSafe } from "./_pipeline/model";
 import { createRequestContext, createSessionStore } from "./_pipeline/context";
@@ -158,12 +157,12 @@ export async function POST(req: NextRequest) {
         send({ type: "run", runId: recorder.runId, model: modelLabel });
 
         // 1-3) 编排交给 _pipeline/index.ts 的 runPipeline（E2 步骤 4）：
-        //     落盘/工具组装/loop/压缩/done 都收进编排层；这里只保留
+        //     落盘/工具组装/系统提示词/loop/压缩/done 都收进编排层；这里只保留
         //     SSE 管道（send/abort/finally）——Next.js 请求生命周期。
+        //     ⚠️ 系统提示词**不在这里装**（C34，2026-09-16）：它现在由 runPipeline 在
+        //     组装完工具注册表之后现装 —— 因为提示词里有一段来自**各工具的投稿**
+        //     （`RegisteredTool.guidelines`），而注册表是在那一层建的。装配点只有一个。
         await runPipeline({
-          // ⭐ 每次请求现取时间：模型需要知道"现在"，否则它会把训练截止
-          // 当今年（2026-09-14 真机验收就是这个问题）。见 _pipeline/prompt/。
-          systemPrompt: buildSystemPrompt(),
           model,
           userMessage,
           store,

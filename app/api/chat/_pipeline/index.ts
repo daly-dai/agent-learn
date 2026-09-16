@@ -22,16 +22,17 @@ import type { TeachingModel } from "@/lib/model";
 import type { JsonlSessionStore } from "@/lib/session";
 import type { TraceRecorder } from "@/lib/trace";
 import { runAgentLoop, type ToolDecision } from "@/lib/agent";
+import { loadSkills, buildSkillCatalog } from "@/lib";
 import type { ToolContext } from "@/lib/tools";
 import { config } from "@/lib/config";
 import type { StreamFrame } from "./frames";
+import { buildSystemPrompt } from "./prompt";
 import { createPipelineTools } from "./tools";
 import { maybeCompact } from "./compact";
 import { askUserAnswer } from "./ask-user";
 import { computeContextPressure } from "./context";
 
 export type RunPipelineParams = {
-  systemPrompt: string;
   model: TeachingModel;
   userMessage: AgentMessage;
   store: JsonlSessionStore;
@@ -51,7 +52,6 @@ export type RunPipelineParams = {
 // 运行整个 pipeline：用户消息 + 落盘 + Agent Loop + 压缩 + 推 done
 export async function runPipeline(params: RunPipelineParams) {
   const {
-    systemPrompt,
     model,
     userMessage,
     store,
@@ -86,6 +86,27 @@ export async function runPipeline(params: RunPipelineParams) {
     recorder,
     send,
   });
+
+  // 1d) 系统提示词的**唯一装配点**（C34，2026-09-16 从 route.ts 搬来）。
+  //     为什么搬：提示词有三个输入，其中"各工具专属的规矩"来自 `toolRegistry.guidelines()`
+  //     —— 而注册表是在这一层建的。放在 route.ts 就只能装两个，第三个没地方来。
+  //     搬完的收益是三个输入同源；代价是 route 少一个参数、这里多十行。
+  //   - 时间：每请求现取（模型需要知道"现在"，否则把训练截止当今年 —— 2026-09-14 真机 bug）
+  //   - 技能清单：每请求现扫技能根（实测热态 3.9ms，不加缓存：技能是用户随时会改的文件）
+  //   - 工具规矩：各工具自己声明、注册表收集（文本住工具文件，不住提示词 —— 见 C34 判据）
+  const { skills, diagnostics } = loadSkills(toolContext.skillsRoot);
+  for (const diagnostic of diagnostics) {
+    // 坏技能**不阻塞**（跳过，其余照常加载），但**诊断必须看得见**：先落服务端日志；
+    // T5 的命令接口会把同一份诊断带给前端面板。
+    console.warn(
+      `[skill] ${diagnostic.name}：${diagnostic.reason}（${diagnostic.dir}）`,
+    );
+  }
+  const systemPrompt = buildSystemPrompt(
+    undefined, // now 走默认（注入时刻只是为了可测）
+    buildSkillCatalog(skills),
+    toolRegistry.guidelines(),
+  );
 
   // 2) 运行 Agent Loop。onEvent 同时落盘轨迹 + 推浏览器。
   const result = await runAgentLoop({

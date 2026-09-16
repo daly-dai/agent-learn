@@ -43,6 +43,26 @@ export class ToolRegistry {
     );
   }
 
+  /**
+   * 收集所有工具的「专属规矩」，供系统提示词渲染（C34，2026-09-16）。
+   *
+   * ⚠️ **规矩文本住在各工具文件里，不住提示词文件里** —— 见 `RegisteredTool.guidelines`。
+   * 这里只做"收集"，不做"内容判断"：哪条规矩该不该出现，由工具自己负责。
+   *
+   * 注意这里**顺带给了工具名**：渲染成 `- <工具名>：<规矩>`，让模型知道这条规矩管谁。
+   * （pi 渲染成不带名字的裸条目 —— 我们保留点名，因为提示词里本来就是这个形状。）
+   */
+  guidelines(): Array<{ name: string; text: string }> {
+    const collected: Array<{ name: string; text: string }> = [];
+    
+    for (const tool of this.tools.values()) {
+      for (const text of tool.guidelines ?? []) {
+        collected.push({ name: tool.name, text });
+      }
+    }
+    return collected;
+  }
+
   async execute(
     name: string,
     args: Record<string, unknown>,

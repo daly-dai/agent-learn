@@ -44,6 +44,11 @@ export function createAskUserTool(hooks: ToolHooks): RegisteredTool {
     name: "ask_user_question",
     description:
       "向用户提出 1-4 个问题并等待回答，逐题作答。仅当你需要用户提供信息、做决定或澄清需求时才调用。优先给每道题 2-6 个具体选项让用户点选（比自由输入更快更明确），选项用不上时才问开放式问题。问题要具体。",
+    // 专属规矩：description 覆盖"什么时候用 / 怎么问"，这里只留"被跳过之后怎么办"——
+    // 它是**契约**（用户点跳过不算出错），写错会让模型反复追问。文本住这里，不住提示词文件。
+    guidelines: [
+      "用户可能「跳过」（返回文案会写明）——**那不是错误**，直接继续手头的任务，不要追问、不要解释、绝不反复问同一问题。",
+    ],
     parameters: {
       type: "object",
       properties: {

@@ -27,6 +27,12 @@ export function createTodoTool(hooks: ToolHooks): RegisteredTool {
     name: "todo_write",
     description:
       "记录并更新当前工作的任务清单。每次调用发送整个列表，它会替换之前的列表（没有部分更新、没有单条编辑）。复杂任务开始前先列出任务，任务状态变化时更新整表。状态：pending（未开始）/ in_progress（进行中）/ completed（已完成）；同时最多一个进行中。",
+    // 专属规矩：上面 description 已经覆盖"每次发整个列表 / 先列任务 / 状态语义"，
+    // 这里只留它没写、而且**用户看得见后果**的那一条（DSH 那条判据：description 承载不了的
+    // 才进提示词）。文本住这里，不住提示词文件 —— 见 `RegisteredTool.guidelines`。
+    guidelines: [
+      "**全部完成时必须再调用一次**，把整张表标成 `completed`——不要留着 `in_progress` 的尾巴（用户看到的就是这张表，最后一项显示「进行中」意味着任务没做完）。",
+    ],
     parameters: {
       type: "object",
       properties: {

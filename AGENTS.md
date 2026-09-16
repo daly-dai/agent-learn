@@ -91,7 +91,7 @@
 ## 给人类（你自己）
 
 - 分层、路线图、功能映射看 `PLAN.md`。
-- 系统提示词在 `app/api/chat/route.ts` 顶部，想调 agent 的说话方式就改那里。
+- 系统提示词在 `app/api/chat/_pipeline/prompt/index.ts`（`buildSystemPrompt`），想调 agent 的说话方式就改那里。⚠️ **两类东西别往里面抄**：① 工具**清单**（"这把工具是什么"由随请求发来的 `tools` 定义承载）② 工具**专属的规矩**（住在**那个工具自己的文件**里 —— `RegisteredTool.guidelines`，由 `ToolRegistry.guidelines()` 收集、在 `_pipeline/index.ts` 的装配点渲染进提示词）。这里只留**不点名任何工具**的通用规矩。判据一句话：**文本住提示词文件 = 弱关联（谁都不欠它一次同步）；住工具文件 = 强关联（改工具就看得见、工具删了话跟着走）**。来龙去脉见 `doc/plan/c34-tool-guidelines.md`。
 - 轨迹（调试黑匣子）在 `.traces/`，一个 run 一个 jsonl 文件。
 
 ## 常用命令
