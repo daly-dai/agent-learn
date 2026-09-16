@@ -131,12 +131,22 @@ async function executeToolCall(
 // ------------------------------------------------------------
 // 超过最大轮次时的「兜底消息」。stopReason="error" + errorMessage 标记，
 // 让使用端知道这不是模型的正常回答，而是被循环上限截断的。
+//
+// ⚠️ **pi 的引擎没有轮次上限**：`packages/agent/src/agent-loop.ts:171` 是无界
+// `while (true)`，它只提供 `shouldStopAfterTurn` 钩子（`src/types.ts:223` 定义、
+// `agent-loop.ts:252` 调用），把"什么时候该停"交给调用方，自己的产品层也没接。
+//
+// 我们**故意保留**这个上限，因为形态不同：
+//   - pi 是 CLI —— 循环跑飞了，用户按 Ctrl-C 就能掐断，代价可控；
+//   - 我们是 Web 产品 —— 一个 HTTP 请求挂住不动 = 浏览器一直转圈 + 持续烧钱，
+//     用户没有"掐断"的手段。所以必须有一条引擎级硬护栏。
+// 即：**这处不对齐 pi 是有据可查的决策，不是抄漏了。**
 // ------------------------------------------------------------
 function createLoopGuardrailMessage(maxTurns: number): AssistantMessage {
   return {
     role: "assistant",
     content: [
-      text(`教学版 Agent 已达到最大轮次 ${maxTurns}，为避免无限循环已停止。`),
+      text(`statve 已达到最大轮次 ${maxTurns}，为避免无限循环已停止。`),
     ],
     stopReason: "error",
     usage: { input: 0, output: 0, totalTokens: 0 },
