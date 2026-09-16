@@ -66,7 +66,7 @@ export async function decideToolCall(
     if (/secret|秘密/i.test(target)) {
       return {
         action: "block",
-        reason: "教学版权限策略：不允许写入包含 secret/秘密 的文件。",
+        reason: "权限策略：不允许写入包含 secret/秘密 的文件。",
       };
     }
   }

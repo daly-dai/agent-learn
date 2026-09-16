@@ -88,7 +88,7 @@ export class MockModel implements TeachingModel {
     // 默认：直接文本回答
     return createAssistantMessage([
       text(
-        "教学版 Agent 收到你的问题。\n\n" +
+        "statve 收到你的问题。\n\n" +
         "当前 MockModel 会在你提到以下内容时调用工具：\n" +
         "• **列出文件** → 调用 list_files\n" +
         "• **读取/查看** → 调用 read_file\n" +
