@@ -27,7 +27,7 @@ import {
   runControllers,
   config,
 } from "@/lib";
-import type { ToolCallContent, ToolDecision } from "@/lib";
+import type { ToolCallContent, ToolContext, ToolDecision } from "@/lib";
 import type { StreamFrame } from "./_pipeline/frames";
 import { buildSystemPrompt } from "./_pipeline/prompt";
 import { decideToolCall } from "./_pipeline/approval";
@@ -51,9 +51,19 @@ export const runtime = "nodejs";
 
 // 路径与行为配置：全部来自 lib/config.ts（唯一入口，环境变量可覆盖）。
 // 工作区根目录 / 轨迹目录 / 会话目录 / 压缩阈值 / 审批超时都收编在这里。
-const { workspace: workspaceRoot, traces: traceDir, sessions: sessionDir } = config.paths;
+const { workspace: workspaceRoot, traces: traceDir, sessions: sessionDir, skillsRoot } = config.paths;
 // 工具注册表【不在这里建单例】（贴 pi create-harness）：
 // 它在每次 POST 请求内组装，业务 hooks 闭包捕获当次的 store/send。
+//
+// ⭐ **"这次请求的环境"只在这里生产一次**（工作区根 + 技能根），其余各层全是透传。
+// 加一项环境值 = 给 `ToolContext` 加字段 + 改这一行，**不改任何签名**（理由见 lib/tools/index.ts）。
+//
+// ⚠️ **本行在模块作用域，是有前提的**：两个值今天都来自 `config`（静态，不会变）。
+// 一旦工作区改成"**按会话 / 按工作区**不同"（C6 工作区选择 + C32 项目级配置：值从会话头的
+// `cwd` 来、技能根由它派生 —— 见 `doc/plan/c8-skills.md` 的**补记 4**），
+// **这一行必须挪进下面的 `POST` 里**。不挪 = **第一个请求的工作区被所有会话共用**：
+// 不报错、只是静默串味 —— 和当年那个"模块级单例注册表"是同一个病的另一个面。
+const toolContext: ToolContext = { workspaceRoot, skillsRoot };
 
 // systemPrompt 常量已拆到 _pipeline/prompt.ts（E2 阶段管线重构）
 
@@ -160,7 +170,8 @@ export async function POST(req: NextRequest) {
           recorder,
           send,
           signal: abortController.signal,
-          workspaceRoot,
+          // 这次请求的环境（模块顶部生产的那一个对象）
+          toolContext,
           beforeToolCall: (call) => handleToolApproval(call, send, sessionId),
         });
       } catch (e) {

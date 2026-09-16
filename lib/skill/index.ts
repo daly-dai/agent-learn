@@ -57,7 +57,7 @@ export type LoadSkillsResult = {
 
 const SKILL_FILE = "SKILL.md";
 /** 给模型看的文件清单上限（照 opencode：列不完就别把上下文塞满） */
-const MAX_LISTED_FILES = 10;
+export const MAX_LISTED_FILES = 10;
 
 /**
  * 扫一个技能根，返回**能用的技能**和**看不见就会出问题的诊断**。

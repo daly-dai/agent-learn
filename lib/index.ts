@@ -54,6 +54,7 @@ export type { SessionSummary } from "./session";
 
 // 工具系统（子模块门面：lib/tools/index.ts）
 export { ToolRegistry, createToolRegistry } from "./tools";
+export type { ToolContext } from "./tools";
 
 // 压缩总结（B2：真摘要生成）
 export { generateSummary } from "./summarize";

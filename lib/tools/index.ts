@@ -24,6 +24,7 @@ import { createTodoTool } from "./todo";
 import { createAskUserTool } from "./ask-user";
 import { createWebFetchTool } from "./web-fetch";
 import { createWebSearchTool } from "./web-search";
+import { createSkillTool } from "./skill";
 
 export class ToolRegistry {
   private readonly tools = new Map<string, RegisteredTool>();
@@ -56,27 +57,56 @@ export class ToolRegistry {
 }
 
 /**
+ * 工具层需要的「**这次请求的环境**」。
+ *
+ * ⚠️ **只放「每次请求可能不同」的值**：
+ *   - 会不同的（工作区根、技能根、将来的"当前项目技能根"…）→ **必须由请求装配处传**，
+ *     工具不能自己去读静态 config（多工作区 / 多技能根那天，静态值表达不了"这一次"）
+ *   - 不会不同的（模型名、输出上限、超时…）→ 进 `config`，谁用谁读，**不进这里**
+ *   （同源判据见 `lib/config/index.ts`：provider 段 = "跟谁说 / 在哪"，web 段 = "我们允许它做多少"）
+ *
+ * ⚠️ **绑定时机的前提（2026-09-16 与用户确认，别当它是永久的）**：这些值在**注册表组装时**
+ * 被工厂闭包焊进工具 ⇒ **依赖"注册表每请求重建"**（`app/api/chat/_pipeline/tools.ts` 在
+ * `runPipeline` 里每请求调一次；最早 route.ts 顶部那个模块级单例正是为此拆掉的）。
+ * **若将来注册表变成会话级 / 进程级长驻**，这些值必须改走 `execute` 的**运行时参数**
+ * （pi 的长驻形态就是这么做的：`execute(toolCallId, params, onUpdate, toolContext, …)`）
+ * —— ⚠️ **那会碰红线文件 `lib/agent/index.ts`**，届时按红线流程走（精读 pi → 对比 → 展示 → 用户拍板）。
+ * 见 `PLAN.md` 排期表的「条件触发」表。
+ */
+export type ToolContext = {
+  /** 文件工具的围栏根：所有文件工具都关在它里面（`resolveInsideWorkspace`） */
+  workspaceRoot: string;
+  /** 技能根：在**工作区之外**，只有 `skill` 工具读它（见 `lib/tools/skill/index.ts` 头部） */
+  skillsRoot: string;
+};
+
+/**
  * 创建预装文件系统工具的 ToolRegistry（每请求组装，贴 pi create-harness）。
- * - 文件工具 + bash：闭包捕获 workspaceRoot，不需要 hooks，工厂签名不变。
+ * - 文件工具 + bash：闭包捕获 `context.workspaceRoot`，不需要 hooks，工厂签名不变。
  * - todo/ask-user：接收 hooks（业务回调）并闭包烙进 execute——引擎无感。
  * hooks 由使用端（route.ts）每次请求组装时传入，捕获当次的 store/send。
+ *
+ * 形状是「**一个对象 + hooks**」而不是一串位置参数（2026-09-16 用户提的，依据见
+ * `doc/plan/c8-skills.md` §11.1）：① 位置参数每加一项就要改整条调用链，对象是**加字段**；
+ * ② 原来的 `(workspaceRoot, hooks, skillsRoot)` 里**两个相邻的 `string`**，顺序写反
+ * **编译不报错、运行时静默错位**（技能根当工作区用）—— 具名对象从形状上消掉这个坑。
  */
 export function createToolRegistry(
-  workspaceRoot: string,
+  context: ToolContext,
   hooks: ToolHooks,
 ): ToolRegistry {
   const registry = new ToolRegistry();
 
   for (const tool of [
-    createListTool(workspaceRoot),
-    createReadTool(workspaceRoot),
-    createWriteNoteTool(workspaceRoot),
-    createWriteTool(workspaceRoot),
-    createEditTool(workspaceRoot),
-    createDeleteTool(workspaceRoot),
-    createGrepTool(workspaceRoot),
-    createFindTool(workspaceRoot),
-    createBashTool(workspaceRoot),
+    createListTool(context.workspaceRoot),
+    createReadTool(context.workspaceRoot),
+    createWriteNoteTool(context.workspaceRoot),
+    createWriteTool(context.workspaceRoot),
+    createEditTool(context.workspaceRoot),
+    createDeleteTool(context.workspaceRoot),
+    createGrepTool(context.workspaceRoot),
+    createFindTool(context.workspaceRoot),
+    createBashTool(context.workspaceRoot),
   ]) {
     registry.register(tool);
   }
@@ -94,6 +124,12 @@ export function createToolRegistry(
   //     靠系统提示词约束"只在需要最新信息时才用"。
   registry.register(createWebFetchTool());
   registry.register(createWebSearchTool());
+
+  // skill（C8）：不绑工作区**也不绑 hooks** —— 它只读技能根下的 SKILL.md。
+  // 自动放行（不进 TOOLS_NEEDING_CONFIRM）：要防的是"动手"，不是"读"。
+  // 认下的信任边界：技能正文是外部指令，会不经批准影响模型行为；兜底是
+  // 正文若要模型动手，bash / 写文件**仍然弹框**。
+  registry.register(createSkillTool(context.skillsRoot));
 
   return registry;
 }

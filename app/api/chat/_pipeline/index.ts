@@ -22,6 +22,7 @@ import type { TeachingModel } from "@/lib/model";
 import type { JsonlSessionStore } from "@/lib/session";
 import type { TraceRecorder } from "@/lib/trace";
 import { runAgentLoop, type ToolDecision } from "@/lib/agent";
+import type { ToolContext } from "@/lib/tools";
 import { config } from "@/lib/config";
 import type { StreamFrame } from "./frames";
 import { createPipelineTools } from "./tools";
@@ -38,7 +39,11 @@ export type RunPipelineParams = {
   recorder: TraceRecorder;
   send: (frame: StreamFrame) => void;
   signal: AbortSignal;
-  workspaceRoot: string;
+  /**
+   * 这次请求的环境（工作区根 + 技能根）：工具注册表与（T3 之后的）系统提示词共用它。
+   * 由 route.ts 组装一次 —— 值与理由见 `lib/tools/index.ts` 的 `ToolContext`。
+   */
+  toolContext: ToolContext;
   /** 审批钩子（route 组装，含副作用：日志+弹框） */
   beforeToolCall: (call: ToolCallContent) => Promise<ToolDecision>;
 };
@@ -46,14 +51,20 @@ export type RunPipelineParams = {
 // 运行整个 pipeline：用户消息 + 落盘 + Agent Loop + 压缩 + 推 done
 export async function runPipeline(params: RunPipelineParams) {
   const {
-    systemPrompt, model, userMessage, store, recorder,
-    send, signal, workspaceRoot,
+    systemPrompt,
+    model,
+    userMessage,
+    store,
+    recorder,
+    send,
+    signal,
+    toolContext,
   } = params;
 
   // 1) 用户消息生命周期事件：既进 SSE（前端画气泡），也进轨迹（黑匣子）
   const userStart = { type: "message_start" as const, message: userMessage };
   const userEnd = { type: "message_end" as const, message: userMessage };
-  
+
   // 轨迹记录器，记录用户消息开始事件
   recorder.record(userStart);
   // 发送用户消息开始事件
@@ -70,7 +81,7 @@ export async function runPipeline(params: RunPipelineParams) {
   // 1c) 每请求组装工具注册表（_pipeline/tools.ts）：
   //     todo/askUser 两个 hooks 闭包都在 tools.ts 内部统一绑定（传 recorder 拿 runId）。
   const toolRegistry = createPipelineTools({
-    workspaceRoot,
+    toolContext,
     store,
     recorder,
     send,

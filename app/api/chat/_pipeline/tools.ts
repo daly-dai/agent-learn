@@ -9,18 +9,23 @@
 // ============================================================
 
 import { createToolRegistry } from "@/lib/tools";
+import type { ToolContext } from "@/lib/tools";
 import type { JsonlSessionStore } from "@/lib/session";
 import type { TraceRecorder } from "@/lib/trace";
 import type { StreamFrame } from "./frames";
 import { askUserAnswer } from "./ask-user";
 
 export function createPipelineTools(params: {
-  workspaceRoot: string;
+  /**
+   * 这次请求的环境（工作区根 + 技能根；形状与理由见 `lib/tools/index.ts` 的 `ToolContext`）。
+   * 它由 route.ts 组装一次、沿管道透传 —— **"环境"的定义只活在生产它的那一处**。
+   */
+  toolContext: ToolContext;
   store: JsonlSessionStore;
   recorder: TraceRecorder;
   send: (frame: StreamFrame) => void;
 }) {
-  return createToolRegistry(params.workspaceRoot, {
+  return createToolRegistry(params.toolContext, {
     // todo_write：先落盘会话（todo 是会话事件），再推 SSE 帧让前端面板实时更新。
     // await 保证工具结果返回时已入库。
     onTodoWrite: async (todos) => {

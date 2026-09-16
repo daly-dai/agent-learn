@@ -16,7 +16,11 @@ import { createToolRegistry, ToolRegistry } from ".";
 
 /** 组装一次注册表。hooks 是业务回调（todo/ask-user 用），这层用不到，给空对象 */
 function registry(): ToolRegistry {
-  return createToolRegistry(process.cwd(), {});
+  // 环境对象（C8 ToolContext）：这层只关心"工具清单"，两个根随便给一个目录
+  return createToolRegistry(
+    { workspaceRoot: process.cwd(), skillsRoot: process.cwd() },
+    {},
+  );
 }
 
 describe("createToolRegistry —— 组装出来的工具清单", () => {
@@ -24,6 +28,11 @@ describe("createToolRegistry —— 组装出来的工具清单", () => {
     const names = registry().definitions().map((def) => def.name);
     expect(names).toContain("web_fetch");
     expect(names).toContain("web_search");
+  });
+
+  it("skill 工具真的在里面（C8 T2 的注册）", () => {
+    const names = registry().definitions().map((def) => def.name);
+    expect(names).toContain("skill");
   });
 
   it("工具名**不重复**（重名会被 Map 静默覆盖，少一个工具也不报错）", () => {
