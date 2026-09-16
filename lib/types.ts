@@ -25,6 +25,14 @@ export type UserMessage = {
   role: "user";
   content: TextContent[];
   timestamp: number;
+  /**
+   * 「这条不是你打的」标记（C8 T4）：有它 = 宿主按 `/名字` 手势注入的技能正文。
+   *
+   * 两个用处，缺一不可：
+   *   ① 界面据此把它渲染成"已加载技能 X"卡片 —— 跟用户自己说的话一眼分开
+   *   ② 手势**只扫没有这个标记的消息** ⇒ 注入件不可能触发下一次注入（防递归、防伪造）
+   */
+  source?: { kind: "skill-invocation"; name: string; baseDir: string };
 };
 
 export type AssistantMessage = {

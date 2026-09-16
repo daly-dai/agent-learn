@@ -21,6 +21,16 @@ function user(text: string): AgentMessage {
   return { role: "user", content: [{ type: "text", text }], timestamp: 1 };
 }
 
+/** 宿主按 `/名字` 注入的技能正文（C8 T4）：也是 role="user"，但带 source 标记 */
+function injectedUser(text: string, name = "code-review"): AgentMessage {
+  return {
+    role: "user",
+    content: [{ type: "text", text }],
+    timestamp: 3,
+    source: { kind: "skill-invocation", name, baseDir: `/skills/${name}` },
+  };
+}
+
 function assistant(text: string, totalTokens = 0): AssistantMessage {
   return {
     role: "assistant",
@@ -112,6 +122,22 @@ describe("foldTrace：用户与模型记录", () => {
     ]);
 
     expect(records).toEqual([]);
+  });
+
+  it("⭐ 宿主注入的技能正文标成「技能注入」，且**不顶掉大纲预览**（C8 T4）", () => {
+    // 真实顺序：用户先发 `/code-review …`，宿主紧接着追加一条带 source 的正文。
+    // 两者 role 都是 "user" —— 只有 source 能把它俩分开。
+    const { records, outline } = foldTrace([
+      run(0, [
+        entry(1, { type: "turn_start", turn: 1 }),
+        entry(2, { type: "message_start", message: user("用 /code-review 评审") }),
+        entry(3, { type: "message_start", message: injectedUser("技能正文…") }),
+      ]),
+    ]);
+
+    expect(records.map((record) => record.label)).toEqual(["指令", "技能注入"]);
+    // 预览必须是用户自己那句话：技能正文动辄几千字，顶上去大纲就没法看了
+    expect(outline.turns[0]?.prompt).toBe("用 /code-review 评审");
   });
 });
 

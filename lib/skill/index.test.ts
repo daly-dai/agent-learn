@@ -27,6 +27,7 @@ import { config } from "../config";
 import {
   buildSkillCatalog,
   findSkill,
+  findSkillInvocations,
   loadSkills,
   renderSkillContent,
   type Skill,
@@ -352,6 +353,105 @@ describe("findSkill —— 精确查名字（不猜、不模糊）", () => {
   it("不存在 → undefined（调用方决定是报错还是静默）", () => {
     const { skills } = loadSkills(root);
     expect(findSkill(skills, "frontend-desgin")).toBeUndefined();
+  });
+});
+
+// ------------------------------------------------------------------
+// findSkillInvocations —— 裸名手势（C8 · T4）
+// ------------------------------------------------------------------
+// 夹具单独开一个临时技能根，不动上面那份（那份被别的用例数过条目）。
+// 三个名字各代表一种**真实会存在**的形状：
+//   - `code-review`  本机真的装了它 = 正常英文名
+//   - `前端设计`     Q3 明确定过"中文技能名是正常的" ⇒ 它必须能命中。
+//                    这条用例同时是"不抄 DSH 的 kebab 正则"那个决定的守卫。
+//   - `docs`         本机没有这个技能，是**为了可证伪才造的**：正文里写 `/docs/api`
+//                    时，若把名字切到斜杠就会切出 `docs` 而**误命中**；按空白切得到
+//                    `docs/api`、查不中。没有它，"名字切到哪儿"这条规则就没有用例守着。
+describe("findSkillInvocations —— 裸名手势（谁被 /名字 点到了）", () => {
+  let gestureRoot: string;
+  let gestureSkills: Skill[];
+
+  beforeAll(async () => {
+    gestureRoot = await mkdtemp(join(tmpdir(), "statve-gesture-"));
+    await writeSkill(
+      gestureRoot,
+      "code-review",
+      "---\nname: code-review\ndescription: 两轴评审\n---\n\nbody\n",
+    );
+    await writeSkill(
+      gestureRoot,
+      "前端设计",
+      "---\nname: 前端设计\ndescription: 界面设计指导\n---\n\nbody\n",
+    );
+    await writeSkill(
+      gestureRoot,
+      "docs",
+      "---\nname: docs\ndescription: 文档查询（只为证明切法）\n---\n\nbody\n",
+    );
+    gestureSkills = loadSkills(gestureRoot).skills;
+  });
+
+  afterAll(async () => {
+    await rm(gestureRoot, { recursive: true, force: true });
+  });
+
+  /** 命中结果的名字列表（顺序 = 在消息里出现的顺序） */
+  function namesIn(text: string): string[] {
+    return findSkillInvocations(text, gestureSkills).map((skill) => skill.name);
+  }
+
+  it("行首的 /名字 命中（面板选中后就是长这样）", () => {
+    expect(namesIn("/code-review 帮我评审这个 commit")).toEqual(["code-review"]);
+  });
+
+  it("正文中间的 /名字 也命中（R3-3：扫整条消息，不只看行首）", () => {
+    expect(namesIn("帮我用 /code-review 评审一下")).toEqual(["code-review"]);
+  });
+
+  it("⭐ 路径不误命中：/docs/api 里那个 docs 不算被点到（切到空白为止，不是切到斜杠）", () => {
+    // 名单里**故意**有一个叫 docs 的技能 —— 这条用例的分辨力全靠它：
+    // 切到斜杠 → 切出 "docs" → 误命中；切到空白 → "docs/api" → 查不中。
+    expect(namesIn("参考 /docs/api 里的说明")).toEqual([]);
+  });
+
+  it("路径 /usr/bin 同理不命中", () => {
+    expect(namesIn("去 /usr/bin 下面找")).toEqual([]);
+  });
+
+  it("分数 5/8 不命中（/ 左边不是串首也不是空白）", () => {
+    expect(namesIn("这个比例是 5/8")).toEqual([]);
+  });
+
+  it("中文技能名命中（中文名正常 ⇒ 不做任何字符集限制）", () => {
+    expect(namesIn("用 /前端设计 帮我看看这个页面")).toEqual(["前端设计"]);
+  });
+
+  it("名字打错 → 静默返回空（查名单，不猜）", () => {
+    expect(namesIn("用 /frontend-desgin 看看")).toEqual([]);
+  });
+
+  it("同一个技能出现两次 → 只算一次（正文注入一次就够）", () => {
+    expect(namesIn("/code-review 先看 /code-review 再说话")).toEqual([
+      "code-review",
+    ]);
+  });
+
+  it("两个不同技能 → 按出现顺序返回（注入顺序可复现）", () => {
+    expect(namesIn("/前端设计 之后再 /code-review")).toEqual([
+      "前端设计",
+      "code-review",
+    ]);
+  });
+
+  it("⚠️ 已知代价：名字后紧跟中文标点 → 不命中（边界就是空白，与 DSH 相同）", () => {
+    // 面板选中后插的是 `/名字 `（带尾空格），从面板走踩不到这条；
+    // 手打不加空格会静默失效 —— 写成用例留档，别留给后人当 bug 查。
+    expect(namesIn("/code-review，帮我评审")).toEqual([]);
+  });
+
+  it("没有技能 / 空文本 → 空结果（不报错）", () => {
+    expect(findSkillInvocations("/code-review 看看", [])).toEqual([]);
+    expect(findSkillInvocations("", gestureSkills)).toEqual([]);
   });
 });
 

@@ -330,6 +330,56 @@ export function findSkill(skills: Skill[], name: string): Skill | undefined {
   return skills.find((skill) => skill.name === name);
 }
 
+/**
+ * 从一条用户消息里找出「裸名手势」点到的技能（C8 T4）。
+ *
+ * 形状抄 DSH（宿主扫消息里的 `/名字` → 命中就注入一条 user 消息），**但"名字怎么算
+ * 命中"不抄它**：DSH 用的是严格 kebab 正则（`(^|\s)/([a-z0-9]+(?:-[a-z0-9]+)*)(?=\s|$)`），
+ * 照抄会让中文技能名**永远静默失效** —— 而 Q3 已定"身份 = 目录名、不做 kebab 校验"。
+ *
+ * 规则三条（前两条管"怎么切"，第三条管"怎么判"）：
+ *   1. `/` 必须在**串首或空白之后** —— 所以 `5/8` 不是手势
+ *   2. 名字 = `/` 之后**到下一个空白或串尾** —— 所以 `/usr/bin` 整段拿去查
+ *   3. 拿 `findSkill` **精确查名单**（与身份同一把尺），查不中就静默
+ *
+ * ⭐ 第 3 条是地基：**"查名单"而不是"用正则猜"**。用正则就得先规定名字长什么样，
+ * 而一旦规定了，不符合的名字（中文、带点、带大写）会被**静默忽略** —— 那正是 DSH
+ * 那个正则搬到本项目会造成的坏结果。
+ *
+ * ⚠️ **已知代价**：名字后紧跟中文标点（`/code-review，`）不命中 —— 边界就是空白，
+ * 与 DSH 相同。面板选中后插的是 `/名字 `（**带尾空格**，见 `use-command-menu` 的
+ * `pickCommand`），所以从面板走踩不到；手打不加空格会静默失效。
+ */
+export function findSkillInvocations(text: string, skills: Skill[]): Skill[] {
+  const found: Skill[] = [];
+  const seen = new Set<string>();
+
+  for (let i = 0; i < text.length; i++) {
+    if (text.charAt(i) !== "/") continue;
+    // 左边界：串首，或前面紧挨着空白
+    if (i > 0 && !isWhitespace(text.charAt(i - 1))) continue;
+
+    // 右边界：下一个空白（或串尾）—— 注意是**空白**不是斜杠
+    let end = i + 1;
+    while (end < text.length && !isWhitespace(text.charAt(end))) end++;
+
+    const name = text.slice(i + 1, end);
+    if (name === "" || seen.has(name)) continue;
+
+    const skill = findSkill(skills, name);
+    if (skill === undefined) continue; // 查不中 = 静默：可能是路径 / 分数 / 打错的字
+    seen.add(name);
+    found.push(skill);
+  }
+
+  return found;
+}
+
+/** 空白判定：只认 ASCII 空白（用户消息里会出现的分隔就是这四种） */
+function isWhitespace(ch: string): boolean {
+  return ch === " " || ch === "\t" || ch === "\n" || ch === "\r";
+}
+
 /** 属性值转义：名字来自**目录名**，而我们明说不做 kebab 校验 ⇒ 引号/& 都可能出现 */
 function escapeAttr(value: string): string {
   return value

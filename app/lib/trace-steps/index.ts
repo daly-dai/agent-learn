@@ -189,16 +189,23 @@ function foldUserMessage(
 ): void {
   if (event.message.role !== "user") return;
 
+  // C8 T4：宿主按 `/名字` 注入的技能正文也是 role="user"，但它**不是用户打的字**。
+  // 标成「技能注入」，并提前返回 —— 它不能顶掉大纲里的指令预览
+  // （那是几千字的技能正文，会把预览挤爆）。
+  const isInjected = event.message.source?.kind === "skill-invocation";
+
   const body = messageText(event.message);
   state.records.push({
     id,
     kind: "user",
     runIndex: state.runIndex,
     turn: state.turn,
-    label: "指令",
+    label: isInjected ? "技能注入" : "指令",
     text: body,
     chars: body.length,
   });
+
+  if (isInjected) return;
 
   // 大纲只认首条人类指令（同轮后续的 steering 不改预览）
   if (state.turnItem && !state.turnItem.prompt) {
