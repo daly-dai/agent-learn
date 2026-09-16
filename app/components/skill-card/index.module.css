@@ -1,0 +1,97 @@
+/* ============================================================
+   skill-card.module.css —— 上下文注入卡片（C8 T7）
+   归属组件：app/components/skill-card/index.tsx
+   ============================================================
+   样式配方**继承** message-row 的压缩卡片（.compaction 那一族）：
+   虚线边 + plate 底 + 整行可点的 head + 同一套字号口径（mono 12px、
+   toggle 带下划线 + 4px 6px 命中区）。刻意不发明新形状 —— 同族的东西
+   长得像，人才学得会（AGENTS §10.6：组件组合 > 发明）。
+
+   两处**改动**（相对压缩卡）：
+   1. tag 用「信号笔」色（--pen-signal-ink），跟压缩卡同一支笔 —— 两者
+      都是"系统往上下文里插了一块"，不是对话的一轮
+   2. body 是**原文载荷**：等宽 + pre-wrap，不做 Markdown 渲染
+      （信封标签和正文混在一起，按 Markdown 渲染只会把结构渲染坏）
+   ============================================================ */
+
+.card {
+  border: 1px dashed var(--line);
+  border-radius: var(--r);
+  background: var(--plate);
+  overflow: hidden;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px; /* 整行可点区（同压缩卡） */
+  padding: 8px 14px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.head:hover {
+  background: rgba(29, 33, 39, 0.03);
+}
+
+.tag {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--pen-signal-ink);
+  flex: none;
+}
+
+.name {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  /* 技能名可以很长（身份 = 目录名，没有长度限制）—— 截断而不是撑破整行 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-mid);
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+
+.toggle {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-mid);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  padding: 4px 6px; /* 命中区 */
+  flex: none;
+}
+
+.body {
+  border-top: 1px solid var(--line-soft);
+  max-height: 340px; /* 同工具结果卡：长载荷不淹掉对话 */
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+.payload {
+  margin: 0;
+  padding: 12px 14px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--ink-mid);
+}

@@ -15,6 +15,7 @@ import type {
 } from "@/lib/types";
 import { Markdown } from "../../markdown";
 import { formatClock } from "../../lib/format";
+import { SkillCard } from "../skill-card";
 import styles from "./message-row.module.css";
 
 /** 工具结果超过这个行数才默认折叠 */
@@ -47,6 +48,18 @@ export const MessageRow = memo(function MessageRow({
   }
 
   if (message.role === "user") {
+    // C8 T7：手势加载注入的正文也是 role="user"，但它**不是用户打的字**
+    // —— 走独立卡片，不套 Row（套了就多一个「你」，那是事实错误）。
+    const skill = message.source;
+    if (skill?.kind === "skill-invocation") {
+      return (
+        <SkillCard
+          name={skill.name}
+          payload={message.content.map((block) => block.text).join("\n")}
+        />
+      );
+    }
+
     return (
       <Row tone="user" role="你" timestamp={message.timestamp}>
         <div className={styles.said}>
