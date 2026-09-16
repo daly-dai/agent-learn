@@ -25,7 +25,7 @@
   display: flex;
   gap: 2px;
   padding: 12px 32px 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--line-strong); /* 结构分界：tab 条 ↔ 内容面（1px） */
 }
 
 .tab {
@@ -70,14 +70,14 @@
 }
 
 .reel {
-  max-width: 880px; /* V2：830 → 880，对话列更宽 */
+  max-width: var(--sheet-max); /* 2026-09-16：880 固定列 → 跟着外壳走 */
   margin: 0 auto;
 }
 
 /* ---- 上下文压缩提示（B2） ---- */
 /* 后端在压缩（调模型生成摘要）时给用户的反馈条，跟消息同列宽，视觉轻量 */
 .compacting {
-  max-width: 880px; /* V2：830 → 880 */
+  max-width: var(--sheet-max); /* 2026-09-16：跟壳走，与消息同列 */
   margin: 10px auto 0;
   display: flex;
   align-items: center;
@@ -106,7 +106,7 @@
    用 padding 算，而不是 max-width：box-sizing: border-box 下 max-width:880 会连
    padding 一起算，内容只剩 816，反而差 64px。 */
 .modeBar {
-  padding: 0 max(32px, calc((100% - 880px) / 2)) 6px;
+  padding: 0 32px 6px; /* 2026-09-16：列宽跟壳后，max(32px, …) 这套手工居中不再需要 */
   display: flex;
   justify-content: flex-end;
 }
@@ -139,11 +139,12 @@
 /* ---- 指令台（输入） ---- */
 .console {
   padding: 8px 32px 20px; /* V2：6px 26px 18px → 8px 32px 20px */
+  /* 不加分隔线：指令台与内容面靠留白分开（第五次调整撤掉了这里一条 2px） */
 }
 
 .consoleFrame {
   position: relative; /* C13：命令补全面板 absolute 定位锚点（贴输入框上方） */
-  max-width: 880px; /* V2：830 → 880 */
+  max-width: var(--sheet-max); /* 2026-09-16：跟壳走 */
   margin: 0 auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -151,7 +152,7 @@
   gap: 12px;
   padding: 11px 10px 11px 16px; /* V2：9px 10px 9px 13px → 11px 10px 11px 16px */
   background: var(--plate);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong); /* 主输入框：唯一允许用结构线的控件 */
   border-radius: var(--r-lg);
 }
 
@@ -244,7 +245,7 @@
    没地方显示了。参考 DSH 的输入框底栏放这里：左读数、右提示，一行两栏。
    （DSH 那行还有 tok/s 与缓存命中率——我们没有这两个数据，不编。） */
 .statusBar {
-  max-width: 880px; /* V2：830 → 880 */
+  max-width: var(--sheet-max); /* 2026-09-16：跟壳走 */
   margin: 9px auto 0;
   display: flex;
   align-items: baseline;
@@ -268,7 +269,7 @@
 
 /* ---- 错误横幅 ---- */
 .alarm {
-  max-width: 880px; /* V2：830 → 880 */
+  max-width: var(--sheet-max); /* 2026-09-16：跟壳走 */
   margin: 0 auto 12px;
   display: flex;
   gap: 12px;

@@ -13,10 +13,13 @@
   display: flex;
   align-items: center;
   gap: 14px;
-  height: 62px; /* V2：54 → 62，顶栏更稳，给控件留出呼吸 */
+  height: 54px; /* 2026-09-16 用户定：62 → 54，顶栏压矮。
+                   V2 抬到 62 的理由是"给控件留出呼吸"，但 V2 后页头
+                   已无任何操作按钮（脏操作都进了 Menu）——控件没了，
+                   那条理由也就不成立。 */
   padding: 0 20px 0 24px;
   background: var(--plate);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--line-strong); /* 结构分界：顶栏 ↔ 主体（1px，不到黑） */
 }
 
 .mark {
@@ -31,12 +34,6 @@
   font-weight: 600;
   letter-spacing: 0.19em;
   text-transform: uppercase;
-  white-space: nowrap;
-}
-
-.wordmarkCn {
-  font-size: 14px;
-  color: var(--ink-mid);
   white-space: nowrap;
 }
 
@@ -131,9 +128,8 @@
   color: var(--ink-mid);
 }
 
-/* 窄屏：隐藏次要信息（中文名 / 分隔线 / 相位文字） */
+/* 窄屏：隐藏次要信息（分隔线 / 相位文字） */
 @media (max-width: 900px) {
-  .wordmarkCn,
   .plateRule {
     display: none;
   }

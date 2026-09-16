@@ -10,7 +10,7 @@
 
 .card {
   width: 100%;
-  max-width: 880px; /* V2：830 → 880，与输入框新列宽对齐 */
+  max-width: var(--sheet-max); /* 与输入框同列宽（2026-09-16 改为跟壳走） */
   margin: 0 auto;
   padding: 14px 16px 16px; /* V2：10px 12px 12px → 14px 16px 16px */
   background: var(--plate);

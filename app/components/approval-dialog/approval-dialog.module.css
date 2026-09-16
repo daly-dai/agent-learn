@@ -11,7 +11,7 @@
 .approvalCard {
   /* 与提问卡同列宽、居中，钉在输入框位置，不再随消息流滚动 */
   width: 100%;
-  max-width: 880px;
+  max-width: var(--sheet-max);
   margin: 0 auto;
   padding: 14px 16px 12px; /* V2：12px 14px 10px → 14px 16px 12px */
   background: var(--plate);

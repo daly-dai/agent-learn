@@ -13,7 +13,7 @@
 
 .panel {
   position: relative; /* 关闭按钮绝对定位的锚点 */
-  max-width: 880px; /* V2：830 → 880，与输入框/消息列同宽 */
+  max-width: var(--sheet-max); /* 与输入框/消息列同宽（2026-09-16 改为跟壳走） */
   margin: 0 auto 0;
   background: var(--plate);
   border: 1px solid var(--line);

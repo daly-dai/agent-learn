@@ -10,7 +10,7 @@
   min-width: 0;
   min-height: 0;
   background: var(--recorder);
-  border-right: 1px solid var(--line);
+  border-right: 1px solid var(--line); /* 分界主力是 --recorder 那档底色差，线只做收边 */
 }
 
 .sidebarHead {

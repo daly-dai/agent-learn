@@ -121,7 +121,7 @@
 }
 
 .sheet {
-  max-width: 880px;
+  max-width: var(--sheet-max); /* 与对话面同列（2026-09-16 改为跟壳走） */
   margin: 0 auto;
   padding-left: var(--rail);
 }
