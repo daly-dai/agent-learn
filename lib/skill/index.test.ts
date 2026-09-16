@@ -1,0 +1,399 @@
+// ============================================================
+// skill.test.ts —— 技能加载与渲染（C8 · T1）
+// ============================================================
+// 测 §8.1 的四个 seam：loadSkills / buildSkillCatalog /
+// renderSkillContent / findSkill。
+//
+// 夹具为什么长这样（AGENTS 第 11.5 条：夹具必须能说出"这个状态为什么真
+// 会发生"）—— 下面每份 SKILL.md 都**照抄本机 ~/.agents/skills 的真实样本**，
+// 不是编出来的 YAML：
+//   - description 带转义引号 ............ code-review 原样
+//   - version/author/license/platforms
+//     + metadata 嵌套块 ................. xlsx / docx 原样
+//   - disable-model-invocation
+//     + argument-hint ................... handoff 原样
+//   - 坏技能（缺 description / 无 frontmatter）**今天不存在**，但技能文件是
+//     用户手写的外部数据 —— 写错 YAML 缩进是必然会发生的状态，所以必须造。
+// 也正因为技能目录是"用户随时会改的外部数据"，测试用临时目录而不是直接读
+// 真实技能根：真实根今天一个坏技能都没有，测不出兜底行为。
+// ============================================================
+
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { existsSync } from "node:fs";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { isAbsolute, join } from "node:path";
+import { config } from "../config";
+import {
+  buildSkillCatalog,
+  findSkill,
+  loadSkills,
+  renderSkillContent,
+  type Skill,
+} from "./index";
+
+/** 往技能根里写一个技能目录（dirName 就是它的身份） */
+async function writeSkill(
+  root: string,
+  dirName: string,
+  skillMd: string,
+  extraFiles: string[] = [],
+): Promise<void> {
+  const baseDir = join(root, dirName);
+  await mkdir(baseDir, { recursive: true });
+  await writeFile(join(baseDir, "SKILL.md"), skillMd, "utf8");
+  for (const rel of extraFiles) {
+    const full = join(baseDir, rel);
+    await mkdir(join(full, ".."), { recursive: true });
+    await writeFile(full, "# fixture\n", "utf8");
+  }
+}
+
+let root: string;
+
+beforeAll(async () => {
+  root = await mkdtemp(join(tmpdir(), "statve-skills-"));
+
+  // ① 带转义引号的 description（code-review 真实形状）
+  await writeSkill(
+    root,
+    "code-review",
+    `---
+name: code-review
+description: "Review the changes since a fixed point. Use when the user asks to \\"review since X\\"."
+---
+
+Two-axis review of the diff.
+`,
+  );
+
+  // ② 最简形态（tdd 真实形状）
+  await writeSkill(
+    root,
+    "tdd",
+    `---
+name: tdd
+description: Test-driven development. Use when the user wants test-first.
+---
+
+Write the test first.
+`,
+  );
+
+  // ③ 额外键 + metadata 嵌套块 + 资源文件（xlsx 真实形状）
+  await writeSkill(
+    root,
+    "xlsx",
+    `---
+name: xlsx
+description: Create, read, edit Excel .xlsx workbooks and CSVs.
+version: 1.1.0
+author: Nous Research
+license: MIT
+platforms: [linux, macos, windows]
+metadata:
+  category: documents
+  homepage: https://example.com
+---
+
+Spreadsheet instructions.
+`,
+    ["scripts/make.py", "LICENSE.txt"],
+  );
+
+  // ④ 隐藏技能（handoff 真实形状：disable-model-invocation + argument-hint）
+  await writeSkill(
+    root,
+    "handoff",
+    `---
+name: handoff
+description: Compact the current conversation into a handoff document.
+argument-hint: "What will the next session be used for?"
+disable-model-invocation: true
+---
+
+Handoff instructions.
+`,
+  );
+
+  // ⑤ 目录名与 frontmatter name 不符（Q3 定案：按目录名加载 + 一条诊断）
+  await writeSkill(
+    root,
+    "wrong-name",
+    `---
+name: something-else
+description: The frontmatter name does not match the directory name.
+---
+
+Body of the misnamed skill.
+`,
+  );
+
+  // ⑥ 缺 description（标准要求必填）→ 跳过 + 诊断
+  await writeSkill(
+    root,
+    "no-description",
+    `---
+name: no-description
+---
+
+Body without a description.
+`,
+  );
+
+  // ⑦ 完全没有 frontmatter → 跳过 + 诊断
+  await writeSkill(root, "no-frontmatter", `Just a body, no frontmatter at all.\n`);
+
+  // ⑧ 不是技能目录（用户会往技能根里放草稿/备份）→ 不加载，但**不是坏技能**
+  await mkdir(join(root, "not-a-skill"), { recursive: true });
+  await writeFile(join(root, "not-a-skill", "README.md"), "scratch\n", "utf8");
+});
+
+afterAll(async () => {
+  await rm(root, { recursive: true, force: true });
+});
+
+describe("loadSkills —— 扫技能根（身份 = 目录名，坏技能跳过但留诊断）", () => {
+  it("正常技能：正文不含 frontmatter、baseDir 是绝对路径、文件清单递归且排除 SKILL.md", () => {
+    const { skills } = loadSkills(root);
+    const xlsx = skills.find((s) => s.name === "xlsx");
+
+    expect(xlsx).toBeDefined();
+    expect(xlsx?.description).toBe("Create, read, edit Excel .xlsx workbooks and CSVs.");
+    expect(xlsx?.content).toBe("Spreadsheet instructions.");
+    expect(xlsx?.baseDir).toBe(join(root, "xlsx"));
+    expect(isAbsolute(xlsx?.baseDir ?? "")).toBe(true);
+    // 递归相对路径、字母序；SKILL.md 自己的正文已经给模型了，不重复列
+    expect(xlsx?.files).toEqual(["LICENSE.txt", join("scripts", "make.py")]);
+    expect(xlsx?.modelInvocable).toBe(true);
+  });
+
+  it("description 的双引号被去掉、内部的 \\\" 还原（真实样本就有转义引号）", () => {
+    const { skills } = loadSkills(root);
+    const codeReview = skills.find((s) => s.name === "code-review");
+    expect(codeReview?.description).toBe(
+      'Review the changes since a fixed point. Use when the user asks to "review since X".',
+    );
+  });
+
+  it("只认 3 个键：version/author/license/platforms/metadata 嵌套块一律忽略且不报错", () => {
+    const { skills, diagnostics } = loadSkills(root);
+    expect(skills.some((s) => s.name === "xlsx")).toBe(true);
+    expect(diagnostics.some((d) => d.name === "xlsx")).toBe(false);
+  });
+
+  it("disable-model-invocation: true → modelInvocable=false，但技能本身仍在（面板要用）", () => {
+    const { skills } = loadSkills(root);
+    const handoff = skills.find((s) => s.name === "handoff");
+    expect(handoff).toBeDefined();
+    expect(handoff?.modelInvocable).toBe(false);
+  });
+
+  it("frontmatter 的 name 与目录名不符 → 按目录名加载 + 一条可见诊断", () => {
+    const { skills, diagnostics } = loadSkills(root);
+    expect(skills.some((s) => s.name === "wrong-name")).toBe(true);
+    expect(skills.some((s) => s.name === "something-else")).toBe(false);
+    expect(diagnostics).toHaveLength(1 + 2); // wrong-name + 缺 description + 无 frontmatter
+    expect(diagnostics.find((d) => d.name === "wrong-name")?.reason).toContain("something-else");
+  });
+
+  it("缺 description → 跳过 + 诊断（一条坏技能不影响其余）", () => {
+    const { skills, diagnostics } = loadSkills(root);
+    expect(skills.some((s) => s.name === "no-description")).toBe(false);
+    expect(diagnostics.some((d) => d.name === "no-description")).toBe(true);
+  });
+
+  it("完全没有 frontmatter → 跳过 + 诊断", () => {
+    const { skills, diagnostics } = loadSkills(root);
+    expect(skills.some((s) => s.name === "no-frontmatter")).toBe(false);
+    expect(diagnostics.some((d) => d.name === "no-frontmatter")).toBe(true);
+  });
+
+  it("好技能照常加载（坏技能不阻塞）：5 个进列表、字母序", () => {
+    const { skills } = loadSkills(root);
+    expect(skills.map((s) => s.name)).toEqual([
+      "code-review",
+      "handoff",
+      "tdd",
+      "wrong-name",
+      "xlsx",
+    ]);
+  });
+
+  it("目录里没有 SKILL.md → 既不进技能列表，也不算坏技能（用户会放草稿目录）", () => {
+    const { skills, diagnostics } = loadSkills(root);
+    expect(skills.some((s) => s.name === "not-a-skill")).toBe(false);
+    expect(diagnostics.some((d) => d.name === "not-a-skill")).toBe(false);
+  });
+
+  it("技能根不存在 → 空结果、不抛错（新机器上还没装过技能）", () => {
+    const result = loadSkills(join(root, "does-not-exist"));
+    expect(result.skills).toEqual([]);
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it("诊断带绝对路径（要能直接去改那个文件）", () => {
+    const { diagnostics } = loadSkills(root);
+    for (const d of diagnostics) {
+      expect(isAbsolute(d.dir)).toBe(true);
+    }
+  });
+});
+
+describe("buildSkillCatalog —— 只给模型看它调得动的（markdown 列表）", () => {
+  it("markdown 形态 `- \`name\`: description`，前面一句引导语", () => {
+    const { skills } = loadSkills(root);
+    const catalog = buildSkillCatalog(skills);
+    expect(catalog).toContain("- `code-review`: Review the changes since a fixed point.");
+    expect(catalog.split("\n")[0]).not.toContain("- `"); // 第一行是引导语，不是条目
+  });
+
+  it("disable-model-invocation 的技能一条都不出现（作者禁止模型自己喊）", () => {
+    const { skills } = loadSkills(root);
+    const catalog = buildSkillCatalog(skills);
+    expect(catalog).not.toContain("handoff");
+  });
+
+  it("没有技能 → 空串（调用方据此整节省略，不留一个空标题）", () => {
+    expect(buildSkillCatalog([])).toBe("");
+  });
+
+  it("全部隐藏 → 也是空串（不能只剩一句引导语空吊着）", () => {
+    const hidden: Skill = {
+      name: "x",
+      description: "d",
+      baseDir: root,
+      content: "c",
+      files: [],
+      modelInvocable: false,
+    };
+    expect(buildSkillCatalog([hidden])).toBe("");
+  });
+
+  it("顺序稳定（按名字）：同样的输入永远同样的输出", () => {
+    const { skills } = loadSkills(root);
+    const names = buildSkillCatalog(skills)
+      .split("\n")
+      .filter((line) => line.startsWith("- `"))
+      .map((line) => line.slice(3).split("`")[0]);
+    expect(names).toEqual(["code-review", "tdd", "wrong-name", "xlsx"]);
+  });
+});
+
+describe("renderSkillContent —— 两条路（工具 / 手势）共用的同一份形态", () => {
+  it("含技能名、绝对目录、相对路径提示、正文", () => {
+    const { skills } = loadSkills(root);
+    const block = renderSkillContent(skills.find((s) => s.name === "code-review")!);
+
+    expect(block).toContain('<skill_content name="code-review">');
+    expect(block).toContain(join(root, "code-review"));
+    expect(block).toContain("Two-axis review of the diff.");
+    expect(block.trimEnd().endsWith("</skill_content>")).toBe(true);
+  });
+
+  it("文件清单进资源段（模型据此知道 scripts/ 存在，不用瞎猜）", () => {
+    const { skills } = loadSkills(root);
+    const block = renderSkillContent(skills.find((s) => s.name === "xlsx")!);
+    expect(block).toContain(join("scripts", "make.py"));
+    expect(block).toContain("LICENSE.txt");
+  });
+
+  it("没有附加文件 → 不出现空清单标题", () => {
+    const { skills } = loadSkills(root);
+    const block = renderSkillContent(skills.find((s) => s.name === "tdd")!);
+    expect(block).toContain("<skill_resources>");
+    expect(block).not.toContain("LICENSE.txt");
+  });
+
+  it("文件超过 10 个 → 只列前 10，并如实说出共几个（不假装列全了）", () => {
+    const many: Skill = {
+      name: "many-files",
+      description: "d",
+      baseDir: root,
+      content: "body",
+      // 边界值构造：上限就是 10，真实技能今天最多十来个文件，
+      // 超限那天必须有确定行为 —— 而这条行为只能在这里钉死。
+      files: Array.from({ length: 12 }, (_, i) => `f${String(i).padStart(2, "0")}.txt`),
+      modelInvocable: true,
+    };
+    const block = renderSkillContent(many);
+    expect(block).toContain("f00.txt");
+    expect(block).toContain("f09.txt");
+    expect(block).not.toContain("f10.txt");
+    expect(block).toContain("12");
+  });
+
+  it("名字里的引号 / & 被转义（名字来自目录名，我们不做 kebab 校验 ⇒ 什么字符都可能）", () => {
+    const weird: Skill = {
+      name: 'a"b&c',
+      description: "d",
+      baseDir: root,
+      content: "body",
+      files: [],
+      modelInvocable: true,
+    };
+    const block = renderSkillContent(weird);
+    expect(block).toContain('<skill_content name="a&quot;b&amp;c">');
+    expect(block.split("\n")[0]).toBe('<skill_content name="a&quot;b&amp;c">');
+  });
+});
+
+describe("findSkill —— 精确查名字（不猜、不模糊）", () => {
+  it("命中目录名 → 返回技能", () => {
+    const { skills } = loadSkills(root);
+    expect(findSkill(skills, "code-review")?.name).toBe("code-review");
+  });
+
+  it("大小写不同不算命中（身份 = 目录名，名字是数据不是线索）", () => {
+    const { skills } = loadSkills(root);
+    expect(findSkill(skills, "Code-Review")).toBeUndefined();
+  });
+
+  it("不存在 → undefined（调用方决定是报错还是静默）", () => {
+    const { skills } = loadSkills(root);
+    expect(findSkill(skills, "frontend-desgin")).toBeUndefined();
+  });
+});
+
+// ------------------------------------------------------------------
+// 真实技能根（本机 ~/.agents/skills）：有才跑，没装过就跳过。
+// 这里**不钉数量**（技能是用户随时会装的，钉 29/20 这种数字会烂），
+// 只钉"无论装了什么、这些性质都必须成立"——钉数量那类断言在技能增加
+// 当天就会变红，然后被人顺手改成新数字，从此失去意义。
+// ------------------------------------------------------------------
+describe("真实技能根（本机已装的技能）", () => {
+  const realRoot = config.paths.skillsRoot;
+  const installed = existsSync(realRoot);
+
+  it.skipIf(!installed)("每个技能都能自证：名字 = 目录名、目录绝对、正文已去掉 frontmatter", () => {
+    const { skills } = loadSkills(realRoot);
+    expect(skills.length).toBeGreaterThan(0);
+    for (const skill of skills) {
+      expect(skill.baseDir.endsWith(skill.name)).toBe(true);
+      expect(isAbsolute(skill.baseDir)).toBe(true);
+      expect(skill.content.startsWith("---")).toBe(false);
+      expect(skill.description.length).toBeGreaterThan(0);
+    }
+  });
+
+  it.skipIf(!installed)("⭐ 隐藏技能两个条件同时成立：不在模型清单里、仍在技能列表里", () => {
+    // 这条是 Q3 的守卫，在真实数据上验：漏一个 → 模型会自己喊作者禁止它喊的技能；
+    // 多滤一个 → 面板里就少了它，用户打 /名字 也没反应。
+    const { skills } = loadSkills(realRoot);
+    const catalog = buildSkillCatalog(skills);
+    const hidden = skills.filter((skill) => !skill.modelInvocable);
+
+    for (const skill of hidden) {
+      expect(catalog).not.toContain(skill.name);
+      expect(findSkill(skills, skill.name)).toBeDefined();
+    }
+  });
+
+  it.skipIf(!installed)("真实技能的目录名不含路径分隔符（否则名字没法当 / 手势的命令名）", () => {
+    const { skills } = loadSkills(realRoot);
+    for (const skill of skills) {
+      expect(skill.name).not.toContain("/");
+      expect(skill.name).not.toContain("\\");
+    }
+  });
+});

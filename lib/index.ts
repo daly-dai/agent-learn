@@ -87,3 +87,7 @@ export { createExportCommand } from "./commands/export";
 
 // 配置（唯一配置入口）
 export { config } from "./config";
+
+// 技能（C8：加载 / 清单 / 渲染 —— 技能根在工作区外，故不走文件工具）
+export { loadSkills, buildSkillCatalog, renderSkillContent, findSkill } from "./skill";
+export type { Skill, SkillDiagnostic, LoadSkillsResult } from "./skill";

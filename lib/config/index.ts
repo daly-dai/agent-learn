@@ -23,6 +23,7 @@
 // ============================================================
 
 import { resolve } from "node:path";
+import { homedir } from "node:os";
 
 /** 从 process.env 读字符串；没设（含空串）时用默认值 */
 function env(name: string, fallback: string): string {
@@ -122,6 +123,16 @@ export const config = {
     workspace: env("WORKSPACE_ROOT", resolve(process.cwd(), "workspace")),
     traces: env("TRACE_DIR", resolve(process.cwd(), ".traces")),
     sessions: env("SESSION_DIR", resolve(process.cwd(), ".sessions")),
+    /**
+     * 技能根（C8）：**只有这一个**，且是用户级（跨项目可用）。
+     *
+     * 为什么单根：项目级 `.agents/skills` 要引入"项目 > 用户"的跨根优先级，
+     * 而这版明确不做分层（决策见 `doc/plan/c8-skills.md`）。
+     * ⚠️ 它在**工作区之外** —— 这正是技能必须走专用 `skill` 工具、不能用
+     * `read_file` 的原因（`read_file` 被 `resolveInsideWorkspace` 关在
+     * 工作区内，读不到这里）。
+     */
+    skillsRoot: env("SKILLS_ROOT", resolve(homedir(), ".agents", "skills")),
     /** 参考开源项目根（C15 仓库更新面板：E:\agents-read 下的 git clone） */
     reposRoot: env("REPOS_ROOT", "E:\\agents-read"),
     /** 仓库更新基线（C15：记录每个仓库上次更新到的 commit，增量总结用；gitignore） */
