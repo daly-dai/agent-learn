@@ -149,9 +149,12 @@ export const config = {
      */
     minCompactTokens: num("MIN_COMPACT_TOKENS", 400),
     /** Agent 循环最大轮次（防无限循环的护栏；route.ts 传入 runAgentLoop） */
-    // 默认 16（原 6 太紧：长任务常常一轮工具调用就多轮，6 轮容易误触护栏；
-    // 16 是实测日常够用的值。MAX_TURNS 可覆盖，测试时可调小观察护栏行为）
-    maxTurns: num("MAX_TURNS", 16),
+    // 默认 36（2026-09-16 用户从 16 上调）。历史：原 6 太紧 —— 长任务常常一次工具调用
+    // 就多轮，6 轮容易误触护栏；16 是当时"实测日常够用"的值。
+    // ⚠️ 上限为什么该存在、以及 pi 为什么**没有**它 → 见 `lib/agent/index.ts` 里
+    //    `createLoopGuardrailMessage` 的注释（那里记了 pi 的行号，可复核）。
+    // MAX_TURNS 可覆盖，测试时可调小观察护栏行为。
+    maxTurns: num("MAX_TURNS", 36),
   },
 
   /** 人工确认（写/改/删弹框） */
