@@ -48,7 +48,7 @@
   <rect x="640" y="50" width="620" height="240" rx="12" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
   <rect x="640" y="50" width="620" height="32" rx="12" fill="#3b82f6"/>
   <rect x="640" y="65" width="620" height="17" fill="#3b82f6"/>
-  <text x="950" y="70" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">我们 agent-learn（只追加不删）</text>
+  <text x="950" y="70" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">我们 statve（只追加不删）</text>
 
   <!-- us: before compaction -->
   <rect x="670" y="95" width="560" height="30" rx="6" fill="#dbeafe" stroke="#3b82f6" stroke-width="1.5"/>

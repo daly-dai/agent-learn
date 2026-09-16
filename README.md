@@ -1,9 +1,9 @@
-# agent-learn
+# statve
 
 > **一个从零手写的 Agent Harness。**
 > 没有 LangChain，没有 agent 框架，没有 LLM SDK —— 唯一的"外来大脑"是一次手写的 `fetch`。
 
-`agent-learn` 是一个用 **Next.js + TypeScript** 实现的 agent 运行环境（harness）：它能把一个大模型变成能读写文件、执行命令、管理任务、并在失控前被拦住的"干活的程序"。
+`statve` 是一个用 **Next.js + TypeScript** 实现的 agent 运行环境（harness）：它能把一个大模型变成能读写文件、执行命令、管理任务、并在失控前被拦住的"干活的程序"。
 
 项目起源于"**做中学**"：读透 9 个成熟开源 agent 项目（pi / DeepSeek Harness / codex / OpenCode / Reasonix …），把它们的架构共识装进一个**能完整读懂**的小项目里。所以它同时是两样东西——**一个能跑的产品**，和**一份可验证的学习记录**。
 

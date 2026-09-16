@@ -148,7 +148,7 @@ tasks/compact.rs:36-77 与 session/turn.rs:1209-1276
 
 ## 三、五家对照总表（分享用一页纸）
 
-| 维度 | 我们（agent-learn） | pi | codex | DSH | Claude Code |
+| 维度 | 我们（statve） | pi | codex | DSH | Claude Code |
 |---|---|---|---|---|---|
 | 存储模型 | 消息树 + 叶子指针，JSONL 只追加 | append-only 日志 + 读时过滤 | 窗口 id 链 + world state checkpoint | 事件日志 + surface 折叠视图 | 会话文件（本地） |
 | 触发 | run 结束阈值（窗口−预留 ≈984K） | threshold/overflow/manual 三 reason + 三处检查 | PreTurn + MidTurn + 换模型 | pressure(0.8) + context-overflow 双触发 | 预留 20k 输出 + 13k 缓冲 + 连续失败 3 次熔断 |

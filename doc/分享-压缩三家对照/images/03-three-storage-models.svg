@@ -17,7 +17,7 @@
   <!-- Column 1: 我们 -->
   <rect x="20" y="55" width="390" height="370" rx="12" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
   <rect x="20" y="55" width="390" height="36" rx="12" fill="#3b82f6"/>
-  <text x="215" y="78" text-anchor="middle" font-size="15" font-weight="700" fill="#ffffff">我们 agent-learn</text>
+  <text x="215" y="78" text-anchor="middle" font-size="15" font-weight="700" fill="#ffffff">我们 statve</text>
 
   <rect x="40" y="105" width="350" height="52" rx="8" fill="#dbeafe" stroke="#3b82f6" stroke-width="2"/>
   <text x="215" y="125" text-anchor="middle" font-size="12" font-weight="600" fill="#1d4ed8">JSONL 会话文件</text>
