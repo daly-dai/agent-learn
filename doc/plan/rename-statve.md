@@ -47,7 +47,7 @@
 | `app/api/chat/_pipeline/prompt/index.ts` | 53 | 「你是 Teaching Agent，一个帮助初学者理解 AI Agent 核心机制的教学助手。」→ 只把名字换成 `statve`，**其余措辞一字不动** |
 | `app/api/chat/_pipeline/prompt/index.test.ts` | 59 | 断言 `toContain("Teaching Agent")` → `toContain("statve")` |
 | `lib/tools/web-search/provider/index.ts` | 108 | UA → `statve/0.1 (web_search)` |
-| `lib/tools/web-fetch/fetcher/index.ts` | 82 | UA → `statve/0.1 (web_fetch; +<新仓库 URL>)` |
+| `lib/tools/web-fetch/fetcher/index.ts` | 82 | UA → `statve/0.1 (web_fetch)`（**不带 URL** —— 见补记 1 第 3 条） |
 | `lib/tools/test-fixtures.ts` | 19 | 临时目录前缀 → `statve-test-` |
 
 ### 3.2 「观测台」7 处——**不是全删，是分清"品牌位"与"文案位"**
@@ -125,7 +125,9 @@
 
 1. **无功能性破坏** —— 没有任何代码或测试依赖 `statve-agent` 这个字面量；`tsc --noEmit` exit 0（含当时工作区里另一会话的 C8 在制品一起编译通过）。
 2. **顺带更干净**：`statve` 在 npm / PyPI / crates / RubyGems / NuGet、GitHub 句柄、以及 `.com/.dev/.ai/.io` 四个域名上**全部为空**（见 §一 的占用核查）——比 `statve-agent` 少一层占用风险。
-3. ⚠️ **web_fetch 的 UA 现在指向 `https://github.com/daly-dai/statve`** —— 那要等 GitHub 仓库名一并改完才真实存在，在那之前是死链（改名前指向 `statve-agent` 时同样是死链，只是目标变了）。
+3. ⚠️ **UA 里那个 URL 是错的，已删掉**。第一版我写的是 `+https://github.com/daly-dai/statve-agent`，二次改名后变成 `.../statve` —— **两次都指向一个不存在的仓库**（GitHub 仓库名还没改）。用户当场指出："这个地址不存在啊"。**修法：删掉 URL**，只留 `statve/0.1 (web_fetch)`。判据：UA 里放链接是给站点运营者"查你是谁"用的，**指向不存在的仓库等于撒谎**；何况本地跑的教学 harness 不是爬虫集群，`statve/0.1` 这个自述已经满足"不伪装成浏览器"。兄弟 UA（web_search）本来就不带 URL，改完两边一致。**等仓库真改完名，再决定要不要补回去。**
+   - **实测（2026-09-16，GitHub API 直查）**：`api.github.com/repos/daly-dai/agent-learn` → **200 存在**（public，2026-08-19 创建）；`.../statve` → **404**；`.../statve-agent` → **404**。本地 `git remote -v` 与仓库根目录名同样都还是 `agent-learn`。
+   - **结论**：真实存在的仓库**只有一个 —— `agent-learn`**；两个 `statve` 变体**从未存在过**。所以"UA 里放 URL"这件事在当前状态下**没有正确答案**，只有"不放"是对的——**要放，得等 GitHub 仓库真改完名。**
 
 **教训（流程，不是技术）**：**两次决定之间没有留痕**。第一次落在 commit `aadc389` 的 message 里（写着 `→ statve / statve-agent`），第二次是全局替换**直接把详案原文覆盖掉**——于是文档与 commit 历史一度互相矛盾、且没有解释。按 `AGENTS.md` 第 10 条，「已有计划升级」必须在原详案**追加补记、保留原文**；本补记就是补上这一步。
 
