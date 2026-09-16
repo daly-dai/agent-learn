@@ -41,16 +41,20 @@
 
 .item:hover,
 .item:focus-visible {
-  background: var(--paper);
+  background: rgba(29, 33, 39, 0.03);
 }
 
-/* 高亮项（键盘导航）：比 hover 更明确的底——用户能分辨"焦点在哪" */
+/* 高亮项（键盘导航）：**比 hover 更明确** —— 用户要能分辨"焦点在哪一项"。
+   ⚠️ 原写法是 `background: var(--paper)`：意图写在注释里，值却和 hover 是同一个，
+   而 `--paper` 与面板底 `--plate` 在 2026-08-26「中性壳」之后**都是纯白**
+   （`app/globals.css:35-36`）⇒ **高亮等于不存在**。2026-09-16 改成实色档。
+   同一个坑在 `app/components/ui/menu/menu.module.css:83-86` 也有（已记进 PLAN）。 */
 .active {
-  background: var(--paper);
+  background: rgba(29, 33, 39, 0.07);
 }
 
 .name {
-  font-family: var(--mono);
+  font-family: var(--font-mono);
   font-size: 13px;
   color: var(--ink);
   white-space: nowrap;
@@ -63,6 +67,27 @@
   white-space: nowrap;
   font-size: 12px;
   color: var(--ink-faint);
+}
+
+/* ---- C8 T6：分组 ---- */
+
+/* 组标题（「命令」/「技能」）：字号比条目小一档、字距放开 —— 它是**标签**
+   不是内容，跟全站那套 mono 标签（「上下文注入」/「压缩」/「CALL」）同一口径 */
+.groupTitle {
+  padding: 4px 10px 2px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--ink-mid);
+}
+
+/* 组之间的一条细线：**全宽**（负 margin 吃掉面板那 6px 内边距，出血到边）。
+   不粘顶，所以滚到下面那一组时上面的标题已经滚走了 —— 这条线就是那一瞬间的块边界 */
+.divider {
+  height: 1px;
+  margin: 4px -6px;
+  background: var(--line-soft);
 }
 
 .empty {

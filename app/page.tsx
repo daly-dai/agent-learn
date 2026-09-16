@@ -55,6 +55,7 @@ import { ApprovalModeSwitch } from "./components/approval-mode-switch";
 import { TaskPanel } from "./components/task-panel";
 import { AskUserCard } from "./components/ask-user-card";
 import { CommandMenu } from "./components/command-menu";
+import { SkillChip } from "./components/skill-chip";
 import { ContextMeter } from "./components/context-meter";
 import { useAgentRun } from "./lib/use-agent-run";
 import { useRunStore } from "./lib/run-store";
@@ -123,6 +124,8 @@ export default function Home() {
     setCommandActiveIndex,
     commandMenuRef,
     filteredCommands,
+    armedSkill,
+    clearArmedSkill,
     handleInputChange,
     handleKeyDown,
     handleBlur,
@@ -410,6 +413,15 @@ export default function Home() {
                       onPick={pickCommand}
                     />
                   </div>
+                )}
+                {/* C8 T6 · R4-1：行首挂着一个技能 → 框内上沿一个可点的标签。
+                    放在 textarea **之前**：consoleFrame 是两列 grid，它 grid-column
+                    1/-1、自然落在第一行，textarea 与右侧按钮仍在第二行 */}
+                {armedSkill && (
+                  <SkillChip
+                    name={armedSkill.name}
+                    onClear={clearArmedSkill}
+                  />
                 )}
                 <textarea
                   className={styles.consoleInput}

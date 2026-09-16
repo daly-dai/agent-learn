@@ -1,0 +1,70 @@
+/* ============================================================
+   skill-chip.module.css —— 输入框内上沿的「已挂技能」标签（C8 T6 · R4-1）
+   归属组件：app/components/skill-chip/index.tsx
+   ============================================================
+   位置：挂在输入框（.consoleFrame，两列 grid）的**第一行、横跨两列**。
+   它不是"某一列的控件"，它属于整个输入框 —— 所以 grid-column: 1 / -1。
+
+   笔色：用**用户笔**（--pen-user / #2f4b99），不是注入块那支信号笔。
+   理由：这个技能是**你挂上去的**，它是你那句话的一部分；而注入块是**系统
+   插进上下文的东西**（那张卡片用信号笔）。同一支笔 = 同一类东西，人才分得清。
+   底色沿用 .said（用户消息）的 rgba(47,75,153,.07)，让"框里挂的"和"发出去的"
+   在视觉上是一件事。
+   ============================================================ */
+
+.chipRow {
+  grid-column: 1 / -1; /* 横跨整行：它属于整个输入框，不属于某一列 */
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 2px 4px 2px 8px;
+  border-radius: 999px;
+  background: rgba(47, 75, 153, 0.07);
+  border: 1px solid rgba(47, 75, 153, 0.18);
+}
+
+.mark {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--pen-user);
+  flex: none;
+}
+
+.name {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+  /* 技能名可以很长（身份 = 目录名，没有长度限制）—— 截断而不是撑破输入框 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 取消：一个真正的按钮（不是装饰）—— 有命中区、有 hover、有 aria-label */
+.clear {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: var(--ink-mid);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.clear:hover {
+  background: rgba(47, 75, 153, 0.14);
+  color: var(--pen-user);
+}

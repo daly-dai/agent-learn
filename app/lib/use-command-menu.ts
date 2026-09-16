@@ -32,6 +32,7 @@ import {
   validateSubmission,
 } from "@/lib/commands/parse";
 import type { CommandDescriptor } from "@/lib/commands";
+import { filterCommands } from "@/app/lib/command-panel";
 
 type UseCommandMenuOptions = {
   /** 执行命令（use-agent-run 的 runCommand：POST /api/chat/command + 刷新历史） */
@@ -86,20 +87,42 @@ export function useCommandMenu({
 
   // ---- 过滤（slashCatalog 快照只过滤不重查）----
   const commandPrefix = input.startsWith("/") ? input.slice(1) : "";
-  const filteredCommands = useMemo(() => {
-    if (!commandMenuOpen) return [];
-    const prefix = commandPrefix.toLowerCase();
-    return commands.filter(
-      (c) =>
-        c.name.startsWith(prefix) ||
-        c.aliases?.some((a) => a.startsWith(prefix)), // 别名只认不显（codex）
-    );
-  }, [commands, commandMenuOpen, commandPrefix]);
+  const filteredCommands = useMemo(
+    // 模糊匹配（子序列）：打 `cr` 能出 `code-review` —— 见 app/lib/command-panel
+    () => (commandMenuOpen ? filterCommands(commands, commandPrefix) : []),
+    [commands, commandMenuOpen, commandPrefix],
+  );
 
-  /** textarea onChange：更新输入 + 命令形态（/ 开头、行首无空格）弹面板 */
+  /**
+   * 行首挂着一个**技能**吗 —— R4-1 的 chip 数据源（`⌘ 名字 ×`）。
+   *
+   * ⭐ 不存 state、**直接从 `input` 推**：单一事实源。存 state 的话，迟早出现
+   * "你手动删掉了 `/名字`、chip 还挂在那儿"这类不同步 —— 而这类 bug 没人会想到去查 chip。
+   */
+  const armedSkill = useMemo(() => {
+    const parsed = parseSlashName(input);
+    if (parsed === null) return null;
+    const descriptor = lookupCommand(commands, parsed.name);
+    return descriptor?.source === "skill" ? descriptor : null;
+  }, [input, commands]);
+
+  /** 点 chip 的 ×：只摘掉行首那个 `/名字`（+ 紧跟的一个空格），**保留你后面打的要求** */
+  const clearArmedSkill = useCallback(() => {
+    setInput((current) => current.replace(/^\/\S+\s?/, ""));
+    inputRef.current?.focus();
+  }, []);
+
+  /**
+   * textarea onChange：更新输入 + 命令形态（/ 开头、行首无空格）弹面板。
+   *
+   * ⚠️ 面板只在**还在打名字**时开（C8 T6）：名字打完之后（出现空白）就收起。
+   * 不加这条的话，选中技能后输入框是 `/code-review `，你接着打「帮我评审」——
+   * 每一个字都会重新弹出一个空面板（名字已经不匹配任何东西了），纯属打扰。
+   */
   const handleInputChange = useCallback((value: string) => {
     setInput(value);
-    setCommandMenuOpen(isSlashCommandLine(value));
+    const prefix = value.startsWith("/") ? value.slice(1) : "";
+    setCommandMenuOpen(isSlashCommandLine(value) && !/\s/.test(prefix));
     setCommandActiveIndex(0);
   }, []);
 
@@ -139,7 +162,15 @@ export function useCommandMenu({
       // 大写/数字开头——都不是命令，按普通消息发（详案补记1：
       // "name 含 /（路径）→ 不拦截"，review 修复：ok:true 含"按普通
       // 消息发"语义，不能一律 runCommand）。
-      if (parseSlashName(raw) === null) {
+      const parsed = parseSlashName(raw);
+      if (parsed === null) {
+        onSend(raw.trim());
+        return;
+      }
+      // ⭐ **提交分流（C8 T6）**：名字落在**技能**上 → 走聊天（正文交给宿主的手势
+      //    注入那条路），不走命令接口。判据取快照里的 `source`，**不另存 state** ——
+      //    所以"面板选的"和"手打的"走的是同一条判断，不会分叉。
+      if (lookupCommand(commands, parsed.name)?.source === "skill") {
         onSend(raw.trim());
         return;
       }
@@ -221,10 +252,24 @@ export function useCommandMenu({
     setCommandActiveIndex, // CommandMenu onActiveChange（onMouseEnter 移高亮）
     commandMenuRef,
     filteredCommands,
+    /** 行首挂着的技能（有值就渲染 R4-1 的 chip） */
+    armedSkill,
+    clearArmedSkill,
     handleInputChange,
     handleKeyDown,
     handleBlur,
     pickCommand,
     submit,
   };
+}
+
+/** 按名字或别名找一条（快照里主名唯一；别名只认不显 ← codex ALIAS_COMMANDS） */
+function lookupCommand(
+  commands: CommandDescriptor[],
+  name: string,
+): CommandDescriptor | undefined {
+  return commands.find(
+    (command) =>
+      command.name === name || (command.aliases ?? []).includes(name),
+  );
 }
