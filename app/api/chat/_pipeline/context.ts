@@ -10,7 +10,27 @@ import { join } from "node:path";
 import { JsonlSessionStore, estimateTokens } from "@/lib/session";
 import { config } from "@/lib/config";
 import { TraceRecorder } from "@/lib/trace";
+import type { ToolContext } from "@/lib/tools";
 import type { ContextPressure } from "@/app/lib/context-occupancy";
+
+/**
+ * 本次部署的「工具环境」（工作区根 + 技能根）—— **唯一的生产点**。
+ *
+ * 为什么放这里、不放各自的 route 里：`POST /api/chat` 要它（建工具注册表 + 扫技能根），
+ * `GET /api/chat/commands` 也要它（把技能组进面板清单）。技能根只允许出现在**一处**
+ * （`doc/plan/c8-skills.md` 的施工纪律 5）—— 将来多根落地时要改的是"一个函数 + 一处
+ * 调用点"，不是散开的签名。
+ *
+ * ⚠️ **本常量在模块作用域，是有前提的**：两个值今天都来自 `config`（静态，不会变）。
+ * 一旦工作区改成"**按会话 / 按工作区**不同"（C6 工作区选择 + C32 项目级配置：值从会话头
+ * 的 `cwd` 来、技能根由它派生 —— 见 `doc/plan/c8-skills.md` 的**补记 4**），
+ * **它必须挪进请求处理函数内部**。不挪 = **第一个请求的工作区被所有会话共用**：
+ * 不报错、只是静默串味 —— 和当年那个"模块级单例注册表"是同一个病的另一面。
+ */
+export const toolContext: ToolContext = {
+  workspaceRoot: config.paths.workspace,
+  skillsRoot: config.paths.skillsRoot,
+};
 
 export type RequestContext = {
   /** 会话存储：每次请求新建实例并从磁盘读全量。

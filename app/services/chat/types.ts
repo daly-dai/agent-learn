@@ -58,9 +58,19 @@ export type SendMessageParams = { text: string; sessionId: string };
 // ---- C13 斜杠命令（POST /api/chat/command + GET /api/chat/commands）----
 // type-only import：lib/commands 的类型面无 node 依赖，前端 bundle 安全。
 import type { CommandDescriptor, CommandResult } from "@/lib/commands";
+import type { SkillDiagnostic } from "@/lib/skill";
 
-/** GET /api/chat/commands → 命令列表（slashCatalog 快照数据源） */
-export type CommandsResult = { commands: CommandDescriptor[] };
+/**
+ * GET /api/chat/commands → 命令清单（slashCatalog 快照数据源）。
+ *
+ * C8 T5：清单里混着**技能**（`source:"skill"`）；`diagnostics` 是技能侧的诊断
+ * （SKILL.md 写坏了 / 与内置命令重名被顶掉）—— 面板要把它显示出来，
+ * 否则"坏技能不阻塞"就变成了"坏技能没人知道"。
+ */
+export type CommandsResult = {
+  commands: CommandDescriptor[];
+  diagnostics: SkillDiagnostic[];
+};
 
 /** POST /api/chat/command 参数：完整命令行 */
 export type ExecuteCommandParams = { line: string; sessionId: string };
