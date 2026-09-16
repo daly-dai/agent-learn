@@ -1,6 +1,7 @@
-# C30 · 改名：`Teaching Agent` / `agent-learn` → `statve` / `statve-agent`
+# C30 · 改名：`Teaching Agent` / `agent-learn` → `statve`
 
-> **状态**：⏳ 进行中（2026-09-16 用户定案，同日施工）
+> **状态**：⏳ 进行中（代码 ✅ / 文档层 ⏳ / 目录名·仓库名 ⏳）。
+> ⚠️ **技术标识二次改过**：原定 `statve-agent`，同日二次决定统一为 `statve` —— 见文末**补记 1**。
 
 ---
 
@@ -9,10 +10,10 @@
 | 层 | 用哪个 | 为什么 |
 |---|---|---|
 | **品牌名**（页头、浏览器标题、系统提示词里它对自己的称呼） | **`statve`** | 单词最好念；域名就是 `statve.com` / `statve.dev`；`harness` 只作**描述词**出现在文案里 |
-| **技术标识**（`package.json` name / GitHub 仓库名 / 本地目录名） | **`statve-agent`** | npm 包名不接受空格与大写 |
+| **技术标识**（`package.json` name / GitHub 仓库名 / 本地目录名） | **`statve`** | npm 包名不接受空格与大写。**原定 `statve-agent`，同日二次决定统一为 `statve`**（用户："不大气"）——见补记 1 |
 | **`观测台`** | **删除** | 用户 2026-09-16 明示 |
 
-**一个名字、两层用法**——避免"UI 写一个、包名写另一个"的后患（搜不到、grep 不中）。
+**一个名字、一层**——原稿分两层（品牌名 `statve` + 技术标识 `statve-agent`），理由是避免"UI 写一个、包名写另一个"；**同日二次决定并成一层**，两处都用 `statve`。那条理由仍然成立，只是不再需要。
 
 ### 名字的来源与占用核查
 
@@ -40,14 +41,14 @@
 
 | 文件 | 行 | 改动 |
 |---|---|---|
-| `package.json` | 2 | `"agent-learn"` → `"statve-agent"` |
+| `package.json` | 2 | `"agent-learn"` → `"statve"` |
 | `app/components/nameplate/index.tsx` | 41、43 | wordmark → `statve`；**删除**「观测台」span（连同 `.wordmarkCn` 样式） |
 | `app/layout.tsx` | 11 | `"Teaching Agent · 观测台"` → `"statve · agent harness"` |
 | `app/api/chat/_pipeline/prompt/index.ts` | 53 | 「你是 Teaching Agent，一个帮助初学者理解 AI Agent 核心机制的教学助手。」→ 只把名字换成 `statve`，**其余措辞一字不动** |
 | `app/api/chat/_pipeline/prompt/index.test.ts` | 59 | 断言 `toContain("Teaching Agent")` → `toContain("statve")` |
-| `lib/tools/web-search/provider/index.ts` | 108 | UA → `statve-agent/0.1 (web_search)` |
-| `lib/tools/web-fetch/fetcher/index.ts` | 82 | UA → `statve-agent/0.1 (web_fetch; +<新仓库 URL>)` |
-| `lib/tools/test-fixtures.ts` | 19 | 临时目录前缀 → `statve-agent-test-` |
+| `lib/tools/web-search/provider/index.ts` | 108 | UA → `statve/0.1 (web_search)` |
+| `lib/tools/web-fetch/fetcher/index.ts` | 82 | UA → `statve/0.1 (web_fetch; +<新仓库 URL>)` |
+| `lib/tools/test-fixtures.ts` | 19 | 临时目录前缀 → `statve-test-` |
 
 ### 3.2 「观测台」7 处——**不是全删，是分清"品牌位"与"文案位"**
 
@@ -65,7 +66,7 @@
 
 `README.md`（H1 + 首段自称）/ `PLAN.md` / `doc/**`（约 10）/ `分享材料/*.svg`（**图片里是文字，要改 SVG 源码**）/ `会话检查点.md`。
 
-**约定**：README 的 H1 用 `statve-agent`（它描述的是这个仓库/包），正文自称用 `statve`（品牌）。这个"两层写法"是有意的，不是漏改。
+**约定**：README 的 H1 与正文自称**都用 `statve`**（原稿曾分两层：H1 用 `statve-agent`、正文用 `statve`；二次决定后统一，见补记 1）。
 
 ### 3.4 **不改**的（都有依据）
 
@@ -104,8 +105,28 @@
 ## 六、顺序
 
 1. 详案 + `PLAN.md` 排期表（本文件）
-2. 代码 8 行 + `tsc` + `pnpm test`
+2. 代码改名（13 文件）+ `tsc` + `pnpm test`
 3. 文档层批量替换（**单独一个 commit**）
 4. （在本会话之外）目录名 / GitHub 仓库名
 
 **收尾（`AGENTS.md` 第 10 条）**：更新本详案 → 更新 `PLAN.md` 状态列 → 更新 `会话检查点.md` → **展示改动清单等用户确认再 commit**。
+
+---
+
+## 七、补记 1（2026-09-16）：技术标识从 `statve-agent` 统一为 `statve`
+
+**触发**：用户看过落地结果后的原话 ——「**statve-agent 我觉得不大气**，我刚刚改成了 statve 全局替换了」。
+
+**原方案 → 新方案**：原定「品牌名 `statve` + 技术标识 `statve-agent`」**两层**（理由是避免"UI 写一个、包名写另一个"）。新方案：**两处都用 `statve`，只有一层**。
+
+**改动**（全部是字面量替换 `statve-agent → statve`）：`package.json` 的 name、web_fetch 的 UA（含其中的仓库 URL）、web_search 的 UA、`test-fixtures.ts` 的临时目录前缀。
+
+**核查结论**（2026-09-16 全库实测）：
+
+1. **无功能性破坏** —— 没有任何代码或测试依赖 `statve-agent` 这个字面量；`tsc --noEmit` exit 0（含当时工作区里另一会话的 C8 在制品一起编译通过）。
+2. **顺带更干净**：`statve` 在 npm / PyPI / crates / RubyGems / NuGet、GitHub 句柄、以及 `.com/.dev/.ai/.io` 四个域名上**全部为空**（见 §一 的占用核查）——比 `statve-agent` 少一层占用风险。
+3. ⚠️ **web_fetch 的 UA 现在指向 `https://github.com/daly-dai/statve`** —— 那要等 GitHub 仓库名一并改完才真实存在，在那之前是死链（改名前指向 `statve-agent` 时同样是死链，只是目标变了）。
+
+**教训（流程，不是技术）**：**两次决定之间没有留痕**。第一次落在 commit `aadc389` 的 message 里（写着 `→ statve / statve-agent`），第二次是全局替换**直接把详案原文覆盖掉**——于是文档与 commit 历史一度互相矛盾、且没有解释。按 `AGENTS.md` 第 10 条，「已有计划升级」必须在原详案**追加补记、保留原文**；本补记就是补上这一步。
+
+**另一条容易误判的事**：`statve-agent → statve` 的替换**命中面很窄**（当时只有 6 个文件含这个字面量）。文档层里写的是 `agent-learn` 和 `Teaching Agent`，**不含 `statve-agent`** —— 所以"全局替换了"≠"改名做完了"。文档层替换是**独立的一步**（见 §六 第 3 条）。
