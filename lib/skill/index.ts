@@ -181,8 +181,12 @@ type Frontmatter = {
  * 解析 SKILL.md 的 frontmatter（`---` 包起来的那一段）。
  *
  * 只管够用：**只认顶格的 `key: value`**。缩进行属于上一个键的嵌套块（真实
- * 技能里 `metadata:` 就带缩进子键），不匹配 ⇒ 自动忽略。也不做 YAML 全量
- * 解析 —— 我们只读 3 个键，为这 3 个键引一个 YAML 依赖不划算。
+ * 技能里 `metadata:` 就带缩进子键）、空行、YAML 注释 —— 这三类都算"合法的
+ * 非键行"，忽略。但**顶格又不像 `key: value` 的行**（一句正文）是 YAML 自己
+ * 的语法错 ⇒ 说明上面那个"收尾"是假的（其实是正文里的分隔线），判坏、返回
+ * null，交给调用方"跳过 + 诊断"。判据就一句：**真 YAML 解析器会报错的行我们
+ * 也不收，它会接受的行我们照收** —— 别家全用真解析器，这样谁都不比谁严。
+ * 也不做 YAML 全量解析 —— 我们只读 3 个键，为这 3 个键引一个依赖不划算。
  */
 function parseFrontmatter(raw: string): Frontmatter | null {
   // Windows 上手写的技能多半是 CRLF；正文要给模型看，统一成 \n
@@ -195,7 +199,18 @@ function parseFrontmatter(raw: string): Frontmatter | null {
   const fields = new Map<string, string>();
   for (const line of lines.slice(1, endIndex)) {
     const match = /^([A-Za-z0-9_-]+):[ \t]*(.*)$/.exec(line);
-    if (!match) continue;
+    if (!match) {
+      // 合法的"非键行"三类：空行 / 缩进行（上一个键的嵌套块 —— 真实技能里
+      // `metadata:` 就带缩进子键）/ 注释行（技能根跨 harness 共用，别家走真
+      // YAML 解析器 ⇒ 注释合法，判坏了是我们制造假阳性）
+      if (line.trim() === "" || /^[ \t]/.test(line) || /^\s*#/.test(line)) {
+        continue;
+      }
+      // ⚠️ 顶格、又不像 `key: value` ⇒ 这个"收尾"其实是正文里的分隔线，
+      // frontmatter 根本没闭合。返回 null ⇒ 走调用方既有的"跳过 + 诊断"，
+      // 绝不能让前半段正文被当成字段静默吞掉（2026-09-17 T8a · a1）。
+      return null;
+    }
     const [, key, rawValue] = match;
     if (!fields.has(key)) fields.set(key, unquote(rawValue));
   }

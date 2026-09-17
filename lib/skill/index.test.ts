@@ -241,6 +241,125 @@ describe("loadSkills —— 扫技能根（身份 = 目录名，坏技能跳过�
   });
 });
 
+// ============================================================
+// parseFrontmatter 的「收尾」判定（2026-09-17 T8a · a1）
+// ============================================================
+// 上面那组用的是共享夹具（坏技能只有"没有 frontmatter"和"缺 description"
+// 两种）；这里坏在**收尾那一行**，换个临时根单开一组，免得动上面的计数断言。
+// ============================================================
+describe("parseFrontmatter —— 收尾必须是「真的收尾」", () => {
+  it("⭐ 忘了写收尾 + 正文里有 --- ⇒ 跳过 + 诊断（不许静默把前半段正文吞掉）", async () => {
+    // 真实场景：技能是用户手写的外部数据，frontmatter 写完忘了补第二行 `---`；
+    // 而 markdown 正文里本来就常有分隔线 —— 那条分隔线会被当成收尾，于是
+    // "前半段正文"被逐行当成 frontmatter 字段吃掉，技能却还能"正常"加载。
+    // 这是**静默**失败：不报错、不诊断，正文平白少一截。
+    const dir = await mkdtemp(join(tmpdir(), "statve-swallow-"));
+
+    try {
+      await writeSkill(
+        dir,
+        "swallow",
+        `---
+name: swallow
+description: 忘了写收尾的技能
+
+# 前半段标题
+
+前半段正文，这一段是真正的正文。
+
+---
+
+后半段正文。
+`,
+      );
+
+      const { skills, diagnostics } = loadSkills(dir);
+
+      expect(skills.map((s) => s.name)).toEqual([]); // ← 今天它是 ["swallow"]
+      expect(diagnostics).toHaveLength(1);
+      expect(diagnostics[0]?.name).toBe("swallow");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("三类「合法的非键行」都不算坏（空行 / 缩进子键 / 顶格注释）", async () => {
+    // 收紧判据的**唯一**风险是假阳性 —— 把一份本来能用的技能判坏。所以这里把
+    // 该放行的三类一次钉住。三类的证据强度**不一样**，如实写清：
+    //   · 缩进子键：真实数据里有 16 行（`metadata:` 的子孙），最硬；
+    //   · 空行 / 顶格注释：真实 30 个技能里 0 行 —— 它们不是"我们见过的形状"，
+    //     而是"合法的 YAML"，且技能根是**跨 harness 共用**的（~/.agents/skills
+    //     不只我们一家在读），别家走真 YAML 解析器 ⇒ 别人写的技能可能带注释，
+    //     判坏了就是我们自己制造的假阳性。
+    const dir = await mkdtemp(join(tmpdir(), "statve-legal-lines-"));
+
+    try {
+      await writeSkill(
+        dir,
+        "legal",
+        `---
+name: legal
+description: frontmatter 里混着空行、缩进子键和注释
+
+# 维护者备注：这个技能还没写完
+metadata:
+  author: someone
+  version: 1.0
+
+---
+
+正文。
+`,
+      );
+
+      const { skills, diagnostics } = loadSkills(dir);
+
+      expect(skills.map((s) => s.name)).toEqual(["legal"]);
+      expect(skills[0]?.description).toBe(
+        "frontmatter 里混着空行、缩进子键和注释",
+      );
+      expect(diagnostics).toEqual([]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("⚠️ 已知边界：被吞的那半段若只有空行和 # 标题，仍然会静默截断", async () => {
+    // 这条**不是在测实现做对了**，是把"我们什么时候会失败"钉在代码里。
+    // 判据是「真 YAML 解析器会报错的行我们也不收」—— 而 `# 标题` 在 YAML 里
+    // 就是注释、空行就是空行，**真解析器同样接受**，于是它照样把上面那个
+    // 假的收尾当真。所以这一段**任何**实现都区分不了（除非比 YAML 更严，
+    // 那就会误杀另一批合法技能）。复现条件：忘了写收尾 + 正文开头只隔了
+    // 标题和空行就出现 `---`（真实 30 个技能里一个都没有）。
+    const dir = await mkdtemp(join(tmpdir(), "statve-boundary-"));
+
+    try {
+      await writeSkill(
+        dir,
+        "boundary",
+        `---
+name: boundary
+description: 收尾忘了写，被吞掉的那半段正好只有标题
+
+# 前半段标题
+
+---
+
+后半段正文。
+`,
+      );
+
+      const { skills, diagnostics } = loadSkills(dir);
+
+      expect(skills.map((s) => s.name)).toEqual(["boundary"]); // 照常加载
+      expect(skills[0]?.content).toBe("后半段正文。"); // 前半段标题没了
+      expect(diagnostics).toEqual([]); // 而且一声不吭
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("buildSkillCatalog —— 只给模型看它调得动的（markdown 列表）", () => {
   it("markdown 形态 `- \`name\`: description`，前面一句引导语", () => {
     const { skills } = loadSkills(root);
