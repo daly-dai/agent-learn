@@ -267,22 +267,92 @@ const CATALOG_LEAD =
   "以下技能可用。开始一项明确匹配某个技能的任务之前，先用 `skill` 工具加载它——不要凭名字猜内容。";
 
 /**
- * 把技能渲染成给模型看的清单（markdown 列表，**只含模型调得动的**）。
+ * 把技能渲染成给模型看的清单（markdown 列表，**只含模型调得动的**），
+ * 外加一段「哪些技能没加载成功」的交代。
  *
- * 空结果返回空串：调用方据此整节省略，不会在提示词里留一个空标题。
+ * 空清单 + 空诊断 → 空串：调用方据此整节省略，不会在提示词里留一个空标题。
+ * ⚠️ **只有诊断、没有清单**时返回的**不是**空串 —— 那是"你装的技能全坏了"，
+ * 恰恰最该说出来（见 `renderDiagnosticNote`）。
  *
  * ⚠️ 这里**不写**"若宿主已注入正文就别再加载"那条防重复规则 —— 它只对
  * 手势路径有意义，写成每请求都付的清单成本不划算；由注入那一侧（产品层）
  * 就近说明。
+ *
+ * ⭐ `diagnostics` 是 2026-09-17 加的（详案 §17）：坏技能"跳过"这条不变，
+ * 但"**跳过了这件事**"必须能到人眼前。五家取舍里只有 Reasonix 做到**零 UI
+ * 成本还真的到得了人** —— 它的办法是把话**写给模型**，让模型转告用户。
  */
-export function buildSkillCatalog(skills: Skill[]): string {
-  const visible = skills.filter((skill) => skill.modelInvocable);
-  if (visible.length === 0) return "";
+export function buildSkillCatalog(
+  skills: Skill[],
+  diagnostics: readonly SkillDiagnostic[] = [],
+): string {
+  const sections: string[] = [];
 
-  const items = visible.map(
-    (skill) => `- \`${skill.name}\`: ${skill.description}`,
-  );
-  return [CATALOG_LEAD, "", ...items].join("\n");
+  const visible = skills.filter((skill) => skill.modelInvocable);
+  if (visible.length > 0) {
+    sections.push(
+      [
+        CATALOG_LEAD,
+        "",
+        ...visible.map((skill) => `- \`${skill.name}\`: ${skill.description}`),
+      ].join("\n"),
+    );
+  }
+
+  if (diagnostics.length > 0) {
+    sections.push(renderDiagnosticNote(diagnostics));
+  }
+
+  return sections.join("\n\n");
+}
+
+/**
+ * 诊断段**最多列几条**（⭐ 只封"给模型看的那一份"）。
+ *
+ * ⚠️ **封的是展示，不是事实**：`loadSkills` 该报几条报几条、服务端日志照打全量、
+ * `GET /api/chat/commands` 的响应照给全量 —— **只有进系统提示词这一份封顶**，
+ * 因为它有**每请求的 token 成本**。依据是 `PLAN.md` 排期表 **C22** 记的那条：
+ * 「**生产者捕获上限与模型输出上限分成两层**……**捕获层要如实报告丢了多少**」。
+ *
+ * 为什么要有它：诊断是这一节里**唯一会无界增长**的东西（技能清单的长短是 C8 已
+ * 拍板接受的，诊断则是"装坏多少就有多少"）。实测今天 0 条，但装机场景可能一次坏一批。
+ *
+ * ⚠️ 封顶的代价：超出的部分**模型又"不知道"了** —— 所以尾句**必须如实报数**，
+ * 让模型把那句也转告出去（否则就退回"只有服务端看得见"）。
+ */
+const MAX_LISTED_DIAGNOSTICS = 5;
+
+/**
+ * 把诊断渲染成一段**给模型看的话** —— 模型会把它转告给用户。
+ *
+ * 为什么不渲染成人看的告警：我们**没有一个自然的地方放它**（面板是"可选项
+ * 列表"，诊断是"出问题了"，两个语义 —— T6 已按此定过），而**能到人眼前的
+ * 通道本来就存在**，就是这份清单。于是让模型当传声筒，代价是两行提示词。
+ *
+ * ⚠️ **已知弱点（诚实记）**：它**依赖模型配合**。模型不提，用户还是不知道 ——
+ * 严格说这是"**弱可见**"，不如一个能主动去查的清单硬（pi 的"已加载资源"视图
+ * 分节 / codex 的 `skills/list` 带 `SkillErrorInfo` 那样）。所以这里**明说
+ * "把下面这条告诉他"**，而不是指望模型自己想到。
+ *
+ * 带路径是因为**修它要打开那个文件** —— 只给名字，用户还得自己去找。
+ */
+function renderDiagnosticNote(
+  diagnostics: readonly SkillDiagnostic[],
+): string {
+  const listed = diagnostics.slice(0, MAX_LISTED_DIAGNOSTICS);
+  const rest = diagnostics.length - listed.length;
+
+  return [
+    `⚠️ 另有 ${diagnostics.length} 个技能**没有加载成功**（原因如下）。`,
+    "如果用户问起某个技能为什么不在，或者你要用一个名字却找不到它，**把下面这条告诉他**：",
+    ...listed.map((d) => `- \`${d.name}\`（${d.dir}）：${d.reason}`),
+    // 封了就要说丢了多少（C22 那条母原则）—— 否则超出的那些又变成"没人知道"
+    ...(rest > 0
+      ? [
+          `- **还有 ${rest} 个没列出**（数量太多）—— 让用户去看服务端日志，那里有全部 ${diagnostics.length} 条`,
+        ]
+      : []),
+  ].join("\n");
 }
 
 /**

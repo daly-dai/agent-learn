@@ -279,6 +279,76 @@ describe("buildSkillCatalog —— 只给模型看它调得动的（markdown 列
       .map((line) => line.slice(3).split("`")[0]);
     expect(names).toEqual(["code-review", "tdd", "wrong-name", "xlsx"]);
   });
+
+  it("不带诊断时逐字不变（可选参数，向后兼容 —— 上面那几条断言就是证据）", () => {
+    const { skills } = loadSkills(root);
+    expect(buildSkillCatalog(skills, [])).toBe(buildSkillCatalog(skills));
+  });
+
+  it("⭐ 带诊断 → 尾巴上多一段交代，坏技能的名字进得了提示词", () => {
+    // 为什么这条重要：这是 2026-09-17 定的"诊断可见"的实际落点（详案 §17）——
+    // 不打 UI，借清单这条现成通道**让模型转告用户**。
+    const { skills, diagnostics } = loadSkills(root);
+    const catalog = buildSkillCatalog(skills, diagnostics);
+
+    expect(catalog).toContain("没有加载成功");
+    expect(catalog).toContain("把下面这条告诉他"); // 明说让模型转告，不是指望它自己想到
+    expect(catalog).toContain("`no-description`");
+    expect(catalog).toContain("`no-frontmatter`");
+  });
+
+  it("⭐ 「跳过坏的」这条没被改：坏技能不会变成清单条目", () => {
+    // 诊断段里的行是 `- \\`名字\\`（路径）：原因`；清单条目是 `- \\`名字\\`: 描述`。
+    // 只断言后者不存在 —— 别把"C 位不同"写成"名字没出现"，那证不出东西。
+    const { skills, diagnostics } = loadSkills(root);
+    const catalog = buildSkillCatalog(skills, diagnostics);
+
+    expect(catalog).not.toContain("- `no-description`:");
+    expect(catalog).not.toContain("- `no-frontmatter`:");
+  });
+
+  it("⭐ 只有诊断、清单为空 → 不是空串（技能全坏了，恰恰最该说）", () => {
+    const { diagnostics } = loadSkills(root);
+    const catalog = buildSkillCatalog([], diagnostics);
+
+    expect(catalog).not.toBe("");
+    expect(catalog).toContain("没有加载成功");
+    // 但没有清单就不该有引导语（那是"清单自己的一部分"，空清单下说了会误导）
+    expect(catalog).not.toContain("以下技能可用");
+  });
+
+  it("⭐ 诊断段封顶 5 条，且**如实报出还剩几条**（只封「给模型那一份」）", () => {
+    // 依据：PLAN.md 排期表 C22 —— 生产者如实产全量，**只有模型输出层才截**，
+    // 而且**截了要说丢了多少**。所以这里同时验两件事：列出的封在 5 条、
+    // 以及"还有 3 个"这句话在。
+    const many = Array.from({ length: 8 }, (_, i) => ({
+      name: `broken-${i}`,
+      dir: join(root, `broken-${i}`),
+      reason: "缺少 description",
+    }));
+
+    const catalog = buildSkillCatalog([], many);
+
+    expect(catalog).toContain("另有 8 个技能"); // 总数照实说
+    expect(catalog).toContain("`broken-0`");
+    expect(catalog).toContain("`broken-4`"); // 第 5 条（下标 4）是最后一条
+    expect(catalog).not.toContain("`broken-5`"); // 第 6 条起不列
+    expect(catalog).toContain("还有 3 个没列出");
+    expect(catalog).toContain("全部 8 条");
+  });
+
+  it("刚好 5 条时不出现「还有 0 个没列出」这种废话", () => {
+    const five = Array.from({ length: 5 }, (_, i) => ({
+      name: `b-${i}`,
+      dir: join(root, `b-${i}`),
+      reason: "缺 description",
+    }));
+
+    const catalog = buildSkillCatalog([], five);
+
+    expect(catalog).toContain("`b-4`");
+    expect(catalog).not.toContain("没列出");
+  });
 });
 
 describe("renderSkillContent —— 两条路（工具 / 手势）共用的同一份形态", () => {

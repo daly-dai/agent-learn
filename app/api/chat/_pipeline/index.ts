@@ -86,8 +86,11 @@ export async function runPipeline(params: RunPipelineParams) {
   //     赶不上这一轮的请求体了；而"模型零工具调用"靠的正是正文已经在这一轮的上下文里。
   const { skills, diagnostics } = loadSkills(toolContext.skillsRoot);
   for (const diagnostic of diagnostics) {
-    // 坏技能**不阻塞**（跳过，其余照常加载），但**诊断必须看得见**：先落服务端日志；
-    // T5 的命令接口会把同一份诊断带给前端面板。
+    // 坏技能**不阻塞**（跳过，其余照常加载），但**诊断必须看得见** —— 三处一起兜（详案 §17）：
+    //   ① 服务端日志（就是下面这一行）
+    //   ② `GET /api/chat/commands` 的响应字段（前端**目前不渲染**，是留给"资源视图"的接口）
+    //   ③ ⭐ **系统提示词里那段交代** —— 抄 Reasonix：把话**写给模型**、让模型转告用户
+    //      （`buildSkillCatalog` 的第二个参数；这是我们唯一"真的到得了人眼前"的一处）
     console.warn(
       `[skill] ${diagnostic.name}：${diagnostic.reason}（${diagnostic.dir}）`,
     );
@@ -137,7 +140,7 @@ export async function runPipeline(params: RunPipelineParams) {
   //   - 工具规矩：各工具自己声明、注册表收集（文本住工具文件，不住提示词 —— 见 C34 判据）
   const systemPrompt = buildSystemPrompt(
     undefined, // now 走默认（注入时刻只是为了可测）
-    buildSkillCatalog(skills),
+    buildSkillCatalog(skills, diagnostics),
     toolRegistry.guidelines(),
   );
 
