@@ -12,30 +12,45 @@
 
 import { describe, expect, it } from "vitest";
 import { createToolRegistry } from "@/lib/tools";
-import { buildSystemPrompt, formatCurrentTime } from ".";
+import { buildSystemPrompt, formatCurrentDate } from ".";
 
 /** 固定时刻（本地时区构造，落在哪一天与时区无关）——2026-09-14 是星期一 */
 const FIXED = new Date(2026, 8, 14, 18, 43);
 
-describe("formatCurrentTime —— 给人/模型看的一行时间", () => {
+describe("formatCurrentDate —— 给人/模型看的一行日期", () => {
   it("带出年月日和星期", () => {
-    const stamp = formatCurrentTime(FIXED);
+    const stamp = formatCurrentDate(FIXED);
     expect(stamp).toContain("2026");
     expect(stamp).toContain("9");
     expect(stamp).toContain("14");
     expect(stamp).toContain("星期一");
   });
 
-  it("带出时区（否则那个时刻对模型是悬浮的）", () => {
-    expect(formatCurrentTime(FIXED)).toContain("时区");
+  it("带出时区（日期跨时区会不一样，不给时区「今天是哪天」就是悬浮的）", () => {
+    expect(formatCurrentDate(FIXED)).toContain("时区");
   });
 
-  it("时区可注入（测试与多区域部署都要这个口子）", () => {
-    // 同一个时刻，换个时区渲染出来的钟点应该不同——证明它真的在用注入的时区
-    const shanghai = formatCurrentTime(FIXED, "Asia/Shanghai");
-    const utc = formatCurrentTime(FIXED, "UTC");
-    expect(shanghai).toContain("Asia/Shanghai");
-    expect(utc).toContain("UTC");
+  it("⭐ 只有日期、没有时分秒（给了钟点 = 前缀缓存一次都命中不了）", () => {
+    // 2026-09-17 修的既有 bug：原来用 timeStyle:"short" ⇒ 每分钟变一次。
+    // 断言"长不出钟点"，比断言"等于某个固定串"更抗格式微调。
+    expect(formatCurrentDate(FIXED)).not.toMatch(/\d{1,2}:\d{2}/);
+  });
+
+  it("⭐ 同一天内任意两个时刻渲染**逐字相同**（缓存能命中的前提）", () => {
+    expect(formatCurrentDate(new Date(2026, 8, 14, 0, 0, 0))).toBe(
+      formatCurrentDate(new Date(2026, 8, 14, 23, 59, 59)),
+    );
+  });
+
+  it("时区可注入：**日期**跨时区真的会不同（拿一个跨午夜的时刻验）", () => {
+    // ⚠️ 这条原来用 FIXED（18:43）验"钟点不同"—— 去掉钟点后那两个日期相同，
+    // 老写法就只剩时区后缀在撑门面、证不出"渲染真的用了注入的时区"。
+    // 换一个跨午夜的瞬间：2026-09-14T17:00Z ⇒ UTC 还是 14 日、东八区已是 15 日。
+    const crossingMidnight = new Date(Date.UTC(2026, 8, 14, 17, 0, 0));
+    const shanghai = formatCurrentDate(crossingMidnight, "Asia/Shanghai");
+    const utc = formatCurrentDate(crossingMidnight, "UTC");
+    expect(shanghai).toContain("9月15日");
+    expect(utc).toContain("9月14日");
     expect(shanghai).not.toBe(utc);
   });
 });
@@ -43,6 +58,14 @@ describe("formatCurrentTime —— 给人/模型看的一行时间", () => {
 describe("buildSystemPrompt —— 提示词整体", () => {
   it("⭐ 必须带当前年份（这次的 bug 就出在这儿）", () => {
     expect(buildSystemPrompt(FIXED)).toContain("2026");
+  });
+
+  it("⭐ 同一天内两份提示词**逐字相同**（这就是前缀缓存能命中的前提）", () => {
+    // 2026-09-17 加。它守的是**成本**不是正确性 —— 提示词带钟点的话，
+    // KV 前缀缓存一次都命中不了，而且**不报错、不变红**，只是账单悄悄变贵。
+    expect(buildSystemPrompt(new Date(2026, 8, 14, 0, 0, 0))).toBe(
+      buildSystemPrompt(new Date(2026, 8, 14, 23, 59, 59)),
+    );
   });
 
   it("必须点明「以这个时间为准、训练截止不是现在」", () => {
