@@ -65,12 +65,16 @@ export async function POST(req: NextRequest) {
     // 区分两种"执行不了"（review 修复）：
     //   - 解析不出命令名（/、/foo/bar 路径、/9abc）= 不是命令形态，
     //     不能报"未知命令：/src"这种事实错误
-    //   - 解析出名字但未注册（/copmact）= 真正的未知命令
+    //   - 解析出名字但未注册（/copmact）= 真正的未知命令 **或技能**
+    // ⚠️ 下面那句必须说「命令**或技能**」—— **C8 T5 引入的缺陷**（2026-09-17
+    //    T8 验收 ⑥ 抓到）：技能也注册进了同一份名单，而文案是 C13 时代写的。
+    // ⚠️ 前端 `app/lib/use-command-menu.ts` 里还有**同一句话的另一份**，
+    //    **改要一起改**（为什么不做成共享函数，那边注释写了理由）。
     const parsed = parseSlashName(line);
     const error =
       parsed === null
         ? `不是命令：${line.trim().split(/\s/)[0]}`
-        : `未知命令：/${parsed.name}`;
+        : `未知命令或技能：/${parsed.name}`;
     console.log(`[command/done] ${line} → ${error}`);
     return NextResponse.json({ error }, { status: 400 });
   }
