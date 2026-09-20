@@ -199,3 +199,32 @@ pwsh **每次都告诉我们"有错"**：错误写进 stderr，走管道时被�
 - ⚠️ **施工中撞到的一个真实边界（下次写规矩还会撞）**：`lib/tools/index.test.ts:89` 的反引号扫描把**反引号包着的全小写单词**当工具名去核对 ⇒ 规矩正文里 `if` / `stdout` / `stderr` **不能加反引号**（加了当场红，而且报错信息看着像"提到了不存在的工具"）。`[类型]::静态方法()` / `-gt` / `$ExecutionContext…` 天然不在扫描范围（首字符不是小写字母）。
 - **一处刻意如此**：`description` 与 `guidelines` 各有一句「合并」—— 不是 C34 禁的重复：**`description` 答形状**（返回什么），**`guidelines` 答读法**（报错可能夹在中间，别只看结尾）。
 - **验收⑥ 的影响面已实测**：`app/api/chat/_pipeline/prompt/index.test.ts` 的断言只要求"投稿都渲染出来 + 条数 > 0"，不钉条数 ⇒ 加两条规矩不会撞它（真注册表那条用例已跑绿）。
+
+#### T2（2026-09-20 · commit `11ea094`）
+
+- **改动**：`lib/process-output/index.ts`（+`readPwshErrors` / +`stripPwshClixml`）；**新增** `lib/process-output/test-fixtures.ts`（真管道样本，两处测试共用）；`lib/tools/bash/bash-runner/index.ts`（+`bashProcessEnv`、`BashResult +stderr`、抽 `createRollingBuffer`）；`lib/tools/bash/index.ts`（+`cleanBashOutput` 并接进 `execute`）。
+- ⭐ **原方案被施工改掉一处，理由是实测出来的**：计划写的是 `readPwshErrors(text)`（喂合并输出）。但 **CLIXML 的样文我们自己的文档里就抄着**（本文件第二节），模型一条 `Get-Content doc/plan/phase-4-bash.md` 就会把同形文本打到 **stdout** 上 ⇒ 按合并输出判定会把一份**正常读出来的文档**改写成「[pwsh 报错 ×20]」—— 正是 C36 要治的"工具静默给出错误结果"。**改成只信 `stderr`**（CLIXML 的家），摘机器话才动合并输出那一份；这条写成了 ⭐ 用例。
+  - ⇒ 顺带把计划里"`BashResult.stderr` 备查"改成**真消费者**（CLIXML 解码的输入）——"备查"没有消费者，正是本项目点过名的「预挖空壳」病。
+- **合并 ≠ 分不清**：保序的单管道合并照旧（Reasonix 的反面理由见第四节结论 2），只多攒一份 stderr（零成本）。
+- **夹具订正一处**：真样本数出来是**同一条报错 ×20**，本文件第二节当时写的是"18 遍"（粗估）。
+- ⚠️ tsc 抓到一次：测试里手编 `{ PATH: "x" }` 当环境夹具 → 本项目 `ProcessEnv` 要求 `NODE_ENV` 必填（Next.js 的类型增强）。改成展开**真实的 `process.env`**（生产调用方传的就是它）。
+- **红 → 绿**：14 条挂 → `lib/process-output` + `lib/tools/bash` 3 文件 / 32 用例全过。
+- **真 spawn 探针**（跑完即删，不入库）：`1..3 | ForEach-Object { [Math]::Min(1,2) }` → 退出码 0 / stdout 空 / stderr 334 字符 CLIXML → `readPwshErrors` count=3。**探针顺带证明 2a 生效**：解出来的报错里**已经没有 ANSI 色码**（09-17 那次原文里是 `_x001B_[31;1m`）—— 源头不产生，就不用洗。
+
+#### T3（2026-09-20 · commit `f68e11d`）
+
+- **改动**：`lib/tools/bash/index.ts`（+`bashStatusNote` 四格判据；`cleanBashOutput` 顺带交出 `pwshErrorCount`，同一个 stderr 不解析两遍）+ 用例 13 条。
+- **吸收 B19**：它那五条行为（空命令报错 / 终止提示 / 退出码提示 / 无输出占位 / ToolResult 形状）全部落地。做法 = **判据抽成纯函数** + `vi.spyOn(BashRunner.prototype, "run")` **把执行器换掉**（工具逻辑与"谁去执行"无关）⇒ 从"必须有真进程"变成"不需要"，沙箱 EPERM 不再是拦路虎。
+- **为什么不抛错**（本节的取舍）：抛错会误伤「退出码 1 但完全正常」的 `grep 无匹配`，还会改掉模型看到的结果形状（`isError` 通道）⇒ 回归面比它修的病大。**延长既有标记机制（DSH 形状），不换机制。**
+- **两个信号都有时只报退出码**：报错正文（×N + 人话）已经在正文里，同一件事不说两遍。
+- **变异检验**：把 `readPwshErrors(stderr)` 故意改成 `readPwshErrors(output)` → **正好那条 ⭐ 守卫用例变红、其余 21 条不动**（验完逐字还原）⇒ 那条用例测在点子上。
+- **端到端真机证据**（走真工具的真 spawn 探针）：模型看到
+  `[pwsh 报错 ×3]` / `InvalidOperation: 无法调用方法。在此语言模式下，方法调用仅在核心类型上受支持。` / `[退出码为 0，但 stderr 有 3 条报错]`；
+  对照（`Write-Output 'ok'`）→ `ok`，**一个字都不加**。
+
+#### 收口（2026-09-20）
+
+- **三个断点全闭上**：退出码骗人（T3 标记点明）· 错误不可读（T2 人话 + 去重）· 模型不知道语法禁区（T1 的规矩进提示词）。
+- **验收读数**：`lib/tools/bash` + `lib/process-output` **3 文件 / 45 用例**全过；`tsc --noEmit` 0；全量 **736 passed / 1 failed**（那条是**既有假红**：`lib/skill/index.test.ts` 的隐藏技能守卫按子串匹配，隐藏技能 `teach` 是 `slidev` 描述里 "teaching materials" 的子串 —— 与 C36 无关，`git stash` 验过，已入池 **C43**）。
+- **明确没做**（划界，理由见第六节）：输出落盘 / 改限额语义（C22→C24 与 B7）；注入 `$ErrorActionPreference='Stop'`（会改用户命令的行为）；改成 pi 那样抛错。
+- **红线自检**：三个 commit 的 `git diff --cached --name-only` 都不含 `lib/agent/index.ts`（本项不涉及引擎）。
