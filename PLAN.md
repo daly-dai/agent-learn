@@ -239,6 +239,7 @@
 | B2.1 | **压缩打磨三件套**（DSH 走读 24 触发）：① compaction entry 补审计字段（被压消息 id 列表 + 摘要模型名）② "摘要必须更小" fail-closed 检查（摘要 ≥ 被压区域不落盘）③ tool-pairing balance 升级（替代"第一条不是 toolResult"单点修正）；B 类不抄（锁/KV cache/影子价格/错误分类/接口抽象——场景不需要） | DSH compaction（走读 24 施工单） | — | — | 💡 讨论中（条件触发：① 长期会话复盘时 ② 下次动 compact.ts 时 ③ 遇孤儿工具坑时）。⚠️ **若 C18 开工则并入 C18**（本项是"够用版打磨"，C18 是"重构级"——同一处别改两遍） ← 并入 C18 |
 | C39 | **流式 tool_call 的截断保护**：模型输出被截断（`stopReason="length"`）时，残缺 JSON 可能被 parse 成不完整对象**拿去执行** | pi 引擎的 `failToolCallsFromTruncatedMessage`；我们 `lib/deepseekModel/`（流式累积 + 一次 parse） | `doc/plan/c39-truncated-toolcall-guard.md`（材料已归位 · 未定案） | — | 未开始 |
 | C42 | **`PLAN.md` 池子表结构收缩：6 列 → 4 列（`ID / 做什么 / 依据 / 去向`）+ 文末「已交付」区**（2026-09-18 定） | 2026-09-18 实测（列数 / 字符数）+ C19 的干跑先例 | `doc/plan/c42-pool-table-shrink.md`（材料已归位 · 未定案） | ① 干跑清单经人核过 ② 收缩后池子主表 grep **不出现** `✅ / ⏳ / 💡` ③ 全部 ID 一个不少、引用零断裂 | 未开始 |
+| C43 | **隐藏技能守卫用例的子串误报**：`lib/skill/index.test.ts` 用 `catalog` 的**子串**包含判断，而隐藏技能 `teach` 是可见技能 `slidev` 描述里 "teaching materials" 的子串 ⇒ **产品行为是对的**（隐藏技能确实没进清单），错的是断言的匹配方式 | 2026-09-20 全量单测实测（C36 T1 验收时撞见；`git stash` 摘掉 T1 改动后照样红 ⇒ 非 C36 引入）+ 本机技能根实读（9 个 `disable-model-invocation: true`） | — | — | 未开始 |
 
 #### 7.3.4 项目级事项（不属于任何功能/优化）
 
