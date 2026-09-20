@@ -189,3 +189,13 @@ pwsh **每次都告诉我们"有错"**：错误写进 stderr，走管道时被�
 **它不报错、不给警告**，只是安静地给出**错误的行号和错误的内容** —— 与 C36 三个断点**同一场病**（工具静默给出错误结果，调用方看不出）。
 
 **顺带解开一个悬案**：DSH 的 `ENCODING_PREAMBLE`（`shell/pwsh-local/src/index.ts:49`，就是那个**双 pin**）在受限语言模式下**每条命令都报 `CannotCreateTypeConstrainedLanguage`** —— 所以那个 pin 在本机**根本没生效**。**这正是本文件 2026-08-26 那节记的坑，在 DSH 自己的 harness 上是活的**；我们的 `cmd + chcp 65001` 正是为绕开它。
+
+### 九、落地记录（施工补记）
+
+#### T1（2026-09-20 · commit `0fdd82c`）
+
+- **改动**：`lib/tools/bash/index.ts`（+`guidelines` 两条、`description` 补一句）+ **新增** `lib/tools/bash/index.test.ts`（5 条用例，从 `createBashTool()` 真实产出上断言，不手拼字符串）。
+- **红 → 绿**：改前 4 条挂（`guidelines` 是空串、`description` 里没有「合并」）→ 改后 `lib/tools` **23 文件 / 297 用例**全过；`tsc --noEmit` 0。
+- ⚠️ **施工中撞到的一个真实边界（下次写规矩还会撞）**：`lib/tools/index.test.ts:89` 的反引号扫描把**反引号包着的全小写单词**当工具名去核对 ⇒ 规矩正文里 `if` / `stdout` / `stderr` **不能加反引号**（加了当场红，而且报错信息看着像"提到了不存在的工具"）。`[类型]::静态方法()` / `-gt` / `$ExecutionContext…` 天然不在扫描范围（首字符不是小写字母）。
+- **一处刻意如此**：`description` 与 `guidelines` 各有一句「合并」—— 不是 C34 禁的重复：**`description` 答形状**（返回什么），**`guidelines` 答读法**（报错可能夹在中间，别只看结尾）。
+- **验收⑥ 的影响面已实测**：`app/api/chat/_pipeline/prompt/index.test.ts` 的断言只要求"投稿都渲染出来 + 条数 > 0"，不钉条数 ⇒ 加两条规矩不会撞它（真注册表那条用例已跑绿）。
