@@ -601,7 +601,7 @@ DSH 的手势正则是**严格 kebab-case + 空白边界**（`index.js:373`）�
 
 **现象**：`read_file`（只读、自动放行、**不弹审批**）读到了 `C:\Users\25082\.agents\skills\code-review\agents\openai.yaml` —— 而工作区在 `E:`。
 
-**根因（一行路径数学）**：`relative(root, target)` 在 Windows 上表达不出**跨盘符**的相对路径时，会**把 target 原样返回**（一个绝对路径）。旧判定是 `rel.startsWith("..")` → 绝对路径不以 `..` 开头 ⇒ **放行**。
+**根因（一行路径数学）**：`path.relative(root, target)` 在 Windows 上表达不出**跨盘符**的相对路径时，会**把 target 原样返回**（一个绝对路径）。旧判定是 `rel.startsWith("..")` → 绝对路径不以 `..` 开头 ⇒ **放行**。
 
 **为什么活了这么久**：老用例 `resolveInsideWorkspace("C:/fake/workspace", "C:/outside/x")` 是**同盘符**越界，挡得住。⭐ **测试覆盖的形状和真实的越界形状不一样** —— 夹具和工作区永远同盘，所以这条路径从来没被走过。
 

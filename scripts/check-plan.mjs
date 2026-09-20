@@ -3,26 +3,33 @@
  * 池子 ↔ 迭代 的一致性检查。
  *
  * 为什么要有它：手写的状态列**必然漂**（2026-09-14 实测 10 处不一致）——
- * 这个脚本把「记得同步」换成「跑一下就报」。（需求池的 C28 / C42）
+ * 这个脚本把「记得同步」换成「跑一下就报」。（需求池的 C28）
  *
  * 用法：
  *   node scripts/check-plan.mjs          检查；漂了 → 退出码 1
  *   node scripts/check-plan.mjs --list   顺便打印池子现状
  *
- * 三条约定（改文档时要跟着改的地方）：
- *   1. 池子行形如 `| C39 | … | 池中 |` —— 只认**最后一个 `|` 之前那一格**（行内可以有别的 `|`）
- *   2. 迭代文档头部有一行 `> **成员**：C36 · C35 · …`
- *   3. 迭代文档若含 `**例外**：`，跳过池子交叉检查
+ * 约定（改文档时要跟着改的地方）：
+ *   1. 池子行形如 `| C39 | … | 未开始 |` —— **格子数必须是 6**
+ *      （ID / 做什么 / 依据 / 详细设计 / 验收 / 状态）
+ *   2. **状态值域只有四个**（2026-09-18 用户定）：
+ *      `未开始` · `已纳入 <迭代或另一项>`（`已纳入 I1` / `已纳入 C24`）· `进行中` · `已交付`
+ *   3. 迭代文档头部有一行 `> **成员**：C36 · C35 · …`
+ *   4. 迭代文档若含 `**例外**：`，跳过池子交叉检查
  *      —— 唯一的例外是 `doc/iteration/i0.md`（self-hosting：它正是来让池子存在的）
  */
 
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const ITERATION_DIR = join(ROOT, "doc", "iteration");
-const LEGACY_MARKS = ["💡", "⏳"]; // 过渡期口径：这两个视同「池中」，见 PLAN.md 需求池顶部
+const POOL_CELL_COUNT = 6;
+/** 状态值域（PLAN.md 需求池顶部那份口径就是它）。 */
+const STATUS_RE = /^(未开始|进行中|已交付|已纳入\s+(I\d+|[A-Z]+\d+))$/;
+/** 已知例外：C38 已指派另一会话，它的状态格里还住着内容 —— 等那边落地再收进值域。 */
+const STATUS_EXCEPTIONS = { C38: "已指派另一会话（状态格里还住着内容）" };
 
 /** 取表格行最后一格的内容。行内的 `|` 不影响结果——从行尾往前找。 */
 function lastCell(line) {
@@ -40,7 +47,17 @@ function readPool() {
   text.split(/\r?\n/).forEach((line, index) => {
     const id = line.match(/^\| ([A-Z]+\d+) \|/);
     if (!id) return;
-    rows.push({ id: id[1], destination: lastCell(line), line: index + 1 });
+    const cells = line.trimEnd().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+    rows.push({
+      id: id[1],
+      cellCount: cells.length,
+      detail: cells[3] ?? "", // 第 4 格 =「详细设计」（导航：文件在哪）
+      acceptance: cells[4] ?? "", // 第 5 格 =「验收」—— **定案的门禁就是这一格**
+      status: lastCell(line), // 第 6 格 =「状态」（值域只有四个）
+      // 行内引用的详案文件 —— 用来查悬空引用
+      planRefs: [...line.matchAll(/doc\/plan\/[A-Za-z0-9._-]+\.md/g)].map((m) => m[0]),
+      line: index + 1,
+    });
   });
   return rows;
 }
@@ -63,76 +80,170 @@ function readIterations() {
   return found;
 }
 
-/** 迭代文件名 `i1.md` → 去向里的代号 `I1`（大小写不敏感地比）。 */
+/** 迭代文件名 `i1.md` → 状态里的代号 `I1`。 */
 function iterationCode(name) {
   return "I" + name.replace(/^i/, "").replace(/\.md$/, "");
 }
 
+/** 状态 → 它指向的迭代代号（`已纳入 I1` → `I1`；别的都返回 null）。 */
+function statusIteration(status) {
+  const m = status.match(/^已纳入\s+(I\d+)$/);
+  return m ? m[1] : null;
+}
+
+/** 状态 → 它指向的另一项 ID（`已纳入 C24` → `C24`；但 `I1` 不算 ID）。 */
+function statusAbsorbedBy(status) {
+  const m = status.match(/^已纳入\s+([A-Z]+\d+)$/);
+  if (!m) return null;
+  return /^I\d+$/.test(m[1]) ? null : m[1];
+}
+
 /**
- * 两条硬检查（漂了就失败）：
- *   ① 迭代列了某 ID，池子却没把它标成 `→ 对应迭代`
- *   ② 池子标了 `→ I<n>`，那个迭代却没列它
+ * 硬检查（漂了就失败）：
+ *   ① 迭代列了某 ID，池子那一格却不是「已纳入 本迭代 / 进行中 / 已交付」
+ *   ② 池子写「已纳入 I<n>」，却没有那个迭代文件、或那个迭代没列它
+ *   ③ 池子写「已纳入 <另一项>」，而那一项不在池子里
  */
 function check(pool, iterations) {
   const problems = [];
   const byId = new Map(pool.map((row) => [row.id, row]));
-  const listedIn = new Map(); // ID → [迭代文件名]
 
   for (const iteration of iterations) {
     const expected = iteration.selfHosting ? null : iterationCode(iteration.name);
     for (const id of iteration.members) {
-      if (!listedIn.has(id)) listedIn.set(id, []);
-      listedIn.get(id).push(iteration.name);
-
       const row = byId.get(id);
       if (!row) {
         problems.push(`${iteration.name} 列了 ${id}，但需求池里没有这一行`);
         continue;
       }
-      if (expected && row.destination !== `→ ${expected}`) {
+      if (!expected) continue;
+      const ok = statusIteration(row.status) === expected || row.status === "进行中" || row.status === "已交付";
+      if (!ok) {
         problems.push(
-          `需求池 ${id}（PLAN.md:${row.line}）去向是「${row.destination}」，` +
-            `但它已在 ${iteration.name} —— 应写成「→ ${expected}」`
+          `需求池 ${id}（PLAN.md:${row.line}）状态是「${row.status}」，但它已在 ${iteration.name} —— ` +
+            `应写成「已纳入 ${expected}」（或 进行中 / 已交付）`
         );
       }
     }
   }
 
   for (const row of pool) {
-    const target = row.destination.match(/^→\s*(I\d+)$/);
-    if (!target) continue;
-    const owner = `${target[1].toLowerCase()}.md`;
-    const iteration = iterations.find((i) => i.name === owner);
-    if (!iteration) {
-      problems.push(`需求池 ${row.id}（PLAN.md:${row.line}）写「${row.destination}」，但没有 ${owner} 这个迭代文件`);
-    } else if (!iteration.members.includes(row.id)) {
-      problems.push(`需求池 ${row.id} 写「${row.destination}」，但 ${owner} 的成员行里没有它`);
+    const code = statusIteration(row.status);
+    if (code) {
+      const owner = `${code.toLowerCase()}.md`;
+      const iteration = iterations.find((i) => i.name === owner);
+      if (!iteration) {
+        problems.push(`需求池 ${row.id}（PLAN.md:${row.line}）写「${row.status}」，但没有 ${owner} 这个迭代文件`);
+      } else if (!iteration.members.includes(row.id)) {
+        problems.push(`需求池 ${row.id} 写「${row.status}」，但 ${owner} 的成员行里没有它`);
+      }
+      continue;
+    }
+    const absorbed = statusAbsorbedBy(row.status);
+    if (absorbed && !byId.has(absorbed)) {
+      problems.push(`需求池 ${row.id}（PLAN.md:${row.line}）写「${row.status}」，但池子里没有 ${absorbed} 这一项`);
     }
   }
 
   return problems;
 }
 
+/** 状态必须在值域里（四个值）。例外见 STATUS_EXCEPTIONS，只报不失败。 */
+function checkStatusDomain(pool) {
+  const problems = [];
+  for (const row of pool) {
+    if (STATUS_EXCEPTIONS[row.id]) continue;
+    if (!STATUS_RE.test(row.status)) {
+      problems.push(
+        `需求池 ${row.id}（PLAN.md:${row.line}）状态是「${row.status}」，不在值域里` +
+          `（未开始 / 已纳入 <迭代或另一项> / 进行中 / 已交付）`
+      );
+    }
+  }
+  return problems;
+}
+
+/**
+ * 池子行的形状：必须 6 格。
+ * 为什么值得单列一条：多出来的那格是**旧状态位没删**（`⏳ 排队` 后面又追一个 `已纳入 I1`）——
+ * 它不影响 `lastCell` 取到正确状态，但**同一行里躺着两个状态**，正是底部那句
+ * 「每个值只在一次动作里变一次 —— 所以它不会漂」要防的东西。
+ * （2026-09-18 手工体检抓出 C36 / C24 两行，才补上这条检查。）
+ */
+function checkRowShape(pool) {
+  const problems = [];
+  for (const row of pool) {
+    if (row.cellCount !== POOL_CELL_COUNT) {
+      problems.push(
+        `需求池 ${row.id}（PLAN.md:${row.line}）有 ${row.cellCount} 格，应为 ${POOL_CELL_COUNT} 格` +
+          `（ID / 做什么 / 依据 / 详细设计 / 验收 / 状态）—— 多出来的通常是没删干净的旧状态`
+      );
+    }
+  }
+  return problems;
+}
+
+/** 池子行指向的详案文件必须真实存在 —— 「一个错的索引比没有索引更糟」。 */
+function checkPlanFileRefs(pool) {
+  const problems = [];
+  for (const row of pool) {
+    for (const ref of row.planRefs) {
+      if (!existsSync(join(ROOT, ref))) {
+        problems.push(`需求池 ${row.id}（PLAN.md:${row.line}）指向 ${ref}，但那个文件不存在`);
+      }
+    }
+  }
+  return problems;
+}
+
+/**
+ * 「有文件」≠「能开工」：已进迭代（或已开工）的项，**验收格非 `—`** 才算定案。
+ * 现在只当提示（I1 正在跑、按顺序补详案是既定计划）；等模型稳定后升为失败。
+ * 为什么不查文件里的小标题：C33 的详案是 `c8-skills.md` 的 11.2 节，标题里没有「详细设计」四个字 ⇒ 猜就会误报。
+ */
+function planReadinessHints(pool) {
+  const hints = [];
+  for (const row of pool) {
+    if (!statusIteration(row.status) && row.status !== "进行中") continue;
+    if (row.acceptance === "—" || row.acceptance === "") {
+      hints.push(`${row.id} 的「验收」格还是空的 ⇒ 没定案，不许开工`);
+    }
+  }
+  return hints;
+}
+
 function main() {
   const pool = readPool();
   const iterations = readIterations();
-  const problems = check(pool, iterations);
-  const legacy = pool.filter((row) => LEGACY_MARKS.some((m) => row.destination.includes(m)));
+  const problems = [
+    ...check(pool, iterations),
+    ...checkPlanFileRefs(pool),
+    ...checkRowShape(pool),
+    ...checkStatusDomain(pool),
+  ];
+  const hints = planReadinessHints(pool);
+  const count = (re) => pool.filter((row) => re.test(row.status)).length;
 
   if (process.argv.includes("--list")) {
-    const extracted = pool.filter((row) => /^→\s*I\d+$/.test(row.destination));
-    const done = pool.filter((row) => row.destination.startsWith("✅"));
-    console.log(`池子 ${pool.length} 行：池中 ${pool.length - extracted.length - done.length}` +
-      ` / 已提取 ${extracted.length} / 已交付 ${done.length}`);
+    const absorbed = pool.filter((row) => statusAbsorbedBy(row.status)).length;
+    const inIteration = pool.filter((row) => statusIteration(row.status)).length;
+    console.log(
+      `池子 ${pool.length} 行：未开始 ${count(/^未开始$/)} / 已纳入 ${inIteration + absorbed}` +
+        `（迭代 ${inIteration} · 被并入 ${absorbed}）/ 进行中 ${count(/^进行中$/)} / 已交付 ${count(/^已交付$/)}`
+    );
     for (const iteration of iterations) {
       console.log(`  ${iteration.name}：${iteration.selfHosting ? "（self-hosting 例外）" : iteration.members.join(" · ") || "（空）"}`);
     }
+    const exceptions = Object.entries(STATUS_EXCEPTIONS).filter(([id]) => pool.some((r) => r.id === id));
+    if (exceptions.length > 0) {
+      console.log(`  值域例外：${exceptions.map(([id, why]) => `${id}（${why}）`).join("；")}`);
+    }
   }
 
-  if (legacy.length > 0) {
-    // 过渡期提示，不是失败：等 C42（表结构收缩）落地后才升为失败。
-    console.log(`提示：${legacy.length} 行还在用旧状态位（${LEGACY_MARKS.join(" / ")}）——` +
-      `按过渡期口径视同「池中」，见 PLAN.md 需求池顶部。`);
+  if (hints.length > 0) {
+    // 提示，不是失败：I1 正在跑，成员按顺序补详案是既定计划。
+    console.log(`提示：${hints.length} 项已进迭代但还没定案 ——`);
+    for (const hint of hints) console.log(`  · ${hint}`);
   }
 
   if (problems.length === 0) {

@@ -146,3 +146,11 @@ Codex 源码确认（`FuzzyFileSearchMatchType.ts`）：匹配类型 = `"file" |
 
 - Codex: `E:\agents-read\codex\codex-rs\tui\src\mention_codec.rs` / `fuzzy_file_search.rs` / `completion_target.rs`
 - pi: `E:\agents-read\pi\node_modules\@earendil-works\pi-coding-agent\src\cli\file-processor.ts` / `pi-tui\src\autocomplete.ts`
+
+---
+
+## 从 PLAN.md 状态格搬入（2026-09-18）—— **C14**
+
+> 原文照搬（AGENTS.md 第 10 条 ②：只搬事实）。原格全文如下：
+
+⏳ 排队（详案 `doc/plan/c14-file-mention.md`：**含 A/B/C 方案对比与选 A 理由 + 效率实测（379 文件 7ms / 17k 文件 81ms，按真实工作区场景，**排除依赖是必须项**）+ debounce + 文件夹支持**；符号 @ 可配置不写死）

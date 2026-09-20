@@ -110,7 +110,7 @@ pwsh **每次都告诉我们"有错"**：错误写进 stderr，走管道时被�
 | | stdout/stderr | 模型怎么知道失败 |
 |---|---|---|
 | **pi** | 合并（`description` 明说 `Returns combined stdout and stderr`） | `exitCode !== 0` → **抛错**，输出拼进错误消息（`harness/tools/bash.ts:137-141`） |
-| **codex** | `stdout` / `stderr` / `aggregated_output` **三个字段**（分开 + 保序合并**都给**） | `exit_code == 0 ? Completed : Failed`（`core/src/tools/events.rs:540-544`） |
+| **codex** | `stdout` / `stderr` / `aggregated_output` **三个字段**（分开 + 保序合并**都给**）；而 Windows 沙箱侧的 spawn 原语把"怎么接"做成**可选项** —— `StderrMode { MergeStdout, Separate }`（`windows-sandbox-rs/src/process.rs:200-205`，2026-09-18 从 `PLAN.md` 的 C36 行搬入并回读一手源码核对） | `exit_code == 0 ? Completed : Failed`（`core/src/tools/events.rs:540-544`） |
 | **DSH** | **两条 collect 流**；给模型时合并并打 **`[stderr]`** 段标（`shell/bash-local/src/index.ts:337-339`） | **`[exit code: N]` 标记后缀**，`isError` 只给 spawn 错误/中止（`shell/tool-bash/src/render.ts:53-57`） |
 | **opencode** | `stdout` / `stderr` / `all` 三视图 | **不告诉模型**（exit 只进 UI 的 `metadata.exit`；`<shell_metadata>` 只管超时/中止，`tool/shell.ts:582-592`） |
 | **Reasonix** | ⭐ **合并（同一个 writer）** —— `cmd.Stdout` 与 `cmd.Stderr` 指向**同一个** `io.MultiWriter`（`internal/shellrun/runner.go:112-120`） | `State`（Completed / Failed / TimedOut / Cancelled）+ `FailurePhase` + `Err`；**仅在失败时**给 `OutputTail`，成功时清空（`runner.go:62-77,171-188`） |

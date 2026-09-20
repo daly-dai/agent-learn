@@ -158,5 +158,14 @@ PLAN 九节写着"漂亮动画 / 复杂 UI"暂缓。这次只做了排版与信�
 
 > 与 DSH 版的差异：DSH 有"非平凡改动必须带 Agent Note 进同 PR"——我们已有等价物（过程日志，AGENTS.md 11.5 ⑧），故合入第 7 步；DSH 的"Component tests feed props directly"我们留到 B8 落地。
 
+---
 
+## 从 `PLAN.md` 需求池搬入（2026-09-18）—— **B3**
 
+> 把 `PLAN.md` 池子行里属于**内容**的部分原文搬进来（`AGENTS.md` 第 10 条 ②：只搬事实、不发明方案）。上面 `---` 之前是文件原有内容。
+
+**B3 · 需求（做什么）**：**UI V2：尺度升级 + 原语库**（2026-08-26 用户 UI 反馈触发：按钮太小、小家子气、溢出操作进 dropdown）：① 全面板尺度升级（按钮 ≥34px 命中区、字号上提、留白加大）② 第一个原语 = **下拉菜单 Menu**（溢出操作归集：顶栏「⋯」、会话行「⋯」、面板头部）③ 面板 chrome 统一（头部 = 标题 + 读数 + 操作区）④ dialog/collapse/select/stepper… 后续按需 ⑤ **精读 DSH `packages/client/AGENTS.md`**（约束 AI 写前端的教材；约束纪律见 `doc/plan/ui-design.md` §10.6）
+
+**B3 · 依据**：DSH `dsh-client-ui-primitives` + Reasonix 面板族（走读 18）
+
+**B3 · 状态格原文（整格照搬）**：⏳ 进行中（①②落地；08-27：原语评估全出局 + 删除确认行内化 + keys.ts + 等宽 12px 收口 + SessionRow 抽取 + **⑤精读完成**（对照表 `doc/知识点-04` + 新组件 checklist §10.9））

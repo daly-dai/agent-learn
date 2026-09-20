@@ -277,3 +277,15 @@ updateRepo(name): Promise<UpdateResult>                      // POST /api/repos�
   - **业务模块**放 `app/api/<模块>/_lib/`（`_` 前缀非路由，先例 `_pipeline`）+ 页面 + services，3 处目录
   - repo 从 `lib/repos/` 迁到 `app/api/repos/_lib/`（本详案所有路径随之更新：_lib/registry、_lib/git…）
   - 删一个业务模块 = 删 3 处目录，不影响 agent 内核；内核红线（lib/agent.ts）不变
+
+---
+
+## 竣工记录（2026-09-18 从 `PLAN.md` 需求池搬入）
+
+> 这一行的实质内容原先只写在需求池那一格里，详案里没有 ⇒ 搬进来再压池子行。
+
+**验收**：✅ 完成（2026-09-01 单测落地）—— 5 文件 36 用例全绿。
+
+**施工中修掉的 3 个根因**：① `vitest.config` 缺 `@/` alias ② `vi.mock` TDZ ③ git 测试缺裸远端。
+
+**顺带逮住的生产死代码**：`summarize.ts` 的截断提示永不触发（测试发现，已修）。

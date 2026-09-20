@@ -17,3 +17,9 @@
 
 - 全量 17 文件 118 用例全绿（含新增 `bash-runner.test.ts` 7 用例、`summarize.test.ts` 9 用例、`store.test.ts` 7 用例）。
 - **沙箱经验**：vitest spawn 子进程在受限沙箱被 EPERM 拦截，测 bash-runner 要 `sandbox_permissions: "danger-full-access"`。
+
+---
+
+## 竣工记录（2026-09-18 从 `PLAN.md` 需求池搬入）
+
+**验收**：✅ tools 全测过、`pnpm test` 绿（落地时 **23 文件 188 用例**；后续规模见 `AGENTS.md` 6.5 的自查判据）。
