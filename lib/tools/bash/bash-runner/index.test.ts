@@ -11,7 +11,7 @@
 // ============================================================
 
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
-import { buildWindowsCommandLine } from ".";
+import { bashProcessEnv, buildWindowsCommandLine } from ".";
 
 const ORIGINAL_PWSH_PATH = process.env.PWSH_PATH;
 
@@ -74,5 +74,44 @@ describe("buildWindowsCommandLine", () => {
   it("PWSH_PATH 未设置时回退到 PATH 里的 pwsh", () => {
     const line = buildWindowsCommandLine("Write-Output 'hi'");
     expect(line).toContain(" & pwsh -NoProfile");
+  });
+});
+
+// ============================================================
+// bashProcessEnv —— 在源头抑制颜色与分页器（C36 T2a）
+// ============================================================
+// 抄 DSH 的那一组（它注释里写着 "the same set Codex hardcodes"）。
+// 为什么放源头而不是靠洗：颜色先别产生，就不用再洗一遍——
+// 而 CLIXML 里那些 `_x001B_[31;1m` 正是"产生出来之后才要洗"的代价。
+
+describe("bashProcessEnv", () => {
+  // 夹具 = 真实的 `process.env` 展开（这正是生产调用方传进来的东西）。
+  // ⚠️ 别手编一个 `{ PATH: "x" }`：本项目的 `ProcessEnv` 类型把 `NODE_ENV` 定成必填
+  // （Next.js 的类型增强），手编会撞类型错——**那不是类型在找麻烦，是它在提醒
+  // "环境变量表不是随便一个字面量"**。
+  it("注入 NO_COLOR / TERM=dumb / PAGER=cat / GIT_PAGER=cat", () => {
+    expect(bashProcessEnv({ ...process.env })).toMatchObject({
+      NO_COLOR: "1",
+      TERM: "dumb",
+      PAGER: "cat",
+      GIT_PAGER: "cat",
+    });
+  });
+
+  it("继承调用方环境（PATH / PWSH_PATH 一个都不能丢）", () => {
+    const env = bashProcessEnv({
+      ...process.env,
+      PATH: "C:\\bin",
+      PWSH_PATH: "C:\\pwsh.exe",
+    });
+    expect(env.PATH).toBe("C:\\bin");
+    expect(env.PWSH_PATH).toBe("C:\\pwsh.exe");
+  });
+
+  it("不改传进来的那个对象（纯函数，别在调用方身上写副作用）", () => {
+    const base = { ...process.env, PATH: "x" };
+    const before = { ...base };
+    bashProcessEnv(base);
+    expect(base).toEqual(before);
   });
 });

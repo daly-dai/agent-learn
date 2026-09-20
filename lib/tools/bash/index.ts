@@ -10,6 +10,27 @@
 import type { RegisteredTool } from "../types";
 import { BashRunner } from "./bash-runner";
 import { text } from "../../message";
+import { readPwshErrors, stripPwshClixml } from "../../process-output";
+
+/**
+ * 把子进程的原始输出整理成**给模型看**的正文（C36 T2，纯函数）。
+ *
+ * 判据只有一条：**只信 stderr**。CLIXML 的样文我们自己的文档里就抄着
+ * （`doc/plan/phase-4-bash.md` 第二节），模型一条 `Get-Content` 就会把它打到
+ * **stdout** 上 —— 若按"合并输出里出现 `#< CLIXML`"判定，就会把一份**正常读出来的
+ * 文档**当成报错并**改写**它（把正文换成"[pwsh 报错 ×20]"）。
+ * 所以：报错只看 `stderr`（CLIXML 的家），而摘掉机器话则要动合并输出那一份。
+ *
+ * 摘掉的理由（不是洁癖）：真样本是**同一条报错写 20 遍**，它把信号埋了；
+ * 解出来的那一句 + "×20"才是信息。
+ */
+export function cleanBashOutput(output: string, stderr: string): string {
+  const errors = readPwshErrors(stderr);
+  if (!errors) return output;
+
+  const body = stripPwshClixml(output).trim();
+  return body.length > 0 ? `${body}\n\n${errors.summary}` : errors.summary;
+}
 
 export function createBashTool(workspaceRoot: string): RegisteredTool {
   const runner = new BashRunner();
@@ -63,11 +84,14 @@ export function createBashTool(workspaceRoot: string): RegisteredTool {
           ? ""
           : `\n[命令退出码：${result.exitCode}]`;
 
+      // 给人看的正文：CLIXML 解成人话、同一条报错的 20 遍收成「×20」（T2）
+      const visibleOutput = cleanBashOutput(result.output, result.stderr);
+
       return {
         content: [
           text(
-            result.output.length > 0
-              ? `${result.output}${statusNote}`
+            visibleOutput.length > 0
+              ? `${visibleOutput}${statusNote}`
               : `(无输出)${statusNote}`,
           ),
         ],

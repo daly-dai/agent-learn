@@ -65,3 +65,83 @@ export function createOutputDecoder(encoding = "utf-8"): OutputDecoder {
     },
   };
 }
+
+// ============================================================
+// pwsh 的报错信封：CLIXML → 人话（C36 T2）
+// ============================================================
+//
+// 为什么住这一层：这仍是"子进程输出"的事 —— 谁 spawn pwsh 都会遇到
+// （C9 的 python 执行器同样需要把 stderr 变成人话）。
+//
+// 背景（真样本见 `test-fixtures.ts`）：pwsh 的报错走管道会被序列化成 CLIXML，
+// 里面套着 ANSI 色码与 `_xHHHH_` 转义。我们**收下了、没解、也没看** ——
+// 于是"20 个文件全报错"在模型眼里是「成功」，在屏幕上是一坨看不懂的 XML。
+//
+// 为什么必须去重：真样本里同一条报错重复 **20 遍**，噪音把信号埋了；
+// **「×20」才是信息**。
+
+export type PwshErrorReport = {
+  /** 去重**前**的报错条数（真样本是 20）——"同一条发生了多少次"本身是信息 */
+  count: number;
+  /** 去重后的人话，按首次出现顺序 */
+  messages: string[];
+  /** 给模型看的现成一段：`[pwsh 报错 ×20]` + 换行 + 人话 */
+  summary: string;
+};
+
+/** pwsh 把错误流序列化成 CLIXML 时，文本以这七个字符开头 */
+const CLIXML_MARKER = "#< CLIXML";
+
+/**
+ * 认 CLIXML → 解出每条报错（解转义 + 去 ANSI + 去重计数）。
+ * **不认得就返回 `null`**（没有 CLIXML 标记、或一条 Error 都没有）——
+ * 调用方照原样用它的文本，**不吞信息**。
+ */
+export function readPwshErrors(text: string): PwshErrorReport | null {
+  if (!text.includes(CLIXML_MARKER)) return null;
+
+  const entries = [...text.matchAll(/<S S="Error">([\s\S]*?)<\/S>/g)].map((match) =>
+    decodeClixmlEntry(match[1]),
+  );
+  if (entries.length === 0) return null;
+
+  // 去重按**内容**：同一条报错重复 20 遍只留一句，但计数保留 20
+  const messages = [...new Set(entries.filter((entry) => entry.length > 0))];
+  const body = messages.length > 0 ? `\n${messages.join("\n")}` : "";
+
+  return {
+    count: entries.length,
+    messages,
+    summary: `[pwsh 报错 ×${entries.length}]${body}`,
+  };
+}
+
+/**
+ * 把 CLIXML 的**信封**从文本里摘掉：报错条目、`#< CLIXML` 头、`<Objs …>` / `</Objs>` 壳。
+ * 其余内容（stdout 正文、非 Error 的记录）原样保留。
+ *
+ * ⚠️ **调用前必须先确认这是真报错**（`readPwshErrors(stderr)` 非 null）——
+ * 这个函数本身不判断来源，它只是"把这一段机器话拿掉"。判据在调用方：
+ * **只信 stderr**（CLIXML 的家），stdout 里出现同形文本是**内容**不是报错。
+ */
+export function stripPwshClixml(text: string): string {
+  return text
+    .replace(/<S S="Error">[\s\S]*?<\/S>/g, "")
+    .replace(/#< CLIXML\s*/g, "")
+    .replace(/<Objs\b[^>]*>\s*/g, "")
+    .replace(/<\/Objs>\s*/g, "");
+}
+
+/**
+ * 解一条 CLIXML 报错：`_xHHHH_` 转义 → ANSI 色码 → 行尾 \r。
+ * 顺序不能换：`_x001B_` 解出来**才是** ESC，先解后洗才洗得掉 `_x001B_[31;1m`。
+ */
+function decodeClixmlEntry(raw: string): string {
+  return raw
+    .replace(/_x([0-9a-fA-F]{4})_/g, (_, hex: string) =>
+      String.fromCharCode(parseInt(hex, 16)),
+    )
+    .replace(/\x1b\[[0-9;]*m/g, "")
+    .replace(/\r/g, "")
+    .trim();
+}

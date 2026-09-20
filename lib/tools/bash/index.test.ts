@@ -15,7 +15,11 @@
 // ============================================================
 
 import { describe, expect, it } from "vitest";
-import { createBashTool } from ".";
+import { cleanBashOutput, createBashTool } from ".";
+import {
+  REAL_PWSH_MESSAGE,
+  REAL_PWSH_STDERR,
+} from "../../process-output/test-fixtures";
 
 /** 复核夹具：工厂只捕获工作区根（T1 的断言不碰它），取当前目录即可 */
 const tool = createBashTool(process.cwd());
@@ -52,5 +56,45 @@ describe("bash 的 description（工具是什么，随 tools 字段发给模型�
   it("原有内容一条不少（Windows 环境的既有指引不许静默丢）", () => {
     expect(tool.description).toMatch(/PowerShell/);
     expect(tool.description).toMatch(/确认/); // 执行前弹框
+  });
+});
+
+// ============================================================
+// 输出的"解人话"（C36 T2）
+// ============================================================
+// 这里测的是**判据**：什么时候该把 CLIXML 换成人话、什么时候一个字都不许动。
+// 为什么这个判据值钱：CLIXML 样文**我们自己的文档里就有**
+// （`doc/plan/phase-4-bash.md` 第二节抄着那段原文），模型一条 `Get-Content` 就会
+// 把它打到 **stdout** 上 —— 若按"合并输出里出现 `#< CLIXML`"判定，
+// 我们会把一份**正常读取的文档**当成报错并改写它。所以只认 **stderr**。
+
+describe("cleanBashOutput —— 只信 stderr，stdout 里的同形文本是内容", () => {
+  it("stderr 真有 CLIXML → 机器话摘掉、换成人话摘要", () => {
+    const text = cleanBashOutput(REAL_PWSH_STDERR, REAL_PWSH_STDERR);
+    expect(text).toContain(`[pwsh 报错 ×20]`);
+    expect(text).toContain(REAL_PWSH_MESSAGE);
+    expect(text).not.toContain("#< CLIXML");
+  });
+
+  it("⭐ stdout 里出现同形文本、stderr 干净 → 原样返回（不是报错）", () => {
+    // 真实场景：模型 `Get-Content doc/plan/phase-4-bash.md`（那段样文就抄在里面）
+    const dumped = `…正文…\n${REAL_PWSH_STDERR}\n…正文…`;
+    expect(cleanBashOutput(dumped, "")).toBe(dumped);
+  });
+
+  it("普通输出 + 空 stderr → 一个字都不动", () => {
+    const plain = "review-lib.diff : 3682\nreview-app.diff : 2860\n";
+    expect(cleanBashOutput(plain, "")).toBe(plain);
+  });
+
+  it("正文与报错混在一起：正文留下、报错变人话、顺序不变", () => {
+    const text = cleanBashOutput(
+      `开始跑\n${REAL_PWSH_STDERR}\n跑完了\n`,
+      REAL_PWSH_STDERR,
+    );
+    expect(text).toContain("开始跑");
+    expect(text).toContain("跑完了");
+    expect(text).toContain(`[pwsh 报错 ×20]`);
+    expect(text.indexOf("开始跑")).toBeLessThan(text.indexOf("[pwsh 报错"));
   });
 });

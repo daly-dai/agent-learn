@@ -34,6 +34,15 @@ export type BashRunOptions = {
 export type BashResult = {
   /** 截断后的合并输出（stdout + stderr） */
   output: string;
+  /**
+   * 同一批输出里**只属于 stderr** 的那一份（截断规则与 `output` 相同）。
+   *
+   * 为什么要单独留一份（C36 T2b）：两个流合并是对的（保序，Reasonix 的反面理由），
+   * 但"合并"不等于"分不清" —— `proc.stderr` 本来就知道来源，多攒一份是零成本。
+   * **消费者**：`lib/process-output` 的 CLIXML 解码只认这一份 ——
+   * stdout 里出现的同形文本是**内容**（我们的文档里就抄着那段样文），不是报错。
+   */
+  stderr: string;
   /** 退出码；被终止/取消时为 null */
   exitCode: number | null;
   /** 是否被终止（超时或用户取消） */
@@ -86,6 +95,49 @@ export function buildWindowsCommandLine(command: string): string {
   return `chcp 65001 >nul & ${pwsh} -NoProfile -EncodedCommand ${encoded}`;
 }
 
+/**
+ * 子进程环境：在**源头**抑制颜色与分页器（C36 T2a，抄 DSH —— 它注释里写着
+ * "the same set Codex hardcodes"）。
+ *
+ * 为什么放源头而不是靠事后洗：**先别产生，就不用洗**。CLIXML 里那些
+ * `_x001B_[31;1m` 正是"产生出来之后才要洗"的代价 —— 而我们洗它的唯一手段是正则。
+ * `PAGER` / `GIT_PAGER` 设成 `cat`：分页器会把输出吞在它自己的界面里，
+ * 而我们的 stdin 是 ignore 的（按不了 q），真卡住就只能等超时。
+ */
+export function bashProcessEnv(
+  base: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  return { ...base, NO_COLOR: "1", TERM: "dumb", PAGER: "cat", GIT_PAGER: "cat" };
+}
+
+/**
+ * 滚动缓冲：始终保留最新，超限丢最旧（防一条命令吐几 MB）。
+ * 抽出来的原因只有一个：**合并输出与 stderr 各要一个**（T2b 要单独留 stderr），
+ * 两处各写一遍"丢最旧"迟早会写歪一处。
+ */
+function createRollingBuffer(maxChars: number) {
+  const chunks: string[] = [];
+  let totalChars = 0;
+  let truncated = false;
+
+  return {
+    push(text: string): void {
+      chunks.push(text);
+      totalChars += text.length;
+      while (totalChars > maxChars && chunks.length > 1) {
+        totalChars -= chunks.shift()!.length;
+        truncated = true;
+      }
+    },
+    get truncated(): boolean {
+      return truncated;
+    },
+    text(): string {
+      return chunks.join("");
+    },
+  };
+}
+
 export class BashRunner {
   async run(command: string, options: BashRunOptions): Promise<BashResult> {
     return new Promise((resolve) => {
@@ -100,27 +152,23 @@ export class BashRunner {
               {
                 cwd: options.cwd,
                 stdio: ["ignore", "pipe", "pipe"],
+                env: bashProcessEnv(),
               },
             )
           : spawn("bash", ["-c", command], {
               cwd: options.cwd,
               stdio: ["ignore", "pipe", "pipe"],
+              env: bashProcessEnv(),
             });
 
       // ---- 滚动缓冲：始终保留最新，超限丢最旧 ----
-      const chunks: string[] = [];
-      let totalChars = 0;
-      let truncated = false;
-
+      // 两份：一份是模型看到的合并输出，一份是单独留的 stderr（见 BashResult.stderr）
       const maxChars = options.maxOutputChars ?? DEFAULT_MAX_OUTPUT_CHARS;
+      const outputBuffer = createRollingBuffer(maxChars);
+      const stderrBuffer = createRollingBuffer(maxChars);
+
       const push = (text: string) => {
-        chunks.push(text);
-        totalChars += text.length;
-        while (totalChars > maxChars && chunks.length > 1) {
-          const removed = chunks.shift()!;
-          totalChars -= removed.length;
-          truncated = true;
-        }
+        outputBuffer.push(text);
         options.onChunk?.(text);
       };
 
@@ -137,9 +185,12 @@ export class BashRunner {
       proc.stdout?.on("data", (data: Buffer) =>
         push(sanitize(stdoutDecoder.decode(data))),
       );
-      proc.stderr?.on("data", (data: Buffer) =>
-        push(sanitize(stderrDecoder.decode(data))),
-      );
+      // stderr 走两个缓冲：既进合并输出（保序），也单独留一份（CLIXML 解码只认它）
+      proc.stderr?.on("data", (data: Buffer) => {
+        const chunk = sanitize(stderrDecoder.decode(data));
+        stderrBuffer.push(chunk);
+        push(chunk);
+      });
 
       // ---- 终止进程：Windows 杀进程树，Unix 两级（SIGTERM → 5 秒后 SIGKILL）----
       let killed = false;
@@ -170,14 +221,20 @@ export class BashRunner {
       proc.on("close", (code) => {
         clearTimeout(timer);
         options.signal?.removeEventListener("abort", killProcess);
-        // 流结束：吐出两个 decoder 里可能残留的半个字符
-        const tail = stdoutDecoder.flush() + stderrDecoder.flush();
-        if (tail.length > 0) push(sanitize(tail));
+        // 流结束：吐出两个 decoder 里可能残留的半个字符（各自归各自那一份）
+        const stdoutTail = sanitize(stdoutDecoder.flush());
+        if (stdoutTail.length > 0) push(stdoutTail);
+        const stderrTail = sanitize(stderrDecoder.flush());
+        if (stderrTail.length > 0) {
+          stderrBuffer.push(stderrTail);
+          push(stderrTail);
+        }
         resolve({
-          output: chunks.join(""),
+          output: outputBuffer.text(),
+          stderr: stderrBuffer.text(),
           exitCode: killed ? null : code,
           cancelled: killed,
-          truncated,
+          truncated: outputBuffer.truncated,
         });
       });
     });
