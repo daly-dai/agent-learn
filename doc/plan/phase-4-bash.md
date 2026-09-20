@@ -228,3 +228,21 @@ pwsh **每次都告诉我们"有错"**：错误写进 stderr，走管道时被�
 - **验收读数**：`lib/tools/bash` + `lib/process-output` **3 文件 / 45 用例**全过；`tsc --noEmit` 0；全量 **736 passed / 1 failed**（那条是**既有假红**：`lib/skill/index.test.ts` 的隐藏技能守卫按子串匹配，隐藏技能 `teach` 是 `slidev` 描述里 "teaching materials" 的子串 —— 与 C36 无关，`git stash` 验过，已入池 **C43**）。
 - **明确没做**（划界，理由见第六节）：输出落盘 / 改限额语义（C22→C24 与 B7）；注入 `$ErrorActionPreference='Stop'`（会改用户命令的行为）；改成 pi 那样抛错。
 - **红线自检**：三个 commit 的 `git diff --cached --name-only` 都不含 `lib/agent/index.ts`（本项不涉及引擎）。
+
+### 十、真机验收清单（2026-09-20 加 · **待用户跑**）
+
+> 为什么还要这一步：前面所有证据都是**代码层**（45 用例）与**真 spawn 探针**（真 CLIXML）。
+> 但 C36 的验收判据是"**模型据此改行为**"—— 那要模型自己在真实链路里跑一条命令才算数。
+> ⚠️ 沙箱起不了 dev server（`next dev` fork 报 EPERM），所以只能由用户在本地跑。
+>
+> **准备**：`pnpm dev` → `localhost:3000`；确认 `MOCK_MODE=false` 且 `DEEPSEEK_API_KEY` 在环境里
+> （`.env.local` 里没有 key，key 在用户 shell）。bash 每次会弹审批框 → 批准。
+
+| # | 发什么 | 期望（过） | 失败长相 |
+|---|---|---|---|
+| **S1** | 「用 bash 跑这条命令，然后告诉我它成功了吗：`1..3 \| ForEach-Object { [Math]::Min(1,2) }`」 | ① 工具结果里有 `[pwsh 报错 ×3]` + `InvalidOperation: 无法调用方法。…` + `[退出码为 0，但 stderr 有 3 条报错]` ② **模型说"这条命令报错了/失败了"** | 工具结果是一坨 `#< CLIXML …`；或模型说"执行成功" |
+| **S2** | 「用 bash 在 `PLAN.md` 里搜一个肯定不存在的词 `zzz不存在zzz`」 | 尾部是 `[命令退出码：1]`，且**模型理解为"没找到"**（不是"工具崩了"） | 模型把"没匹配"说成失败/崩溃 |
+| **S3** | 「用 bash 把 `doc/plan/phase-4-bash.md` 里含 `CLIXML` 的行原样抓出来」 | 那些行**原样**出现（`#< CLIXML…` / `<S S="Error">…`），**没有**被换成「[pwsh 报错 ×N]」，也没有 `[退出码为 0，但 stderr 有 N 条报错]` | 文档内容被**改写**成报错摘要 ⇒ 说明判据又看回合并输出了 |
+| **S4**（观察项，非硬判据） | 「用 bash 统计 `PLAN.md` 里最长的行有多少字符」 | 理想：它不再写 `[Math]::Max(...)`（受限模式禁区），改用管道（如 `Measure-Object -Maximum`）；若仍踩，**它自己认得这条报错并改写法**（规矩给了替代写法与自查手段） | 踩了禁区、且把报错当"成功"、不换写法 |
+
+**报告粒度**：逐条说"过 / 没过"，**贴工具结果原文最好**（那是能回填 `.traces/` 的证据）。S1 是主判据，S3 是"判据只信 stderr"的端到端验证。
