@@ -119,6 +119,11 @@
 - **沙箱里能跑 vitest，但要走这条路**：`pnpm test` 挂在 vite 加载配置这一步（`optimizeSafeRealPathSync` 在 Windows 上 `exec("net use")`，撞命名管道 → `spawn EPERM`，**不是测试失败**）→ 授权 `danger-full-access` 后跑 `node node_modules/vitest/vitest.mjs run --pool=threads`（6 秒跑完全套）。**意义：AI 能自己跑 TDD——先看到红，再看到绿。**
 - `tsc --noEmit` 沙箱可跑（exit 0）。
 
+**真机验收（浏览器里让模型跑命令）** ⚠️ 2026-09-20 连栽两次，教训写在这里
+- ⭐ **应用的工作区根 ≠ 仓库根**：`lib/config/index.ts` 的默认值是 `resolve(process.cwd(), "workspace")`，即 **`<仓库>/workspace`**（`WORKSPACE_ROOT` 可覆盖，`.env.local` 里目前没设）。**文件工具的围栏、bash 的 `cwd` 全在它里面** ⇒ 验收命令里写 `PLAN.md` / `doc/plan/*.md` 就是**围栏外的路径**：模型读不到、相对路径也根本不存在。**能自包含的命令最稳（不读文件）**；要读就读工作区内的（如 `workspace/README.md`）。
+- ⭐ **期望值必须自己先跑出来**，不许写"我以为会怎样"（第一版清单里两条期望当场被用户打回）：① `[Math]::Min(1,2)` 只在**受限语言模式的机器**上才报错 —— 环境依赖，换台机器这条判据**永远过不了门槛** ② `Select-String` 无匹配在 **pwsh 里退出码是 0**（把 bash `grep` 的"无匹配 → 1"当成了 pwsh 行为，那条必然红）。
+- 顺带记两条 pwsh 事实（C36 实测）：**造"退出码 0 但有报错"的确定性写法 = `1..3 | ForEach-Object { Write-Error "boom" }`** —— 错误流经原生重定向时 PowerShell **总是**序列化成 CLIXML（`Write-Error` / `Get-Item 不存在路径` / `throw` / 受限模式报错，四种都产出），**任何 Windows 机器都能复现**；解那个信封要先解 `_xHHHH_` 转义再洗 ANSI（实现见 `lib/process-output/`）。
+
 **判退出码 / 判"干净"**
 - ⚠️ **`node … 2>&1 | Select-Object -Last N` 会让 `$LASTEXITCODE` 变成 1**（PowerShell 把原生 stderr 当错误记录）——**"全绿但退出码 1"就是这么来的假象**。要判真实退出码：重定向到文件，再单独读 `$LASTEXITCODE`。
 - ⚠️ **`tsc` 绿 ≠ 没有垃圾**：tsconfig **没开 `noUnusedLocals`**，删代码后留下的死导入（`readFileSync` / `writeFileSync` / `messageText`）它一个字都不报。**删完代码要另眼看一遍导入**，别把"类型自洽"当成"干净"。
