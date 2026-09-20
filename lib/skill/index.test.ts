@@ -360,6 +360,22 @@ description: 收尾忘了写，被吞掉的那半段正好只有标题
   });
 });
 
+/**
+ * 清单里的**条目名**（只数条目行，不算引导语与诊断段）。
+ *
+ * ⭐ 为什么必须有这个 helper（C43，2026-09-20）：判"某个技能有没有进清单"时，
+ * **不能对整份清单做子串包含判断** —— 那会把"这个名字出现在**别人的描述里**"
+ * 也算成"它进清单了"。真实翻车：隐藏技能 `teach` 是可见技能 `slidev` 描述里
+ * "teaching materials" 的子串 ⇒ 全量单测出现一条**假红**（产品行为是对的）。
+ * 判据要落在**条目**这一层；条目形态本身由上面那条「markdown 形态」用例守着。
+ */
+function catalogEntryNames(catalog: string): string[] {
+  return catalog
+    .split("\n")
+    .filter((line) => line.startsWith("- `"))
+    .map((line) => line.slice(3).split("`")[0]);
+}
+
 describe("buildSkillCatalog —— 只给模型看它调得动的（markdown 列表）", () => {
   it("markdown 形态 `- \`name\`: description`，前面一句引导语", () => {
     const { skills } = loadSkills(root);
@@ -370,8 +386,38 @@ describe("buildSkillCatalog —— 只给模型看它调得动的（markdown 列
 
   it("disable-model-invocation 的技能一条都不出现（作者禁止模型自己喊）", () => {
     const { skills } = loadSkills(root);
-    const catalog = buildSkillCatalog(skills);
-    expect(catalog).not.toContain("handoff");
+    expect(catalogEntryNames(buildSkillCatalog(skills))).not.toContain("handoff");
+  });
+
+  it("⭐ 隐藏技能的名字出现在**别人的描述里**不算进清单（C43：子串匹配的假红）", () => {
+    // 这个组合**真实发生过**（2026-09-20 本机实测，就是它把全量跑弄红的）：
+    //   - `slidev` 是**可见**技能，描述末尾是 "…, teaching materials, or developer decks."
+    //   - `teach` 是**隐藏**技能（frontmatter 写了 disable-model-invocation: true）
+    //   ⇒ `"teaching materials".includes("teach")` 为真 ⇒ 旧判据 `not.toContain("teach")` 假红。
+    // **产品行为当时就是对的**（`teach` 这个条目没进清单）—— 错的是"拿子串当性质"。
+    const visibleSlidev: Skill = {
+      name: "slidev",
+      // 原样抄自本机 `~/.agents/skills/slidev/SKILL.md` 的 description
+      description:
+        "Create and present web-based slidedecks for developers using Slidev with Markdown, Vue components, code highlighting, animations, and interactive features. Use when building technical presentations, conference talks, code walkthroughs, teaching materials, or developer decks.",
+      baseDir: join(root, "slidev"),
+      content: "# Slidev\n",
+      files: [],
+      modelInvocable: true,
+    };
+    const hiddenTeach: Skill = {
+      name: "teach",
+      description: "Explain a topic interactively.",
+      baseDir: join(root, "teach"),
+      content: "# Teach\n",
+      files: [],
+      modelInvocable: false,
+    };
+
+    const catalog = buildSkillCatalog([visibleSlidev, hiddenTeach]);
+
+    expect(catalogEntryNames(catalog)).toEqual(["slidev"]); // 只有可见那个成为条目
+    expect(catalog).toContain("teaching materials"); // 描述原话照旧（不因误判被删）
   });
 
   it("没有技能 → 空串（调用方据此整节省略，不留一个空标题）", () => {
@@ -392,11 +438,12 @@ describe("buildSkillCatalog —— 只给模型看它调得动的（markdown 列
 
   it("顺序稳定（按名字）：同样的输入永远同样的输出", () => {
     const { skills } = loadSkills(root);
-    const names = buildSkillCatalog(skills)
-      .split("\n")
-      .filter((line) => line.startsWith("- `"))
-      .map((line) => line.slice(3).split("`")[0]);
-    expect(names).toEqual(["code-review", "tdd", "wrong-name", "xlsx"]);
+    expect(catalogEntryNames(buildSkillCatalog(skills))).toEqual([
+      "code-review",
+      "tdd",
+      "wrong-name",
+      "xlsx",
+    ]);
   });
 
   it("不带诊断时逐字不变（可选参数，向后兼容 —— 上面那几条断言就是证据）", () => {
@@ -673,7 +720,11 @@ describe("真实技能根（本机已装的技能）", () => {
     const hidden = skills.filter((skill) => !skill.modelInvocable);
 
     for (const skill of hidden) {
-      expect(catalog).not.toContain(skill.name);
+      // ⚠️ 判据是「**清单的条目里有没有它**」，不是「清单的文本里有没有这串字符」——
+      // 后者 2026-09-20 被真实数据打红过一次（见上面 `catalogEntryNames` 的注释与
+      // 那条 slidev/teach 用例）。这条跑的是**本机真实技能根**，用户随时会装新技能，
+      // 必须只用"性质"当判据，不能靠"今天恰好没有哪个描述提到它"。
+      expect(catalogEntryNames(catalog)).not.toContain(skill.name);
       expect(findSkill(skills, skill.name)).toBeDefined();
     }
   });
