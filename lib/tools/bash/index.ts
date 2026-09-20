@@ -23,13 +23,57 @@ import { readPwshErrors, stripPwshClixml } from "../../process-output";
  *
  * 摘掉的理由（不是洁癖）：真样本是**同一条报错写 20 遍**，它把信号埋了；
  * 解出来的那一句 + "×20"才是信息。
+ *
+ * 顺带把条数交出来（T3 的判据要用）——同一个 `stderr` 不解析两遍。
  */
-export function cleanBashOutput(output: string, stderr: string): string {
+export function cleanBashOutput(
+  output: string,
+  stderr: string,
+): { text: string; pwshErrorCount: number } {
   const errors = readPwshErrors(stderr);
-  if (!errors) return output;
+  if (!errors) return { text: output, pwshErrorCount: 0 };
 
   const body = stripPwshClixml(output).trim();
-  return body.length > 0 ? `${body}\n\n${errors.summary}` : errors.summary;
+  return {
+    text: body.length > 0 ? `${body}\n\n${errors.summary}` : errors.summary,
+    pwshErrorCount: errors.count,
+  };
+}
+
+export type BashStatusInput = {
+  /** 退出码；被终止时为 null */
+  exitCode: number | null;
+  cancelled: boolean;
+  /** 从 stderr 解出来的 pwsh 报错条数（0 = 没有） */
+  pwshErrorCount: number;
+};
+
+/**
+ * 工具结果尾部的**标记**（C36 T3，纯函数）——三个断点里最阴的那个：
+ * **退出码只反映最后一条语句**。真样本里 `ForEach-Object` 自己跑完了
+ * （错在它执行的脚本块里）⇒ 整条管道算成功、退出码 0、工具回「成功」，
+ * 而 20 个文件一个都没处理。
+ *
+ * **为什么加标记而不是抛错**（抄 DSH 的形状，五家对照见详案第四节结论 3）：
+ *   ① 抛错会误伤"退出码 1 但完全正常"的 `grep 无匹配`
+ *   ② 抛错会改掉模型看到的形状（`isError` 通道），回归面比它修的病大
+ *   ⇒ 修的是**延长既有的标记机制**，不是换机制。
+ *
+ * 四格：被终止 → 终止；非 0 → 退出码；**0 但有报错 → 点明"退出码是 0"**；
+ * 0 且干净 → 什么都不加（别把正常输出弄噪）。两个信号都有时只报退出码 ——
+ * 报错正文已经（以"×N + 人话"的形式）在正文里了，同一件事不说两遍。
+ */
+export function bashStatusNote({
+  exitCode,
+  cancelled,
+  pwshErrorCount,
+}: BashStatusInput): string {
+  if (cancelled) return "\n[命令被终止：超时或用户取消]";
+  if (exitCode !== 0) return `\n[命令退出码：${exitCode}]`;
+  if (pwshErrorCount > 0) {
+    return `\n[退出码为 0，但 stderr 有 ${pwshErrorCount} 条报错]`;
+  }
+  return "";
 }
 
 export function createBashTool(workspaceRoot: string): RegisteredTool {
@@ -77,21 +121,21 @@ export function createBashTool(workspaceRoot: string): RegisteredTool {
         onChunk: options?.onChunk,
       });
 
-      // 终止/失败时给模型一个明确的收尾提示（它要据此向用户解释）
-      const statusNote = result.cancelled
-        ? "\n[命令被终止：超时或用户取消]"
-        : result.exitCode === 0
-          ? ""
-          : `\n[命令退出码：${result.exitCode}]`;
-
       // 给人看的正文：CLIXML 解成人话、同一条报错的 20 遍收成「×20」（T2）
-      const visibleOutput = cleanBashOutput(result.output, result.stderr);
+      const view = cleanBashOutput(result.output, result.stderr);
+
+      // 尾部标记：退出码 + "其实有报错"这条判据（T3）
+      const statusNote = bashStatusNote({
+        exitCode: result.exitCode,
+        cancelled: result.cancelled,
+        pwshErrorCount: view.pwshErrorCount,
+      });
 
       return {
         content: [
           text(
-            visibleOutput.length > 0
-              ? `${visibleOutput}${statusNote}`
+            view.text.length > 0
+              ? `${view.text}${statusNote}`
               : `(无输出)${statusNote}`,
           ),
         ],
