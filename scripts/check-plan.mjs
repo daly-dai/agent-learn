@@ -17,6 +17,9 @@
  *   3. 迭代文档头部有一行 `> **成员**：C36 · C35 · …`
  *   4. 迭代文档若含 `**例外**：`，跳过池子交叉检查
  *      —— 唯一的例外是 `doc/iteration/i0.md`（self-hosting：它正是来让池子存在的）
+ *   5. 新建的 `doc/plan/<名>.md` **必须在 `PLAN.md` 里被提到**
+ *      （池子行 /「横切文档」表 /「地基」小节都算）—— 没有入口的文件就是空壳，
+ *      要么挂入口，要么搬 `doc/plan-archive/`（归档区不参与这条检查）
  */
 
 import { existsSync, readFileSync, readdirSync } from "node:fs";
@@ -26,10 +29,8 @@ import { fileURLToPath } from "node:url";
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const ITERATION_DIR = join(ROOT, "doc", "iteration");
 const POOL_CELL_COUNT = 6;
-/** 状态值域（PLAN.md 需求池顶部那份口径就是它）。 */
+/** 状态值域（PLAN.md 需求池顶部那份口径就是它）。**没有例外** —— 全池子每一行都在这四个值里。 */
 const STATUS_RE = /^(未开始|进行中|已交付|已纳入\s+(I\d+|[A-Z]+\d+))$/;
-/** 已知例外：C38 已指派另一会话，它的状态格里还住着内容 —— 等那边落地再收进值域。 */
-const STATUS_EXCEPTIONS = { C38: "已指派另一会话（状态格里还住着内容）" };
 
 /** 取表格行最后一格的内容。行内的 `|` 不影响结果——从行尾往前找。 */
 function lastCell(line) {
@@ -148,11 +149,10 @@ function check(pool, iterations) {
   return problems;
 }
 
-/** 状态必须在值域里（四个值）。例外见 STATUS_EXCEPTIONS，只报不失败。 */
+/** 状态必须在值域里（四个值）。**没有例外** —— C38 那一格 2026-09-20 搬进文件后也收编了。 */
 function checkStatusDomain(pool) {
   const problems = [];
   for (const row of pool) {
-    if (STATUS_EXCEPTIONS[row.id]) continue;
     if (!STATUS_RE.test(row.status)) {
       problems.push(
         `需求池 ${row.id}（PLAN.md:${row.line}）状态是「${row.status}」，不在值域里` +
@@ -197,6 +197,26 @@ function checkPlanFileRefs(pool) {
 }
 
 /**
+ * 反方向的那一条：盘上每个 `doc/plan/*.md`，**必须在 `PLAN.md` 里被提到**
+ * （池子行 /「横切文档」表 /「地基」小节都算 —— 判据是"PLAN.md 是唯一入口"）。
+ * 为什么要有它：规则写着「空壳文件数应当永远是 0」「建新文件前先找现成的」——
+ * 但**没人指向的文件，人不会去打开它**，所以只能机器查。
+ * `doc/plan-archive/` 不参与：那是归档区，"没有入口"正是搬进去的理由。
+ */
+function checkOrphanPlanFiles() {
+  const problems = [];
+  const planText = readFileSync(join(ROOT, "PLAN.md"), "utf8");
+  for (const name of readdirSync(join(ROOT, "doc", "plan")).filter((f) => f.endsWith(".md"))) {
+    if (planText.includes(name)) continue;
+    problems.push(
+      `doc/plan/${name} 在 PLAN.md 里没有任何地方提到它 —— ` +
+        `要么给它挂个入口（需求池行 /「横切文档」表 /「地基」小节），要么搬去 doc/plan-archive/`
+    );
+  }
+  return problems;
+}
+
+/**
  * 「有文件」≠「能开工」：已进迭代（或已开工）的项，**验收格非 `—`** 才算定案。
  * 现在只当提示（I1 正在跑、按顺序补详案是既定计划）；等模型稳定后升为失败。
  * 为什么不查文件里的小标题：C33 的详案是 `c8-skills.md` 的 11.2 节，标题里没有「详细设计」四个字 ⇒ 猜就会误报。
@@ -218,6 +238,7 @@ function main() {
   const problems = [
     ...check(pool, iterations),
     ...checkPlanFileRefs(pool),
+    ...checkOrphanPlanFiles(),
     ...checkRowShape(pool),
     ...checkStatusDomain(pool),
   ];
@@ -233,10 +254,6 @@ function main() {
     );
     for (const iteration of iterations) {
       console.log(`  ${iteration.name}：${iteration.selfHosting ? "（self-hosting 例外）" : iteration.members.join(" · ") || "（空）"}`);
-    }
-    const exceptions = Object.entries(STATUS_EXCEPTIONS).filter(([id]) => pool.some((r) => r.id === id));
-    if (exceptions.length > 0) {
-      console.log(`  值域例外：${exceptions.map(([id, why]) => `${id}（${why}）`).join("；")}`);
     }
   }
 
