@@ -20,6 +20,8 @@
  *   5. 新建的 `doc/plan/<名>.md` **必须在 `PLAN.md` 里被提到**
  *      （池子行 /「横切文档」表 /「地基」小节都算）—— 没有入口的文件就是空壳，
  *      要么挂入口，要么搬 `doc/plan-archive/`（归档区不参与这条检查）
+ *   6. `已纳入 <另一项>` 的**容器必须是活的** —— 不能指向 `已交付`（收工的容器 =
+ *      死指针），也不能指向另一个 `已纳入`（指针套指针）。2026-09-21 加。
  */
 
 import { existsSync, readFileSync, readdirSync } from "node:fs";
@@ -217,6 +219,43 @@ function checkOrphanPlanFiles() {
 }
 
 /**
+ * 「已纳入 <另一项>」的**容器必须是活的**（2026-09-21 加）。
+ *
+ * 这条指针的语义是"**进度看被并入的那一项**"（`PLAN.md` 顶部那份口径）——
+ * 所以容器若已经**交付**，指针就指着一个不会再动的东西（想跟也跟不动）；
+ * 若它自己也写着「已纳入 Y」，那是指针套指针、中间那层谁都不落到实地。
+ *
+ * 为什么值得单列一条：前面几条只查"目标**存在**" —— 2026-09-21 实测，
+ * C22 / C23 一直写着「已纳入 C24」，而 C24 已经是 `已交付`，脚本照样报 ✅。
+ * **「一个事实几份」的漂移，正是从这种"被引用那一端没人管"里漏出来的。**
+ * （合法容器：`未开始` / `进行中` / `已纳入 I<n>` —— 前两者是"还有活要干"，
+ * 后者是"已经在跑、进度看那份迭代 md"。）
+ */
+function checkAbsorbedTargetAlive(pool) {
+  const problems = [];
+  const byId = new Map(pool.map((row) => [row.id, row]));
+  for (const row of pool) {
+    const absorbed = statusAbsorbedBy(row.status);
+    if (!absorbed) continue;
+    const target = byId.get(absorbed);
+    if (!target) continue; // 目标不存在由 check() 报，别重复报同一个因
+    const chained = statusAbsorbedBy(target.status);
+    if (target.status === "已交付") {
+      problems.push(
+        `需求池 ${row.id}（PLAN.md:${row.line}）写「${row.status}」，但 ${absorbed} 已经是「已交付」` +
+          ` —— 指针指向一个收工的容器：跟着它一起处置（已交付 / 未开始），或改指还在跑的项`
+      );
+    } else if (chained) {
+      problems.push(
+        `需求池 ${row.id}（PLAN.md:${row.line}）写「${row.status}」，而 ${absorbed} 自己也写「${target.status}」` +
+          ` —— 指针套指针，拉直成「已纳入 ${chained}」`
+      );
+    }
+  }
+  return problems;
+}
+
+/**
  * 「有文件」≠「能开工」：已进迭代（或已开工）的项，**验收格非 `—`** 才算定案。
  * 现在只当提示（I1 正在跑、按顺序补详案是既定计划）；等模型稳定后升为失败。
  * 为什么不查文件里的小标题：C33 的详案是 `c8-skills.md` 的 11.2 节，标题里没有「详细设计」四个字 ⇒ 猜就会误报。
@@ -241,6 +280,7 @@ function main() {
     ...checkOrphanPlanFiles(),
     ...checkRowShape(pool),
     ...checkStatusDomain(pool),
+    ...checkAbsorbedTargetAlive(pool),
   ];
   const hints = planReadinessHints(pool);
   const count = (re) => pool.filter((row) => re.test(row.status)).length;
