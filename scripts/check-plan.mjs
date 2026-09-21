@@ -271,6 +271,35 @@ function planReadinessHints(pool) {
   return hints;
 }
 
+/**
+ * 「现在在跑哪个迭代」—— **由池子推导，不落成字段**（落了就会漂，C28 的老毛病）。
+ * 判据：迭代成员里只要还有一行**没到 `已交付`**，这个迭代就还在跑；
+ * 一个都没有 ⇒ 如实说"没有在跑的迭代"，并给出**起新一批**的三步（免得下个会话
+ * 面对"入口是空的"发愣）。派生出来的读数不会漂，因为它没有第二份。
+ */
+function reportCurrentIterations(iterations, pool) {
+  const byId = new Map(pool.map((row) => [row.id, row]));
+  const running = iterations
+    .filter((iteration) => !iteration.selfHosting)
+    .map((iteration) => ({
+      name: iteration.name,
+      total: iteration.members.length,
+      pending: iteration.members.filter((id) => byId.get(id)?.status !== "已交付"),
+    }))
+    .filter((iteration) => iteration.pending.length > 0);
+
+  if (running.length === 0) {
+    console.log(
+      "当前没有在跑的迭代（池子里没有「已纳入 I<n>」的行）—— 起新一批：从池子挑成员（三格齐）" +
+        " → 建 doc/iteration/i<n>.md（头部写「> **成员**：…」）→ 那几格标「已纳入 I<n>」"
+    );
+    return;
+  }
+  for (const iteration of running) {
+    console.log(`当前在跑：${iteration.name}（${iteration.pending.length}/${iteration.total} 未交付：${iteration.pending.join(" · ")}）`);
+  }
+}
+
 function main() {
   const pool = readPool();
   const iterations = readIterations();
@@ -296,6 +325,8 @@ function main() {
       console.log(`  ${iteration.name}：${iteration.selfHosting ? "（self-hosting 例外）" : iteration.members.join(" · ") || "（空）"}`);
     }
   }
+
+  reportCurrentIterations(iterations, pool);
 
   if (hints.length > 0) {
     // 提示，不是失败：I1 正在跑，成员按顺序补详案是既定计划。
