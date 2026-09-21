@@ -76,6 +76,33 @@ export function bashStatusNote({
   return "";
 }
 
+/** 命令自己合并流的两写法：`2>&1`（stderr → 成功流）、`*>&1`（所有流 → 成功流） */
+const SELF_MERGED_STREAM_RE = /(?:2|\*)\s*>\s*&\s*1/;
+
+/**
+ * 命令自己把 stderr 并进 stdout 时的提示（2026-09-21 加，复盘时当场撞出的边界）。
+ *
+ * 为什么非提示不可：走**真实路径**（`cmd /c chcp 65001 & pwsh -EncodedCommand`，
+ * stdio 形状与 `BashRunner` 一致）实测 —— pwsh 会把错误记录**并进成功流**，而成功流
+ * 写到非控制台的管道时这些记录**被丢弃**：`stdout` 与 `stderr` **双双 0 字节**，
+ * 报错文本整个消失（`… 2>&1 | Out-File` 也是 0 字节）。
+ *
+ * 于是上面那条判据（只信 `stderr`）在这里**必然失效**：退出码 0、两路皆空 ⇒ 判成"成功"。
+ * 方向正好和 C36 T2 相反 —— T2 说"判来源不判形状"，这条说"**来源会被命令自己搬走**"。
+ * 而**丢掉的文本救不回来**（它根本没出来，不是藏起来了）⇒ 只能挡在发生之前：
+ * 这一句提示 + `guidelines` 里那条规矩（规矩归工具文件，C34）。
+ *
+ * 误报可接受：命令里恰好"写着"这串字符（例如让 `Get-Content` 打一份含它的文档）
+ * 也会多这一句 —— 它只是提示，不改正文、不动 `isError` 通道。
+ */
+export function selfMergedStreamNote(command: string): string {
+  if (!SELF_MERGED_STREAM_RE.test(command)) return "";
+  return (
+    "\n[命令里用了 2>&1：本工具返回的本来就是 stdout 与 stderr 合并后的文本；" +
+    "自己合并会让 pwsh 把报错记录丢弃（实测两路都是 0 字节），报错收不回来 —— 要留下报错，去掉它]"
+  );
+}
+
 export function createBashTool(workspaceRoot: string): RegisteredTool {
   const runner = new BashRunner();
 
@@ -94,6 +121,10 @@ export function createBashTool(workspaceRoot: string): RegisteredTool {
       // ② 读取姿势（不是形状说明）。形状归 description —— C34 禁的是**同一句话两个家**，
       //    这里多给的是"因此该怎么读它"。
       "返回值是 stdout 与 stderr 合并后的文本（保持原有的先后顺序，不区分来源）：报错可能夹在输出中间，不要只看结尾。",
+      // ③ 一条**反向**的边界（2026-09-21）：上面两条教它"怎么读"，这条教它"别把报错弄丢"。
+      //    住这里而不是只藏在判据里，是因为**模型就是写命令的那个人** —— 它不写，
+      //    这件事就不会发生；判据只能事后提示（而且那时文本已经没了）。
+      "不要在命令里自己写 `2>&1`（或 `*>&1`）：本工具返回的本来就是 stdout 与 stderr 合并后的文本。自己合并会让 pwsh 把错误记录并进成功流，而成功流写到管道时这些记录会被丢弃 —— 报错文本会**整个消失**（实测两路都是 0 字节），我们也判不出来。",
     ],
     parameters: {
       type: "object",
@@ -131,12 +162,15 @@ export function createBashTool(workspaceRoot: string): RegisteredTool {
         pwshErrorCount: view.pwshErrorCount,
       });
 
+      // 反方向的边界：命令自己合并流 ⇒ 报错可能已经消失（判据判不出来，只能提示）
+      const mergeNote = selfMergedStreamNote(command);
+
       return {
         content: [
           text(
             view.text.length > 0
-              ? `${view.text}${statusNote}`
-              : `(无输出)${statusNote}`,
+              ? `${view.text}${statusNote}${mergeNote}`
+              : `(无输出)${statusNote}${mergeNote}`,
           ),
         ],
         details: {

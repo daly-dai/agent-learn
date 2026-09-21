@@ -15,7 +15,12 @@
 // ============================================================
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { bashStatusNote, cleanBashOutput, createBashTool } from ".";
+import {
+  bashStatusNote,
+  cleanBashOutput,
+  createBashTool,
+  selfMergedStreamNote,
+} from ".";
 import { BashRunner } from "./bash-runner";
 import {
   REAL_PWSH_MESSAGE,
@@ -44,6 +49,13 @@ describe("bash 的 guidelines（规矩住工具文件里，C34 归属规则）",
 
   it("说明返回的是 stdout 与 stderr 合并后的文本", () => {
     expect(guidelines).toMatch(/合并/);
+  });
+
+  it("⭐ 反向的边界也挂着：自己写 2>&1 会让报错消失（2026-09-21）", () => {
+    // 上面两条教"怎么读"，这条教"别把报错弄丢"——它们是**相反方向**的知识，
+    // 所以必须同住在模型看得见的那一面（规则住工具文件，C34）。
+    expect(guidelines).toMatch(/2>&1/);
+    expect(guidelines).toMatch(/消失|丢弃/);
   });
 });
 
@@ -152,6 +164,48 @@ describe("bashStatusNote —— 尾部标记的四格判据", () => {
 });
 
 // ============================================================
+// 反方向的边界：命令自己写 `2>&1` ⇒ 报错被丢弃（2026-09-21 复盘当场撞出）
+// ============================================================
+// 实测（走真实路径 `cmd /c chcp 65001 & pwsh -EncodedCommand`，stdio 形状与
+// `BashRunner` 一致 —— 四个探针一步步排出来的，过程见 `doc/plan/phase-4-bash.md`）：
+//
+//   | 命令                              | stdout | stderr        |
+//   | 1..3 | % { Write-Error 'boom' }   | 0      | 350 字节 CLIXML | ← 判据抓得住
+//   | 同一句 + 2>&1                      | 0      | **0**         | ← 报错整个消失
+//
+// 机制：`2>&1` 把错误记录并进**成功流**，成功流写到非控制台的管道时被丢弃。
+// 于是"只信 stderr"这条判据在这里**必然失效**。而丢掉的文本**救不回来**（它根本没
+// 出来）⇒ 只能防在发生之前，所以这一个提示 + 一条规矩，而不是"检测出来再修"。
+
+describe("selfMergedStreamNote —— 命令自己合并流时给一句提示", () => {
+  it("命令里没有合并流 → 一个字都不加（别把正常输出弄噪）", () => {
+    expect(selfMergedStreamNote("Get-ChildItem -Recurse")).toBe("");
+    expect(selfMergedStreamNote("1..3 | % { Write-Error 'boom' }")).toBe("");
+  });
+
+  it("⭐ 写了 2>&1 → 说清「报错会消失、收不回来」", () => {
+    const note = selfMergedStreamNote("1..3 | % { Write-Error 'boom' } 2>&1");
+    expect(note).toMatch(/2>&1/);
+    expect(note).toMatch(/0 字节/); // 实测读数，不是形容词
+    expect(note).toMatch(/去掉/); // 给可执行的做法，不只说"你错了"
+  });
+
+  it("`*>&1`（所有流并进成功流）同样提示", () => {
+    expect(selfMergedStreamNote("do-something *>&1")).toMatch(/2>&1/);
+  });
+
+  it("带空格、带重定向目标的写法也认（别指望模型写成标准形态）", () => {
+    expect(selfMergedStreamNote("cmd 2> &1")).not.toBe("");
+    expect(selfMergedStreamNote("cmd 2>&1 | Select-Object -Last 5")).not.toBe("");
+  });
+
+  it("误报是可接受的代价：文本里「写着」这串字符也会提示一句", () => {
+    // 只是提示，不改正文、不动 isError —— 比漏报好。
+    expect(selfMergedStreamNote('Write-Output "2>&1"')).not.toBe("");
+  });
+});
+
+// ============================================================
 // execute 全流程（B19 的那五条行为，用 spy 替掉真 spawn）
 // ============================================================
 // 为什么必须替掉执行器：沙箱里 `spawn` 捕获输出会撞 EPERM，**真起进程的用例在本机
@@ -233,6 +287,13 @@ describe("bash execute —— 工具定义的五条既有行为（B19）", () =>
     expect(textOf(await tool.execute({ command: "x" }))).toBe(
       "review-lib.diff : 3682\n",
     );
+  });
+
+  it("⭐ 命令里写了 2>&1 → 正文尾部多一句提示（与退出码标记可叠加）", async () => {
+    runResult = { ...runResult, output: "ok\n" };
+    const body = textOf(await tool.execute({ command: "1..3 | % { Write-Error 'x' } 2>&1" }));
+    expect(body).toContain("ok\n");
+    expect(body).toContain("[命令里用了 2>&1");
   });
 });
 
