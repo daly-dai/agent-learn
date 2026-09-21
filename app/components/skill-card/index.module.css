@@ -35,7 +35,7 @@
 }
 
 .head:hover {
-  background: rgba(29, 33, 39, 0.03);
+  background: var(--feed-hover); /* C35：原来硬编码 3% 墨档，收进反馈 token */
 }
 
 .tag {

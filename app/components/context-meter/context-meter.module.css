@@ -31,7 +31,7 @@
 }
 
 .trigger:hover {
-  background: var(--paper);
+  background: var(--feed-hover); /* C35：原来借「面」（--paper），而它坐在 consoleFrame（--plate）上 */
 }
 
 .track {

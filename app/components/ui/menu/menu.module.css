@@ -34,7 +34,7 @@
 }
 
 .trigger:hover:not(:disabled) {
-  background: var(--paper);
+  background: var(--feed-hover); /* C35：原来借「面」（--paper） */
   color: var(--ink);
 }
 
@@ -80,9 +80,16 @@
   cursor: pointer;
 }
 
-.item:hover:not(:disabled),
+/* C35：原来两边都借「面」（`--paper`），而面板是 `--plate` —— 两个面在 2026-09-16
+   收成同一个 #ffffff ⇒ **白底画白**，hover 与聚焦底色一起隐形。
+   注：本菜单的键盘导航走**真 DOM 焦点**（index.tsx 的 next.focus()），所以
+   `:focus-visible` 的全局 outline 还能兜一层；底色仍要给，否则焦点行与其他行看不出区别。 */
+.item:hover:not(:disabled) {
+  background: var(--feed-hover);
+}
+
 .item:focus-visible {
-  background: var(--paper);
+  background: var(--feed-active);
 }
 
 .item:disabled {

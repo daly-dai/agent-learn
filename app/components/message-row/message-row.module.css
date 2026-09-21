@@ -132,7 +132,7 @@
 }
 
 .compactionHead:hover {
-  background: rgba(29, 33, 39, 0.03);
+  background: var(--feed-hover); /* C35：原来硬编码 3% 墨档，收进反馈 token */
 }
 
 .compactionTag {
@@ -291,7 +291,7 @@
 
 .apparatusToggle:hover {
   color: var(--ink);
-  background: var(--paper);
+  background: var(--feed-hover); /* C35：原来借「面」（--paper），而工具卡是 --plate */
 }
 
 .apparatusBody {

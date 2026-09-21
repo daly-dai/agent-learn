@@ -182,7 +182,7 @@
 
 .backBtn:hover,
 .skipBtn:hover {
-  background: var(--paper);
+  background: var(--feed-hover); /* C35：原来借「面」（--paper），而卡片是 --plate */
   color: var(--ink);
 }
 

@@ -37,7 +37,7 @@
 }
 
 .header:hover {
-  background: var(--paper);
+  background: var(--feed-hover); /* C35：原来借「面」（--paper），而面板是 --plate */
 }
 
 .title {
@@ -107,7 +107,7 @@
 
 .close:hover {
   color: var(--pen-signal-ink);
-  background: var(--paper);
+  background: var(--feed-hover); /* C35：原来借「面」（--paper），而面板是 --plate */
 }
 
 /* 展开列表（reasonix 式）：grid 状态列 + 文本列，行间距薄 */

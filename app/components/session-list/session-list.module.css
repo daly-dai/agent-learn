@@ -77,11 +77,13 @@
 }
 
 .sessionItem:hover {
-  background: var(--paper);
+  background: var(--feed-hover); /* C35：原来借「面」（--paper）——在侧栏上是"变亮"，与仓库页的"变暗"方向相反 */
 }
 
 /* 当前会话：状态类故意全局（JSX 拼 is-current） */
 .sessionItem:global(.is-current) {
+  /* c35-allow: 这是「当前项的面」+ 边，不是反馈 —— 原型 prototype-statve-shell.html 的
+     .sess.on 同款（面 + inset 细环）；反馈档管的是悬停 / 键盘当前项。 */
   background: var(--plate);
   border-color: var(--line);
 }

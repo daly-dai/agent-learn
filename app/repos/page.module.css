@@ -55,7 +55,7 @@
 }
 
 .back:hover {
-  background: var(--recorder);
+  background: var(--feed-hover); /* C35：原来用 --recorder（在这个白页上是"变暗"），与侧栏 hover 的"变亮"方向相反 */
 }
 
 /* ============ 左右主体 ============ */
@@ -126,7 +126,9 @@
 }
 
 .repoItem:hover {
-  background: rgba(29, 33, 39, 0.06);
+  /* C35：原来硬编码 6% 墨档（大块行区域比小控件重一档）——收进 token 后先跟 hover 同档，
+     真机看着偏弱再单独拍（见详案六.6 第 3 点）。 */
+  background: var(--feed-hover);
 }
 
 /* 选中：白底 + 左琥珀条（与重点标注同色系，全页唯一的两处琥珀） */
@@ -194,7 +196,7 @@
 
 .rowUpdateBtn:hover:not(:disabled) {
   border-color: var(--line);
-  background: var(--plate);
+  background: var(--feed-hover); /* C35：原来借「面」（--plate），而所在行是白 */
   color: var(--pen-user);
 }
 
