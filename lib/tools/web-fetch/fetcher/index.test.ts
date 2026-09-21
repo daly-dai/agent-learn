@@ -167,6 +167,49 @@ describe("fetchUrl —— 闸门、重定向、限额", () => {
     if (result.ok) expect(result.url).toBe("https://example.com/b");
   });
 
+  // C24 ⑥（2026-09-21 用户拍板）：**跳转链要留档**。
+  // 为什么：给模型的只有 `Fetched <最终地址>`（对的），但"它从哪跳过来的"**哪儿都没有** ——
+  // 出事时（拿到的不是想抓的那篇）轨迹回答不了这个问题。
+  // ⚠️ 对照：DSH 也只给最终 URL、opencode 给的是**原始 URL** ⇒ **这是我方独有的**；
+  // 动机不是"模型需要"，而是**轨迹是调试黑匣子**。
+  it("重定向链留档：chain = [原始, …中间, 最终]（C24 ⑥）", async () => {
+    const { fetchImpl } = stubFetch({
+      "https://example.com/a": () =>
+        new Response(null, { status: 301, headers: { location: "https://example.com/b" } }),
+      "https://example.com/b": () =>
+        new Response(null, { status: 302, headers: { location: "https://www.example.com/c" } }),
+      "https://www.example.com/c": () => new Response("done", { status: 200 }),
+    });
+
+    const result = await fetchUrl("https://example.com/a", {
+      fetch: fetchImpl,
+      lookup: publicDns,
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.chain).toEqual([
+        "https://example.com/a",
+        "https://example.com/b",
+        "https://www.example.com/c",
+      ]);
+    }
+  });
+
+  it("没有重定向时 chain 只有一项（别为了凑字段编出中间站）", async () => {
+    const { fetchImpl } = stubFetch({
+      "https://example.com/only": () => new Response("ok", { status: 200 }),
+    });
+
+    const result = await fetchUrl("https://example.com/only", {
+      fetch: fetchImpl,
+      lookup: publicDns,
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.chain).toEqual(["https://example.com/only"]);
+  });
+
   it("响应超过大小上限 → 截断并标记 truncated（不能把 1GB 全下下来）", async () => {
     const big = "x".repeat(5000);
     const { fetchImpl } = stubFetch({

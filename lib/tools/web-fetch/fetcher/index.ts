@@ -58,6 +58,15 @@ export type FetchSuccess = {
   bytes: number;
   /** 是否因为超过 maxBytes 被截断 */
   truncated: boolean;
+  /**
+   * 跳转链：`[入参地址, …中间跳, 最终地址]`；没有重定向时只有一项。
+   *
+   * ⚠️ **这是我方独有的留档**（C24 ⑥，2026-09-21 用户拍板）——对照过：DSH 也只给最终 URL
+   * （`tool-web/src/fetch.ts:372`），opencode 给的甚至是**原始 URL**（`core/src/tool/webfetch.ts:171`）。
+   * 动机**不是"模型需要"**，而是**轨迹是调试黑匣子**：拿到的东西不对时，要能回答
+   * "它从哪跳过来的"。所以它只进 `details`，**不进给模型看的正文**（正文里那一行仍是最终地址）。
+   */
+  chain: string[];
 };
 
 export type FetchFailure = {
@@ -95,6 +104,8 @@ export async function fetchUrl(
   const maxRedirects = deps.maxRedirects ?? DEFAULT_MAX_REDIRECTS;
 
   let current = raw;
+  /** 跳转链：每跳把**过完闸门**的地址记下来（初始地址也算第一项）——见 FetchSuccess.chain */
+  const chain: string[] = [];
 
   // hop 从 0 数到 maxRedirects：允许跟 maxRedirects 次，第 maxRedirects+1 次进不来
   for (let hop = 0; hop <= maxRedirects; hop += 1) {
@@ -107,6 +118,7 @@ export async function fetchUrl(
         blockedReason: guarded.reason,
       };
     }
+    chain.push(guarded.url.href);
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -174,6 +186,7 @@ export async function fetchUrl(
         body: text,
         bytes,
         truncated,
+        chain,
       };
     } catch (error) {
       if (isAbortError(error)) {

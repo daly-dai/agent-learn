@@ -118,6 +118,9 @@ export function createWebFetchTool(
           bytes: fetched.bytes,
           kind,
           truncated: rendered.truncated,
+          // C24 ⑥：跳转链留档（只给人/轨迹看，不进模型可见的正文）。
+          // 没有重定向时是单元素数组 —— **保持字段恒在**，读轨迹的人不用猜"这次有没有"。
+          redirectChain: fetched.chain,
         },
       };
     },
