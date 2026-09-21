@@ -64,6 +64,23 @@ describe("resolveInsideWorkspace —— 路径沙箱", () => {
     );
   });
 
+  // ⚠️ **跨盘符**（C33，2026-09-21 补）：Windows 上 `relative()` 表达不出跨盘符相对路径时，
+  // 会把 target **原样返回**（一个绝对路径），而绝对路径不以 `..` 开头 ⇒ 旧判定放行。
+  // **老用例碰不到它**：上面那条 `C:/outside/x` 与本夹具 `ROOT` **同盘**（都是 C:），
+  // 所以这条路径从来没被走过 —— 测试覆盖的形状和真实越界的形状不一样。
+  //
+  // 夹具为什么是真的（不是编的）：本机的工作区在 **E:**（`<仓库>/workspace`），
+  // 而用户的技能根在 **C:**（`~/.agents/skills`）—— 2026-09-16 真机撞出的正是这两个盘：
+  // 只读、**免审批**的 `read_file` 读到了 `C:\Users\…\.agents\skills\…`。
+  it.skipIf(process.platform !== "win32")(
+    "跨盘符的绝对路径抛错（C33：另一盘的文件也出不去）",
+    () => {
+      expect(() => resolveInsideWorkspace(ROOT, "E:/outside/x")).toThrow(
+        /路径越界/,
+      );
+    },
+  );
+
   it("根本身带 '..' 输入抛错（防御：rel 为空但 input 含 ..）", () => {
     expect(() => resolveInsideWorkspace(ROOT, "sub/..")).toThrow(/路径越界/);
   });

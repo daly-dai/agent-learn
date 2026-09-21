@@ -5,12 +5,12 @@
 // workspaceRoot 内，`..` 越界直接抛错。这是「agent 只能在工作区
 // 里动文件」的结构保证——工具能力再强也出不了这个围栏。
 //
-// ⚠️ **但这条保证当前有一个已知例外**：**跨盘符**的绝对路径能穿出去
-// （2026-09-16 真机实测，**经用户决定暂不修**）。详见下面 resolveInsideWorkspace
-// 里的说明与 `PLAN.md` 排期表的 C33。
+// ⚠️ **这条保证曾经有一个例外：跨盘符**（2026-09-16 真机撞出：只读、免审批的
+// `read_file` 读到了另一个盘的文件）。**2026-09-21 已修**（C33），见
+// resolveInsideWorkspace 里的说明与回归用例 `index.test.ts` 的「跨盘符的绝对路径抛错」。
 // ============================================================
 
-import { relative, resolve } from "node:path";
+import { isAbsolute, relative, resolve } from "node:path";
 
 /** 取字符串参数；空串/非字符串时用 fallback（工具参数的可选值统一入口） */
 export function stringArg(value: unknown, fallback: string): string {
@@ -25,15 +25,21 @@ export function resolveInsideWorkspace(
   const target = resolve(workspaceRoot, input);
   const root = resolve(workspaceRoot);
   const rel = relative(root, target);
-  // ⚠️ 已知漏洞（2026-09-16 真机实测，**故意未修**）：`relative()` 在 Windows 上
-  // 表达不出**跨盘符**相对路径时，会把 target **原样返回**（一个绝对路径），
-  // 于是 `startsWith("..")` 为假 ⇒ **跨盘符的绝对路径能穿出工作区**。
-  // 实测：工作区在 E:，而只读、免审批的 `read_file` 读到了 C: 上的文件。
-  // 同盘符挡得住 —— 所以老用例（夹具与工作区永远同盘）碰不到它，
-  // **测试覆盖的形状和真实越界的形状不一样**。
-  // 修法（`isAbsolute(rel)` 一并判定）与先红后绿的回归用例都已验证过一次，
-  // **留到做项目分组时一起修**（围栏语义那时要重定）——见 `PLAN.md` 排期表的 **C33**。
-  if (rel.startsWith("..") || (rel === "" && input.includes(".."))) {
+  // ⚠️ **跨盘符**（C33，2026-09-21 修）：`relative()` 在 Windows 上表达不出**跨盘符**
+  // 相对路径时，会把 target **原样返回**（一个绝对路径）—— 而绝对路径不以 `..` 开头，
+  // 所以只判 `startsWith("..")` 会**放行**。2026-09-16 真机上就是这么漏的：工作区在 E:，
+  // 而只读、**免审批**的 `read_file` 读到了 C: 上的文件；`read_file`/`grep`/`find`/`list_files`
+  // **共用这一个函数** ⇒ 另一个盘的任意文件都可读，配上自动放行的 `web_fetch` 就是外发通道。
+  // `isAbsolute(rel)` 正是为这个形状准备的：`relative()` 正常工作时**永远**给相对路径。
+  //
+  // 老用例当初碰不到它，是因为夹具与工作区**永远同盘** —— **测试覆盖的形状和真实越界的
+  // 形状不一样**。回归用例见 `index.test.ts` 的「跨盘符的绝对路径抛错」；那条用例保护的
+  // **不是这个实现**，是语义（任何围栏实现都不许跨盘符放行）—— 所以 C6 换围栏时它照样守着。
+  if (
+    rel.startsWith("..") ||
+    isAbsolute(rel) ||
+    (rel === "" && input.includes(".."))
+  ) {
     throw new Error(`路径越界：${input}`);
   }
   return target;
