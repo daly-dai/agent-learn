@@ -12,7 +12,7 @@
 // 105 条塌成 2 行。
 // ============================================================
 
-import type { AgentEvent, TextContent, ToolCallContent } from "@/lib/types";
+import type { AgentEvent } from "@/lib/types";
 import type { ObservedEvent } from "./sse";
 import { textLength } from "./format";
 
@@ -60,7 +60,12 @@ function foldOne(rows: TraceRow[], item: ObservedEvent): void {
       rows.push(openSpan(event.toolName, event.toolCallId, item.at));
       break;
     case "tool_execution_end":
-      closeSpan(rows, event.toolCallId, event.isError, item.at);
+      closeSpan({
+        rows,
+        callId: event.toolCallId,
+        isError: event.isError,
+        at: item.at,
+      });
       break;
     case "tool_permission":
       foldPermission(rows, event);
@@ -83,8 +88,16 @@ function foldMessageStart(rows: TraceRow[], item: ObservedEvent): void {
   const message = item.event.message;
   if (message.role !== "user") return;
 
-  const chars = message.content.reduce((sum, block) => sum + block.text.length, 0);
-  rows.push({ pen: "user", kind: "signal", label: "指令", note: `${chars} 字` });
+  const chars = message.content.reduce(
+    (sum, block) => sum + block.text.length,
+    0,
+  );
+  rows.push({
+    pen: "user",
+    kind: "signal",
+    label: "指令",
+    note: `${chars} 字`,
+  });
 }
 
 /** 连续的流式增量只占一行，长度随字数增长 —— 一支笔画出的一条线 */
@@ -95,7 +108,14 @@ function bumpStroke(rows: TraceRow[], chars: number): void {
     last.note = `${last.size} 字`;
     return;
   }
-  rows.push({ pen: "model", kind: "stroke", label: "输出", size: chars, live: true, note: `${chars} 字` });
+  rows.push({
+    pen: "model",
+    kind: "stroke",
+    label: "输出",
+    size: chars,
+    live: true,
+    note: `${chars} 字`,
+  });
 }
 
 /** 模型消息收尾：给这一笔标上 token 用量；非流式模型在这里补出整笔 */
@@ -114,7 +134,13 @@ function sealStroke(rows: TraceRow[], item: ObservedEvent): void {
   }
 
   const chars = textLength(message.content);
-  rows.push({ pen: "model", kind: "stroke", label: "输出", size: chars, note: `${chars} 字 · ${tokens}` });
+  rows.push({
+    pen: "model",
+    kind: "stroke",
+    label: "输出",
+    size: chars,
+    note: `${chars} 字 · ${tokens}`,
+  });
 }
 
 function openSpan(toolName: string, callId: string, at: number): TraceRow {
@@ -129,8 +155,16 @@ function openSpan(toolName: string, callId: string, at: number): TraceRow {
 }
 
 /** 用 toolCallId 把 end 配回它的 start，两条事件合成一段有长度的跨度 */
-function closeSpan(rows: TraceRow[], callId: string, isError: boolean, at: number): void {
-  const span = [...rows].reverse().find((row) => row.callId === callId && row.live);
+function closeSpan(params: {
+  rows: TraceRow[];
+  callId: string;
+  isError: boolean;
+  at: number;
+}): void {
+  const { rows, callId, isError, at } = params;
+  const span = [...rows]
+    .reverse()
+    .find((row) => row.callId === callId && row.live);
   if (!span) return;
 
   span.live = false;

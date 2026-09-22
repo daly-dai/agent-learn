@@ -7,9 +7,19 @@
 // ============================================================
 
 import { describe, expect, it } from "vitest";
-import type { AgentEvent, AgentMessage, AssistantMessage, ToolResult } from "@/lib/types";
+import type {
+  AgentEvent,
+  AgentMessage,
+  AssistantMessage,
+  ToolResult,
+} from "@/lib/types";
 import type { TraceEntry } from "@/lib/trace";
-import { PROMPT_PREVIEW, RESPONSE_PREVIEW, foldTrace, type TraceRun } from "./index";
+import {
+  PROMPT_PREVIEW,
+  RESPONSE_PREVIEW,
+  foldTrace,
+  type TraceRun,
+} from "./index";
 
 // ---- 测试助手：造条目 / 消息 / 工具结果 ----
 
@@ -57,9 +67,18 @@ function oneTurn(): TraceEntry[] {
     entry(2, { type: "turn_start", turn: 1 }),
     entry(3, { type: "message_start", message: user("你好") }),
     entry(4, { type: "message_update", message: assistant("你"), delta: "你" }),
-    entry(5, { type: "message_update", message: assistant("你好"), delta: "好" }),
+    entry(5, {
+      type: "message_update",
+      message: assistant("你好"),
+      delta: "好",
+    }),
     entry(6, { type: "message_end", message: assistant("你好", 42) }),
-    entry(7, { type: "turn_end", turn: 1, message: assistant("你好", 42), toolResults: [] }),
+    entry(7, {
+      type: "turn_end",
+      turn: 1,
+      message: assistant("你好", 42),
+      toolResults: [],
+    }),
   ];
 }
 
@@ -89,7 +108,9 @@ describe("foldTrace：用户与模型记录", () => {
       tokens: 42,
     });
     expect(outline).toEqual({
-      turns: [{ turn: 1, runIndex: 0, id: "0:2", prompt: "你好", response: "你好" }],
+      turns: [
+        { turn: 1, runIndex: 0, id: "0:2", prompt: "你好", response: "你好" },
+      ],
       steps: 2,
       errors: [],
     });
@@ -130,7 +151,10 @@ describe("foldTrace：用户与模型记录", () => {
     const { records, outline } = foldTrace([
       run(0, [
         entry(1, { type: "turn_start", turn: 1 }),
-        entry(2, { type: "message_start", message: user("用 /code-review 评审") }),
+        entry(2, {
+          type: "message_start",
+          message: user("用 /code-review 评审"),
+        }),
         entry(3, { type: "message_start", message: injectedUser("技能正文…") }),
       ]),
     ]);
@@ -147,12 +171,23 @@ describe("foldTrace：工具配对", () => {
       run(0, [
         entry(
           1,
-          { type: "tool_execution_start", toolCallId: "t1", toolName: "read_file", args: { path: "a.ts" } },
+          {
+            type: "tool_execution_start",
+            toolCallId: "t1",
+            toolName: "read_file",
+            args: { path: "a.ts" },
+          },
           1_000,
         ),
         entry(
           2,
-          { type: "tool_execution_end", toolCallId: "t1", toolName: "read_file", result: toolResult("内容"), isError: false },
+          {
+            type: "tool_execution_end",
+            toolCallId: "t1",
+            toolName: "read_file",
+            result: toolResult("内容"),
+            isError: false,
+          },
           1_250,
         ),
       ]),
@@ -171,16 +206,36 @@ describe("foldTrace：工具配对", () => {
 
   it("两个工具交错时各配各的耗时（按 start 顺序留在列表里）", () => {
     const start = (seq: number, id: string, ts: number): TraceEntry =>
-      entry(seq, { type: "tool_execution_start", toolCallId: id, toolName: id, args: {} }, ts);
+      entry(
+        seq,
+        {
+          type: "tool_execution_start",
+          toolCallId: id,
+          toolName: id,
+          args: {},
+        },
+        ts,
+      );
     const end = (seq: number, id: string, ts: number): TraceEntry =>
       entry(
         seq,
-        { type: "tool_execution_end", toolCallId: id, toolName: id, result: toolResult(id), isError: false },
+        {
+          type: "tool_execution_end",
+          toolCallId: id,
+          toolName: id,
+          result: toolResult(id),
+          isError: false,
+        },
         ts,
       );
 
     const { records } = foldTrace([
-      run(0, [start(1, "a", 100), start(2, "b", 150), end(3, "b", 400), end(4, "a", 500)]),
+      run(0, [
+        start(1, "a", 100),
+        start(2, "b", 150),
+        end(3, "b", 400),
+        end(4, "a", 500),
+      ]),
     ]);
 
     expect(records.map((r) => r.label)).toEqual(["a", "b"]);
@@ -208,7 +263,12 @@ describe("foldTrace：工具配对", () => {
   it("isError 把工具记录改成 error，并把坐标按顺序记进 errors", () => {
     const { records, outline } = foldTrace([
       run(0, [
-        entry(1, { type: "tool_execution_start", toolCallId: "t1", toolName: "bash", args: {} }),
+        entry(1, {
+          type: "tool_execution_start",
+          toolCallId: "t1",
+          toolName: "bash",
+          args: {},
+        }),
         entry(2, {
           type: "tool_execution_end",
           toolCallId: "t1",
@@ -216,7 +276,12 @@ describe("foldTrace：工具配对", () => {
           result: toolResult("boom"),
           isError: true,
         }),
-        entry(3, { type: "tool_execution_start", toolCallId: "t2", toolName: "bash", args: {} }),
+        entry(3, {
+          type: "tool_execution_start",
+          toolCallId: "t2",
+          toolName: "bash",
+          args: {},
+        }),
         entry(4, {
           type: "tool_execution_end",
           toolCallId: "t2",
@@ -274,11 +339,22 @@ describe("foldTrace：轮次大纲", () => {
     ]);
 
     expect(outline.turns).toEqual([
-      { turn: 1, runIndex: 0, id: "0:1", prompt: "原始指令", response: "最终回答" },
+      {
+        turn: 1,
+        runIndex: 0,
+        id: "0:1",
+        prompt: "原始指令",
+        response: "最终回答",
+      },
     ]);
     // 记录行 = 2 条人类消息 + 2 条助手输出：message_end 是「助手消息」边界，
     // 不是「轮次」边界——没有待封口的流式记录时，每条 message_end 各开一条。
-    expect(records.map((r) => r.kind)).toEqual(["user", "user", "model", "model"]);
+    expect(records.map((r) => r.kind)).toEqual([
+      "user",
+      "user",
+      "model",
+      "model",
+    ]);
     expect(outline.steps).toBe(4);
   });
 
@@ -306,7 +382,10 @@ describe("foldTrace：轮次大纲", () => {
 
 describe("foldTrace：信号类记录", () => {
   it("审批 allow 不记（默认路径），block 与 rewrite 各记一条", () => {
-    const permission = (seq: number, action: "allow" | "block" | "rewrite"): TraceEntry =>
+    const permission = (
+      seq: number,
+      action: "allow" | "block" | "rewrite",
+    ): TraceEntry =>
       entry(seq, {
         type: "tool_permission",
         toolCallId: `t${seq}`,
@@ -318,7 +397,11 @@ describe("foldTrace：信号类记录", () => {
       });
 
     const { records } = foldTrace([
-      run(0, [permission(1, "allow"), permission(2, "block"), permission(3, "rewrite")]),
+      run(0, [
+        permission(1, "allow"),
+        permission(2, "block"),
+        permission(3, "rewrite"),
+      ]),
     ]);
 
     expect(records.map((r) => r.label)).toEqual(["审批拦截", "参数改写"]);
@@ -338,7 +421,11 @@ describe("foldTrace：信号类记录", () => {
       ]),
     ]);
 
-    expect(records[0]).toMatchObject({ kind: "signal", label: "上下文压缩", text: "12345 tokens" });
+    expect(records[0]).toMatchObject({
+      kind: "signal",
+      label: "上下文压缩",
+      text: "12345 tokens",
+    });
   });
 });
 

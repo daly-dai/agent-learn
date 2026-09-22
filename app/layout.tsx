@@ -12,7 +12,11 @@ export const metadata: Metadata = {
   description: "观察一个 Agent 如何思考、调用工具、给出答案",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="zh-CN">
       <body>{children}</body>

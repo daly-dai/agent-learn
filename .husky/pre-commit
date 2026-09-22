@@ -1,0 +1,8 @@
+# 提交门：只对**暂存区**的文件跑检查，不碰你没改的文件。
+# 为什么是 lint-staged 而不是全库 lint：全库跑一次要几秒到几十秒，而提交是高频动作 ——
+# 慢的钩子会被绕过（--no-verify），那还不如没有。全库的把关交给 `pnpm lint` / `pnpm format:check`。
+#
+# lint-staged 的配置在 package.json（`*.{ts,tsx}` → eslint --fix + prettier --write）。
+# 为什么用 pnpm exec 而不是 npx：本项目是 pnpm 单包管理器，pnpm exec 直接解析本地 bin，
+# 不会像 npx 那样在找不到时尝试联网下载。
+pnpm exec lint-staged

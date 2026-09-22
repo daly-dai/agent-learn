@@ -85,12 +85,12 @@ export function createWebSearchTool(
       const queries = readQueries(args.queries, maxQueries);
       const provider = deps.provider ?? defaultProvider(maxResults);
 
-      const merged = await runQueries(
+      const merged = await runQueries({
         provider,
         queries,
         maxResults,
-        options?.signal,
-      );
+        signal: options?.signal,
+      });
 
       return {
         content: [text(formatSearchOutput(merged))],
@@ -171,12 +171,13 @@ export function readQueries(raw: unknown, maxQueries: number): string[] {
  * 用 `Promise.all` 的话，第一个 rejection 抛出后，其余失败会变成
  * unhandled rejection（一次调用 = 最多 4 个请求，全失败很常见）。
  */
-async function runQueries(
-  provider: WebSearchProvider,
-  queries: string[],
-  maxResults: number,
-  signal?: AbortSignal,
-): Promise<WebSearchResult> {
+async function runQueries(params: {
+  provider: WebSearchProvider;
+  queries: string[];
+  maxResults: number;
+  signal?: AbortSignal;
+}): Promise<WebSearchResult> {
+  const { provider, queries, maxResults, signal } = params;
   const [only] = queries;
   // 单查询：直接用 provider 的结果，不走合并（合并只会多一次无谓的搬运）
   if (queries.length === 1 && only !== undefined) {
@@ -269,7 +270,9 @@ export function formatSearchOutput(result: WebSearchResult): string {
   } else {
     // ⚠️ 绝不返回空字符串：空结果在工具输出里等于"工具坏了"，模型只能瞎猜。
     // 明说没查到，它才会换查询词或如实回答。
-    parts.push("这次搜索没有返回任何来源。换个说法再搜，或如实告诉用户你没查到。");
+    parts.push(
+      "这次搜索没有返回任何来源。换个说法再搜，或如实告诉用户你没查到。",
+    );
   }
 
   if (result.truncated) {

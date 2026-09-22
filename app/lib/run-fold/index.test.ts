@@ -8,7 +8,6 @@
 
 import { describe, expect, it } from "vitest";
 import type {
-  AgentEvent,
   AgentMessage,
   AssistantMessage,
   SessionStats,
@@ -119,10 +118,14 @@ describe("foldRunFrame —— 帧折叠", () => {
 
   it("event(message_start)：消息进转录稿 + observed 记录（seq 递增、at 注入）", () => {
     const msg = userMsg("你好");
-    const next = foldRunFrame(EMPTY_RUN, {
-      type: "event",
-      event: { type: "message_start", message: msg },
-    }, 42);
+    const next = foldRunFrame(
+      EMPTY_RUN,
+      {
+        type: "event",
+        event: { type: "message_start", message: msg },
+      },
+      42,
+    );
     expect(next.messages).toEqual([msg]);
     expect(next.observed).toEqual([
       { seq: 1, at: 42, event: { type: "message_start", message: msg } },
@@ -199,7 +202,10 @@ describe("foldRunFrame —— 帧折叠", () => {
     expect(next.runId).toBe("run-9");
     expect(next.stats).toEqual(STATS);
     expect(next.todos).toEqual(TODOS);
-    expect(next.contextPressure).toEqual({ contextWindow: 128_000, pressureTokens: 5000 });
+    expect(next.contextPressure).toEqual({
+      contextWindow: 128_000,
+      pressureTokens: 5000,
+    });
     expect(next.pendingApproval).toBeNull();
     expect(next.pendingAsk).toBeNull();
     expect(next.compacting).toBe(false);
@@ -211,10 +217,13 @@ describe("foldRunFrame —— 帧折叠", () => {
       type: "event",
       event: { type: "message_start", message: userMsg("已说了一半") },
     });
-    const next = foldRunFrame({ ...base, compacting: true }, {
-      type: "error",
-      message: "网络断了",
-    });
+    const next = foldRunFrame(
+      { ...base, compacting: true },
+      {
+        type: "error",
+        message: "网络断了",
+      },
+    );
     expect(next.error).toBe("网络断了");
     expect(next.compacting).toBe(false);
     expect(next.lastOutcome).toBe("error");
@@ -273,7 +282,10 @@ describe("foldRunFrame —— 帧折叠", () => {
   });
 
   it("compacting：置位压缩中", () => {
-    const next = foldRunFrame(EMPTY_RUN, { type: "compacting", tokensBefore: 90_000 });
+    const next = foldRunFrame(EMPTY_RUN, {
+      type: "compacting",
+      tokensBefore: 90_000,
+    });
     expect(next.compacting).toBe(true);
   });
 });
@@ -312,7 +324,9 @@ describe("deriveRunPhase —— 状态点阶段（优先级：审批>提问>执�
   });
 
   it("上次出错 → error", () => {
-    expect(deriveRunPhase({ ...EMPTY_RUN, lastOutcome: "error" })).toBe("error");
+    expect(deriveRunPhase({ ...EMPTY_RUN, lastOutcome: "error" })).toBe(
+      "error",
+    );
   });
 
   it("审批与提问并存时审批优先", () => {
@@ -338,7 +352,10 @@ describe("applyHistory / applyCommandResult —— 冷会话恢复与命令回�
     expect(next.messages).toEqual([userMsg("历史一")]);
     expect(next.stats).toEqual(STATS);
     expect(next.todos).toEqual(TODOS);
-    expect(next.contextPressure).toEqual({ contextWindow: 128_000, pressureTokens: 3000 });
+    expect(next.contextPressure).toEqual({
+      contextWindow: 128_000,
+      pressureTokens: 3000,
+    });
     // 历史恢复不是 run：不动 loading/结局
     expect(next.loading).toBe(false);
     expect(next.lastOutcome).toBe("none");
@@ -350,7 +367,10 @@ describe("applyHistory / applyCommandResult —— 冷会话恢复与命令回�
       stats: STATS,
       todos: TODOS,
     });
-    const next = applyHistory(withTodos, { messages: [userMsg("更多")], stats: STATS });
+    const next = applyHistory(withTodos, {
+      messages: [userMsg("更多")],
+      stats: STATS,
+    });
     expect(next.todos).toEqual(TODOS); // 保留
     expect(next.contextPressure).toBeUndefined(); // 原来就没有
   });
@@ -366,7 +386,10 @@ describe("applyHistory / applyCommandResult —— 冷会话恢复与命令回�
     expect(next.messages).toEqual([userMsg("压缩后有卡片")]);
     expect(next.stats).toEqual(STATS);
     expect(next.todos).toEqual(TODOS);
-    expect(next.contextPressure).toEqual({ contextWindow: 128_000, pressureTokens: 1000 });
+    expect(next.contextPressure).toEqual({
+      contextWindow: 128_000,
+      pressureTokens: 1000,
+    });
     expect(next.commandFeedback).toBe("");
   });
 

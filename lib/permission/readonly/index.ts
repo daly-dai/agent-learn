@@ -20,40 +20,112 @@
 /** 单命令只读表：程序名本身 = 只读行为（无文件/网络/进程副作用） */
 const READ_ONLY_COMMANDS = new Set([
   // Unix 常用（抄 Reasonix readOnlyCommands）
-  "cat", "head", "tail", "less", "more",
-  "ls", "dir", "find", "locate", "which", "whereis", "type",
-  "grep", "egrep", "fgrep", "rg",
-  "echo", "printf",
-  "pwd", "cd", "whoami", "id", "uname", "hostname",
-  "date", "printenv",
-  "wc", "sort", "uniq", "cut", "tr",
-  "stat", "file", "du", "df",
-  "ps", "top", "htop",
-  "diff", "cmp", "comm",
-  "man", "info", "help",
-  "true", "false", "test", "[",
-  "basename", "dirname", "realpath", "readlink",
+  "cat",
+  "head",
+  "tail",
+  "less",
+  "more",
+  "ls",
+  "dir",
+  "find",
+  "locate",
+  "which",
+  "whereis",
+  "type",
+  "grep",
+  "egrep",
+  "fgrep",
+  "rg",
+  "echo",
+  "printf",
+  "pwd",
+  "cd",
+  "whoami",
+  "id",
+  "uname",
+  "hostname",
+  "date",
+  "printenv",
+  "wc",
+  "sort",
+  "uniq",
+  "cut",
+  "tr",
+  "stat",
+  "file",
+  "du",
+  "df",
+  "ps",
+  "top",
+  "htop",
+  "diff",
+  "cmp",
+  "comm",
+  "man",
+  "info",
+  "help",
+  "true",
+  "false",
+  "test",
+  "[",
+  "basename",
+  "dirname",
+  "realpath",
+  "readlink",
   // PowerShell 观察性 cmdlet（抄 Reasonix 的窄表：只列动词本质
   // 是观察的 cmdlet；get-content 读、get-process 查进程等）
-  "get-childitem", "get-content", "get-item", "get-location",
-  "get-process", "get-command", "get-nettcpconnection",
-  "resolve-path", "select-string", "measure-object", "compare-object",
+  "get-childitem",
+  "get-content",
+  "get-item",
+  "get-location",
+  "get-process",
+  "get-command",
+  "get-nettcpconnection",
+  "resolve-path",
+  "select-string",
+  "measure-object",
+  "compare-object",
   // PowerShell 常用别名
-  "where", "select",
+  "where",
+  "select",
 ]);
 
 /** 子命令只读表：base → 只读子命令集合（不在集合里 = fail-closed 弹框） */
 const READ_ONLY_PREFIXES: Record<string, Set<string>> = {
   git: new Set([
-    "log", "status", "diff", "show", "tag", "blame", "grep", "ls-files",
-    "ls-tree", "rev-parse", "rev-list", "describe", "reflog", "shortlog",
-    "whatchanged", "cherry", "cat-file", "for-each-ref", "name-rev",
+    "log",
+    "status",
+    "diff",
+    "show",
+    "tag",
+    "blame",
+    "grep",
+    "ls-files",
+    "ls-tree",
+    "rev-parse",
+    "rev-list",
+    "describe",
+    "reflog",
+    "shortlog",
+    "whatchanged",
+    "cherry",
+    "cat-file",
+    "for-each-ref",
+    "name-rev",
   ]),
   go: new Set(["vet", "doc", "list", "version", "env"]),
   npm: new Set(["ls", "list", "view", "info", "outdated", "audit"]),
   // cargo 整表去掉（Reasonix：check/doc 写 target/ 构建产物、search 走网络——
   // 都不算纯只读；教学环境 cargo 少用，全弹框 fail-closed 最安全）
-  docker: new Set(["ps", "images", "inspect", "logs", "stats", "info", "version"]),
+  docker: new Set([
+    "ps",
+    "images",
+    "inspect",
+    "logs",
+    "stats",
+    "info",
+    "version",
+  ]),
   node: new Set(["-v", "--version"]),
   python: new Set(["--version", "-v", "-V"]),
   python3: new Set(["--version", "-v", "-V"]),
@@ -78,20 +150,28 @@ function hasWriteArgs(base: string, sub: string, args: string[]): boolean {
   switch (base) {
     case "find":
       return args.some((a) =>
-        ["-exec", "-execdir", "-delete", "-ok", "-okdir",
-          "-fls", "-fprint", "-fprint0", "-fprintf"].includes(a),
+        [
+          "-exec",
+          "-execdir",
+          "-delete",
+          "-ok",
+          "-okdir",
+          "-fls",
+          "-fprint",
+          "-fprint0",
+          "-fprintf",
+        ].includes(a),
       );
     case "sort":
-      return args.some((a) =>
-        a === "-o" || a === "--output" || a.startsWith("--output="),
+      return args.some(
+        (a) => a === "-o" || a === "--output" || a.startsWith("--output="),
       );
     case "git":
       if (sub === "tag") {
         // tag 只在"列出现"（无操作数，或带 -l/--list）时只读；
         // `git tag v1.0` = 创建 tag（写），必须拦截
         const listing =
-          args.length === 0 ||
-          args.some((a) => a === "-l" || a === "--list");
+          args.length === 0 || args.some((a) => a === "-l" || a === "--list");
         return !listing;
       }
       if (
@@ -122,7 +202,10 @@ function hasWriteArgs(base: string, sub: string, args: string[]): boolean {
  * 影响 args，不影响 base/sub 查表；引号内的 | > 会被走私检测拦下
  * 成弹框——保守方向，安全）。 */
 function splitCommand(command: string): string[] {
-  return command.trim().split(/\s+/).filter((w) => w.length > 0);
+  return command
+    .trim()
+    .split(/\s+/)
+    .filter((w) => w.length > 0);
 }
 
 /** 命令分类结果 */
@@ -152,7 +235,8 @@ export function classifyReadOnlyCommand(command: string): ReadOnlyClass {
   if (args.length > 0) {
     const sub = args[0]!.toLowerCase();
     if (READ_ONLY_PREFIXES[base]?.has(sub)) {
-      if (hasWriteArgs(base, sub, args.slice(1))) return { base, sub, ok: false };
+      if (hasWriteArgs(base, sub, args.slice(1)))
+        return { base, sub, ok: false };
       return { base, sub, ok: true };
     }
   }

@@ -10,8 +10,13 @@
 // ============================================================
 
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+} from "node:fs";
 import { join } from "node:path";
 import type { AssistantMessage } from "@/lib/types";
 import type { CompleteInput, TeachingModel } from "@/lib/model";
@@ -87,7 +92,9 @@ describe("summarizeUpdate —— 变更总结", () => {
     fakeModel.setHandler((input) => {
       // 验证 prompt 里带了 commit 和项目背景
       expect(input.messages.length).toBe(1);
-      const text = (input.messages[0] as { content: { type: "text"; text: string }[] }).content
+      const text = (
+        input.messages[0] as { content: { type: "text"; text: string }[] }
+      ).content
         .map((c) => (c.type === "text" ? c.text : ""))
         .join("");
       expect(text).toContain("abc1234 修复 X");
@@ -95,10 +102,11 @@ describe("summarizeUpdate —— 变更总结", () => {
       return assistant("## 更新概览\n修复了 X");
     });
 
-    const summary = await summarizeUpdate("pi", "主参考：agent-loop", [
-      "abc1234 修复 X",
-      "def5678 新增 Y",
-    ]);
+    const summary = await summarizeUpdate({
+      repoName: "pi",
+      note: "主参考：agent-loop",
+      commits: ["abc1234 修复 X", "def5678 新增 Y"],
+    });
 
     expect(summary.degraded).toBe(false);
     expect(summary.text).toContain("更新概览");
@@ -108,7 +116,11 @@ describe("summarizeUpdate —— 变更总结", () => {
     const spy = vi.fn();
     fakeModel.setHandler(spy as never);
 
-    const summary = await summarizeUpdate("pi", "note", []);
+    const summary = await summarizeUpdate({
+      repoName: "pi",
+      note: "note",
+      commits: [],
+    });
 
     expect(spy).not.toHaveBeenCalled();
     expect(summary.text).toBe("");
@@ -118,7 +130,9 @@ describe("summarizeUpdate —— 变更总结", () => {
   it("超过 40 条 commit 截断（防撑爆请求，提示截断）", async () => {
     let promptText = "";
     fakeModel.setHandler((input) => {
-      const text = (input.messages[0] as { content: { type: "text"; text: string }[] }).content
+      const text = (
+        input.messages[0] as { content: { type: "text"; text: string }[] }
+      ).content
         .map((c) => (c.type === "text" ? c.text : ""))
         .join("");
       promptText = text;
@@ -126,7 +140,7 @@ describe("summarizeUpdate —— 变更总结", () => {
     });
 
     const many = Array.from({ length: 50 }, (_, i) => `commit-${i} msg`);
-    await summarizeUpdate("pi", "note", many);
+    await summarizeUpdate({ repoName: "pi", note: "note", commits: many });
 
     expect(promptText).toContain("共 50 条，以下展示前 40 条");
     expect(promptText).toContain("commit-0");
@@ -135,29 +149,39 @@ describe("summarizeUpdate —— 变更总结", () => {
 
   it("模型返回 error → 降级 degraded=true", async () => {
     fakeModel.setHandler(() => assistant("", "error"));
-    const summary = await summarizeUpdate("pi", "note", ["c1 msg"]);
+    const summary = await summarizeUpdate({
+      repoName: "pi",
+      note: "note",
+      commits: ["c1 msg"],
+    });
     expect(summary.degraded).toBe(true);
     expect(summary.text).toBe("");
   });
 
   it("模型返回空文本 → 降级 degraded=true（fail-closed）", async () => {
     fakeModel.setHandler(() => assistant("   "));
-    const summary = await summarizeUpdate("pi", "note", ["c1 msg"]);
+    const summary = await summarizeUpdate({
+      repoName: "pi",
+      note: "note",
+      commits: ["c1 msg"],
+    });
     expect(summary.degraded).toBe(true);
   });
 });
 
 describe("saveUpdateLog —— 落盘 workspace", () => {
   it("生成 workspace/更新日志/<日期>-<项目>.md，含 commit 列表与总结", async () => {
-    const ok = await saveUpdateLog("pi", { text: "## 更新概览\n修了 X", degraded: false }, [
-      "abc1234 修复 X",
-    ]);
+    const ok = await saveUpdateLog(
+      "pi",
+      { text: "## 更新概览\n修了 X", degraded: false },
+      ["abc1234 修复 X"],
+    );
 
     expect(ok).toBe(true);
     // 找生成的文件（日期动态，扫目录）
     const dir = join(tempDir, "更新日志");
     expect(existsSync(dir)).toBe(true);
-    const files = require("node:fs").readdirSync(dir) as string[];
+    const files = readdirSync(dir) as string[];
     const mine = files.find((f) => f.endsWith("-pi.md"));
     expect(mine).toBeDefined();
 
@@ -168,10 +192,12 @@ describe("saveUpdateLog —— 落盘 workspace", () => {
   });
 
   it("降级总结也落盘（标记未生成 LLM 总结）", async () => {
-    const ok = await saveUpdateLog("codex", { text: "", degraded: true }, ["c1 msg"]);
+    const ok = await saveUpdateLog("codex", { text: "", degraded: true }, [
+      "c1 msg",
+    ]);
     expect(ok).toBe(true);
     const dir = join(tempDir, "更新日志");
-    const files = require("node:fs").readdirSync(dir) as string[];
+    const files = readdirSync(dir) as string[];
     const mine = files.find((f) => f.endsWith("-codex.md"));
     expect(mine).toBeDefined();
     expect(readFileSync(join(dir, mine!), "utf8")).toContain("未生成 LLM 总结");

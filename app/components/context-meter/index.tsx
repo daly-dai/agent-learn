@@ -16,7 +16,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import styles from "./context-meter.module.css";
-import { contextOccupancy, type ContextPressure } from "@/app/lib/context-occupancy";
+import {
+  contextOccupancy,
+  type ContextPressure,
+} from "@/app/lib/context-occupancy";
 
 /** 圆环几何：14px viewBox、2px stroke */
 const RADIUS = 5.5;
@@ -33,7 +36,11 @@ function formatTokens(value: number): string {
   return `${scaled(value / 1_000_000)}M`;
 }
 
-export function ContextMeter({ pressure }: { pressure: ContextPressure | undefined }) {
+export function ContextMeter({
+  pressure,
+}: {
+  pressure: ContextPressure | undefined;
+}) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLSpanElement>(null);
   const context = contextOccupancy(pressure);
@@ -41,14 +48,18 @@ export function ContextMeter({ pressure }: { pressure: ContextPressure | undefin
 
   // 数据消失（切模型/清空）时关闭已开面板，不保留过期 UI
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- "外部数据消失 → 关掉过期面板"只能由 effect 驱动；改成派生值要动组件状态模型（重构级改动）→ 见池子 C46
     if (!available && open) setOpen(false);
   }, [available, open]);
 
   // 外部点击 / Esc 关闭（Menu 同款模式）
   useEffect(() => {
-    if (!open || !available) return;
+    if (!open || !available) return undefined;
     const onPointerDown = (e: PointerEvent): void => {
-      if (e.target instanceof Node && rootRef.current?.contains(e.target) === true) {
+      if (
+        e.target instanceof Node &&
+        rootRef.current?.contains(e.target) === true
+      ) {
         return;
       }
       setOpen(false);
@@ -87,13 +98,17 @@ export function ContextMeter({ pressure }: { pressure: ContextPressure | undefin
             cx="7"
             cy="7"
             r={RADIUS}
-            strokeDasharray={`${CIRCUMFERENCE * percent / 100} ${CIRCUMFERENCE}`}
+            strokeDasharray={`${(CIRCUMFERENCE * percent) / 100} ${CIRCUMFERENCE}`}
             transform="rotate(-90 7 7)"
           />
         </svg>
       </button>
       {open && (
-        <div className={styles.panel} role="dialog" aria-label={`上下文已用 ${reading}`}>
+        <div
+          className={styles.panel}
+          role="dialog"
+          aria-label={`上下文已用 ${reading}`}
+        >
           <div className={styles.header}>
             <span className={styles.percent}>{reading}</span>
             <span className={styles.headline}>上下文已用</span>
@@ -102,10 +117,7 @@ export function ContextMeter({ pressure }: { pressure: ContextPressure | undefin
             </span>
           </div>
           <div className={styles.bar}>
-            <div
-              className={styles.segment}
-              style={{ width: `${percent}%` }}
-            />
+            <div className={styles.segment} style={{ width: `${percent}%` }} />
           </div>
         </div>
       )}

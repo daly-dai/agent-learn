@@ -16,7 +16,8 @@
 // 不校验就能 `../../x` 越界（见 lib/sessionManager.ts 的说明）。
 // ============================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { SessionManager, isValidSessionId } from "@/lib/session";
 import { config } from "@/lib/config";
 
@@ -24,7 +25,10 @@ export const runtime = "nodejs";
 
 // SessionManager 无内存态（方法直接打文件系统），模块级单例安全
 // 路径来自 lib/config.ts（唯一配置入口，环境变量可覆盖）
-const manager = new SessionManager(config.paths.sessions, config.paths.workspace);
+const manager = new SessionManager(
+  config.paths.sessions,
+  config.paths.workspace,
+);
 
 // --- GET /api/sessions：会话列表 ---
 export async function GET() {

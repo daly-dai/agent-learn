@@ -21,8 +21,8 @@ const g = globalThis as {
   __sessionApprovals?: Map<string, Set<string>>;
 };
 
-const sessionApprovals: Map<string, Set<string>> =
-  (g.__sessionApprovals ??= new Map());
+const sessionApprovals: Map<string, Set<string>> = (g.__sessionApprovals ??=
+  new Map());
 
 /** 本会话内是否已允许过该工具（不弹框） */
 export function isSessionApproved(

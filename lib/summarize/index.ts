@@ -132,25 +132,16 @@ export function serializeConversation(messages: AgentMessage[]): string {
     if (message.role === "user") {
       const content = messageText(message);
       if (content) parts.push(`[User]: ${content}`);
-    } else if (message.role === "assistant") {
-      const texts: string[] = [];
-      const toolCalls: string[] = [];
+      continue;
+    }
 
-      // 分离文本块和工具调用
-      for (const block of message.content) {
-        if (block.type === "text" && block.text) {
-          texts.push(block.text);
-        } else if (block.type === "toolCall") {
-          toolCalls.push(formatToolCall(block));
-        }
-      }
+    if (message.role === "compactionSummary") {
+      // 旧摘要（多次压缩时可能出现）：原样带过去，供增量合并
+      parts.push(`[Compaction summary]: ${message.summary}`);
+      continue;
+    }
 
-      if (texts.length > 0) parts.push(`[Assistant]: ${texts.join("\n")}`);
-
-      if (toolCalls.length > 0) {
-        parts.push(`[Assistant tool calls]: ${toolCalls.join("; ")}`);
-      }
-    } else if (message.role === "toolResult") {
+    if (message.role === "toolResult") {
       const content = messageText(message);
 
       if (content) {
@@ -158,9 +149,27 @@ export function serializeConversation(messages: AgentMessage[]): string {
           `[Tool result]: ${truncateForSummary(content, TOOL_RESULT_MAX_CHARS)}`,
         );
       }
-    } else if (message.role === "compactionSummary") {
-      // 旧摘要（多次压缩时可能出现）：原样带过去，供增量合并
-      parts.push(`[Compaction summary]: ${message.summary}`);
+      continue;
+    }
+
+    // user / 摘要 / 工具结果都已在上面 continue 掉，剩下的一定是 assistant
+    // （四种角色互斥）。不套 if，下面那层 for 才停在 max-depth 之内。
+    const texts: string[] = [];
+    const toolCalls: string[] = [];
+
+    // 分离文本块和工具调用
+    for (const block of message.content) {
+      if (block.type === "text" && block.text) {
+        texts.push(block.text);
+      } else if (block.type === "toolCall") {
+        toolCalls.push(formatToolCall(block));
+      }
+    }
+
+    if (texts.length > 0) parts.push(`[Assistant]: ${texts.join("\n")}`);
+
+    if (toolCalls.length > 0) {
+      parts.push(`[Assistant tool calls]: ${toolCalls.join("; ")}`);
     }
   }
 

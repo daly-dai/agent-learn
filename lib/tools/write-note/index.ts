@@ -31,8 +31,14 @@ export function createWriteNoteTool(workspaceRoot: string): RegisteredTool {
       required: ["fileName", "content"],
     },
     async execute(args) {
-      const fileName = stringArg(args.fileName, "note.md").replace(/[/\\]/g, "-");
-      const notePath = resolveInsideWorkspace(workspaceRoot, `notes/${fileName}`);
+      const fileName = stringArg(args.fileName, "note.md").replace(
+        /[/\\]/g,
+        "-",
+      );
+      const notePath = resolveInsideWorkspace(
+        workspaceRoot,
+        `notes/${fileName}`,
+      );
       await mkdir(dirname(notePath), { recursive: true });
       await writeFile(notePath, `${stringArg(args.content, "")}\n`, "utf8");
       return {

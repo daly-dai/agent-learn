@@ -11,8 +11,15 @@
 // ============================================================
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { rename } from "node:fs/promises";
+import type * as fsPromises from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SessionManager } from ".";
@@ -23,7 +30,7 @@ import { createUserMessage } from "../../message";
 // 磁盘状态。**原子性本身（进程被杀）在单测里造不出来，造了也是假的**，
 // 所以我们不造崩溃，造它**可观测的那一半**："替换这一步发生前，原文件始终完整"。
 vi.mock("node:fs/promises", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  const actual = await importOriginal<typeof fsPromises>();
   return { ...actual, rename: vi.fn(actual.rename) };
 });
 
@@ -38,7 +45,11 @@ function makeManager(): {
 } {
   const dir = mkdtempSync(join(tmpdir(), "session-manager-test-"));
   const manager = new SessionManager(dir, dir);
-  return { manager, dir, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
+  return {
+    manager,
+    dir,
+    cleanup: () => rmSync(dir, { recursive: true, force: true }),
+  };
 }
 
 describe("SessionManager 会话目录操作", () => {
@@ -97,9 +108,11 @@ describe("rename 原子写 —— 先写临时文件再替换", () => {
     try {
       const id = await manager.create("旧标题");
       // 走真管道塞一条真消息（不手拼 JSON）——"只改首行、不动其余行"才有东西可验
-      await new JsonlSessionStore(manager.sessionPath(id), dir, id).appendMessage(
-        createUserMessage("一条真消息"),
-      );
+      await new JsonlSessionStore({
+        filePath: manager.sessionPath(id),
+        cwd: dir,
+        sessionId: id,
+      }).appendMessage(createUserMessage("一条真消息"));
 
       await manager.rename(id, "新标题");
 
@@ -116,10 +129,7 @@ describe("rename 原子写 —— 先写临时文件再替换", () => {
 
   it("⭐ 替换前一刻：原文件仍是完整旧内容、临时文件已是完整新内容", async () => {
     const { manager, dir, cleanup } = makeManager();
-    const actual =
-      await vi.importActual<typeof import("node:fs/promises")>(
-        "node:fs/promises",
-      );
+    const actual = await vi.importActual<typeof fsPromises>("node:fs/promises");
     try {
       const id = await manager.create("旧标题");
       const filePath = join(dir, `${id}.jsonl`);

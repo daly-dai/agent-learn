@@ -78,7 +78,8 @@
      （删 .next 冷启动必现），故去掉 Google 字体、直接用系统栈。
      中文本就由系统字体接管（PingFang SC / 微软雅黑），视觉退化很小。 */
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Microsoft YaHei", sans-serif;
 
   /* 圆角：机加工面板的感觉，不是气泡。

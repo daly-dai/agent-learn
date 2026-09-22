@@ -17,7 +17,12 @@
 
 import type { RegisteredTool } from "../types";
 import { stringArg } from "../path-utils";
-import { findSkill, loadSkills, MAX_LISTED_FILES, renderSkillContent } from "../../skill";
+import {
+  findSkill,
+  loadSkills,
+  MAX_LISTED_FILES,
+  renderSkillContent,
+} from "../../skill";
 import { text } from "../../message";
 
 /**
@@ -52,7 +57,8 @@ export function createSkillTool(skillsRoot: string): RegisteredTool {
       properties: {
         name: {
           type: "string",
-          description: "技能名（技能清单里的名字，= 技能目录名），例如 code-review。",
+          description:
+            "技能名（技能清单里的名字，= 技能目录名），例如 code-review。",
         },
       },
       required: ["name"],

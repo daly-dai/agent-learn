@@ -19,7 +19,11 @@ import type { CommandApi } from "../types";
 
 function makeStore() {
   const dir = mkdtempSync(join(tmpdir(), "commands-clear-test-"));
-  const store = new JsonlSessionStore(join(dir, "test.jsonl"), dir, "test-session");
+  const store = new JsonlSessionStore({
+    filePath: join(dir, "test.jsonl"),
+    cwd: dir,
+    sessionId: "test-session",
+  });
   const cleanup = () => rmSync(dir, { recursive: true, force: true });
   return { store, cleanup };
 }
@@ -60,7 +64,10 @@ describe("/clear 命令（createClearCommand + 注册表集成）", () => {
         apiOf(store),
         new AbortController().signal,
       );
-      expect(result).toEqual({ kind: "error", text: "用法: /clear（不接受参数）" });
+      expect(result).toEqual({
+        kind: "error",
+        text: "用法: /clear（不接受参数）",
+      });
     } finally {
       cleanup();
     }

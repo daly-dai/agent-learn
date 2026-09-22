@@ -55,7 +55,9 @@
 }
 
 .back:hover {
-  background: var(--feed-hover); /* C35：原来用 --recorder（在这个白页上是"变暗"），与侧栏 hover 的"变亮"方向相反 */
+  background: var(
+    --feed-hover
+  ); /* C35：原来用 --recorder（在这个白页上是"变暗"），与侧栏 hover 的"变亮"方向相反 */
 }
 
 /* ============ 左右主体 ============ */
@@ -196,7 +198,9 @@
 
 .rowUpdateBtn:hover:not(:disabled) {
   border-color: var(--line);
-  background: var(--feed-hover); /* C35：原来借「面」（--plate），而所在行是白 */
+  background: var(
+    --feed-hover
+  ); /* C35：原来借「面」（--plate），而所在行是白 */
   color: var(--pen-user);
 }
 

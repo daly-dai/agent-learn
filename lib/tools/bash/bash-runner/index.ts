@@ -89,9 +89,7 @@ export function buildWindowsCommandLine(command: string): string {
   // pwsh -EncodedCommand 要求 UTF-16LE（含 BOM 语义）的 base64
   const encoded = Buffer.from(command, "utf16le").toString("base64");
   // PWSH_PATH 指向真实 pwsh 时加引号（路径可能含空格）
-  const pwsh = process.env.PWSH_PATH
-    ? `"${process.env.PWSH_PATH}"`
-    : "pwsh";
+  const pwsh = process.env.PWSH_PATH ? `"${process.env.PWSH_PATH}"` : "pwsh";
   return `chcp 65001 >nul & ${pwsh} -NoProfile -EncodedCommand ${encoded}`;
 }
 
@@ -107,7 +105,13 @@ export function buildWindowsCommandLine(command: string): string {
 export function bashProcessEnv(
   base: NodeJS.ProcessEnv = process.env,
 ): NodeJS.ProcessEnv {
-  return { ...base, NO_COLOR: "1", TERM: "dumb", PAGER: "cat", GIT_PAGER: "cat" };
+  return {
+    ...base,
+    NO_COLOR: "1",
+    TERM: "dumb",
+    PAGER: "cat",
+    GIT_PAGER: "cat",
+  };
 }
 
 /**
@@ -146,15 +150,11 @@ export class BashRunner {
       // 非 Windows：直接 bash -c。
       const proc =
         process.platform === "win32"
-          ? spawn(
-              "cmd",
-              ["/d", "/s", "/c", buildWindowsCommandLine(command)],
-              {
-                cwd: options.cwd,
-                stdio: ["ignore", "pipe", "pipe"],
-                env: bashProcessEnv(),
-              },
-            )
+          ? spawn("cmd", ["/d", "/s", "/c", buildWindowsCommandLine(command)], {
+              cwd: options.cwd,
+              stdio: ["ignore", "pipe", "pipe"],
+              env: bashProcessEnv(),
+            })
           : spawn("bash", ["-c", command], {
               cwd: options.cwd,
               stdio: ["ignore", "pipe", "pipe"],
@@ -215,7 +215,10 @@ export class BashRunner {
         }
       };
 
-      const timer = setTimeout(killProcess, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+      const timer = setTimeout(
+        killProcess,
+        options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+      );
       options.signal?.addEventListener("abort", killProcess, { once: true });
 
       proc.on("close", (code) => {

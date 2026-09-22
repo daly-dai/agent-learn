@@ -24,8 +24,6 @@
 // ============================================================
 
 import { create } from "zustand";
-import type { AgentMessage, SessionStats, TodoItem } from "@/lib/types";
-import type { ContextPressure } from "@/app/lib/context-occupancy";
 import {
   approveTool,
   answerUserQuestion,
@@ -143,7 +141,11 @@ export const useRunStore = create<RunStore>()((set, get) => ({
         if (!prev) return state;
         // 保持原 run-fold 语义：错误文案 + compacting 复位（error 帧同款）；
         // loading 由 finally 收尾
-        return replaceRun(state, sessionId, { ...prev, error: msg, compacting: false });
+        return replaceRun(state, sessionId, {
+          ...prev,
+          error: msg,
+          compacting: false,
+        });
       });
     } finally {
       activeAborts.delete(sessionId);
@@ -285,7 +287,11 @@ export const useRunStore = create<RunStore>()((set, get) => ({
       return replaceRun(state, sessionId, { ...prev, pendingApproval: null });
     });
     try {
-      await approveTool({ toolCallId: pending.toolCallId, ...decision, sessionId });
+      await approveTool({
+        toolCallId: pending.toolCallId,
+        ...decision,
+        sessionId,
+      });
     } catch {
       // 404 = 已超时/已处理，无需处理
     }
@@ -303,7 +309,11 @@ export const useRunStore = create<RunStore>()((set, get) => ({
       await answerUserQuestion({ toolCallId: pending.toolCallId, answers });
     } catch (e) {
       // 404 = 服务端没有这个挂起提问（已超时 / 或 ask-user 路由未加载）。
-      console.warn("回传提问回答失败", (e as Error).message, pending.toolCallId);
+      console.warn(
+        "回传提问回答失败",
+        (e as Error).message,
+        pending.toolCallId,
+      );
     }
   },
 }));

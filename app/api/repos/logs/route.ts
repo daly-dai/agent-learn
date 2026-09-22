@@ -11,7 +11,8 @@
 // 文件来自 saveUpdateLog 的固定命名，读的是自己写的东西（白名单内）。
 // ============================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { listUpdateLogs, readAllLogs } from "../_lib/history";
 
 export const runtime = "nodejs";

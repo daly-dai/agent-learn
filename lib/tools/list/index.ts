@@ -2,7 +2,6 @@
 // list_files —— 列出工作区文件
 // ============================================================
 
-import { relative } from "node:path";
 import type { RegisteredTool } from "../types";
 import { resolveInsideWorkspace, stringArg } from "../path-utils";
 import { listFiles } from "../shared";
@@ -22,7 +21,10 @@ export function createListTool(workspaceRoot: string): RegisteredTool {
       },
     },
     async execute(args) {
-      const dir = resolveInsideWorkspace(workspaceRoot, stringArg(args.path, "."));
+      const dir = resolveInsideWorkspace(
+        workspaceRoot,
+        stringArg(args.path, "."),
+      );
       const entries = await listFiles(dir, workspaceRoot);
       return {
         content: [text(entries.length > 0 ? entries.join("\n") : "(空目录)")],

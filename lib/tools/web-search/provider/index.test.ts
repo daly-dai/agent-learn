@@ -122,7 +122,9 @@ describe("mapAnthropicResponse —— 归一化", () => {
     // "缺省"必须能被表达出来——DSH 的接口注释写得很清楚：
     // 逼 adapter 编造 title/snippet 会让这层说谎。
     const result = mapAnthropicResponse({ content: REAL_SHAPE }, 8);
-    const second = result.sources.find((s) => s.url === "https://b.example/ctx");
+    const second = result.sources.find(
+      (s) => s.url === "https://b.example/ctx",
+    );
     expect(second?.url).toBe("https://b.example/ctx");
     expect(second?.snippet).toBeUndefined();
   });
@@ -151,11 +153,15 @@ describe("mapAnthropicResponse —— 归一化", () => {
         content: [
           {
             type: "web_search_tool_result",
-            content: [{ type: "web_search_result", url: "https://one.example/" }],
+            content: [
+              { type: "web_search_result", url: "https://one.example/" },
+            ],
           },
           {
             type: "web_search_tool_result",
-            content: [{ type: "web_search_result", url: "https://two.example/" }],
+            content: [
+              { type: "web_search_result", url: "https://two.example/" },
+            ],
           },
         ],
       },
@@ -274,9 +280,10 @@ function sentBody(call: { init: RequestInit | undefined }): SentBody {
 describe("DeepSeek 搜索 provider —— 请求形状", () => {
   it("端点 = baseUrl + /messages（**不是** chat/completions 那个 baseUrl）", async () => {
     const { fetchImpl, calls } = stubFetch(okResponse);
-    await createDeepSeekSearchProvider({ ...BASE_OPTIONS, fetch: fetchImpl }).search(
-      "DeepSeek V4",
-    );
+    await createDeepSeekSearchProvider({
+      ...BASE_OPTIONS,
+      fetch: fetchImpl,
+    }).search("DeepSeek V4");
     expect(calls[0].url).toBe("https://search.example/anthropic/v1/messages");
   });
 
@@ -298,7 +305,10 @@ describe("DeepSeek 搜索 provider —— 请求形状", () => {
 
   it("同时发 x-api-key 和 authorization（官方端点 + 兼容代理都能用）", async () => {
     const { fetchImpl, calls } = stubFetch(okResponse);
-    await createDeepSeekSearchProvider({ ...BASE_OPTIONS, fetch: fetchImpl }).search("q");
+    await createDeepSeekSearchProvider({
+      ...BASE_OPTIONS,
+      fetch: fetchImpl,
+    }).search("q");
 
     const headers = calls[0].init?.headers as Record<string, string>;
     expect(headers["x-api-key"]).toBe("sk-test");
@@ -311,7 +321,10 @@ describe("DeepSeek 搜索 provider —— 请求形状", () => {
     // （stub 不看 redirect，于是 manual→follow 的突变全绿）。DSH 原话：
     // provider.ts:227 `redirect: 'error'`。
     const { fetchImpl, calls } = stubFetch(okResponse);
-    await createDeepSeekSearchProvider({ ...BASE_OPTIONS, fetch: fetchImpl }).search("q");
+    await createDeepSeekSearchProvider({
+      ...BASE_OPTIONS,
+      fetch: fetchImpl,
+    }).search("q");
     expect(calls[0].init?.redirect).toBe("error");
   });
 
@@ -348,12 +361,18 @@ describe("DeepSeek 搜索 provider —— 失败路径", () => {
   it("HTTP 错误 → 抛错里带状态码和服务端说明", async () => {
     const { fetchImpl } = stubFetch(
       () =>
-        new Response(JSON.stringify({ error: { message: "invalid api key" } }), {
-          status: 401,
-        }),
+        new Response(
+          JSON.stringify({ error: { message: "invalid api key" } }),
+          {
+            status: 401,
+          },
+        ),
     );
     await expect(
-      createDeepSeekSearchProvider({ ...BASE_OPTIONS, fetch: fetchImpl }).search("q"),
+      createDeepSeekSearchProvider({
+        ...BASE_OPTIONS,
+        fetch: fetchImpl,
+      }).search("q"),
     ).rejects.toThrow(/401/);
   });
 
@@ -362,7 +381,10 @@ describe("DeepSeek 搜索 provider —— 失败路径", () => {
       throw new Error("ECONNREFUSED");
     };
     await expect(
-      createDeepSeekSearchProvider({ ...BASE_OPTIONS, fetch: fetchImpl }).search("q"),
+      createDeepSeekSearchProvider({
+        ...BASE_OPTIONS,
+        fetch: fetchImpl,
+      }).search("q"),
     ).rejects.toThrow(/ECONNREFUSED/);
   });
 
@@ -371,10 +393,10 @@ describe("DeepSeek 搜索 provider —— 失败路径", () => {
     const controller = new AbortController();
     controller.abort();
     await expect(
-      createDeepSeekSearchProvider({ ...BASE_OPTIONS, fetch: fetchImpl }).search(
-        "q",
-        controller.signal,
-      ),
+      createDeepSeekSearchProvider({
+        ...BASE_OPTIONS,
+        fetch: fetchImpl,
+      }).search("q", controller.signal),
     ).rejects.toThrow(/中止|abort/i);
   });
 
@@ -383,7 +405,10 @@ describe("DeepSeek 搜索 provider —— 失败路径", () => {
       () => new Response("<html>502 Bad Gateway</html>", { status: 200 }),
     );
     await expect(
-      createDeepSeekSearchProvider({ ...BASE_OPTIONS, fetch: fetchImpl }).search("q"),
+      createDeepSeekSearchProvider({
+        ...BASE_OPTIONS,
+        fetch: fetchImpl,
+      }).search("q"),
     ).rejects.toThrow();
   });
 });

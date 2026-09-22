@@ -55,14 +55,18 @@ describe("register —— 注册校验 fail-loud（DSH normalizeDefinition）", 
   it("handler 非函数 → throw", () => {
     const registry = createCommandRegistry();
     expect(() =>
-      registry.register(command({ handler: "not a fn" as unknown as SlashCommand["handler"] })),
+      registry.register(
+        command({ handler: "not a fn" as unknown as SlashCommand["handler"] }),
+      ),
     ).toThrow(/handler/);
   });
 
   it("source 非法值 → throw", () => {
     const registry = createCommandRegistry();
     expect(() =>
-      registry.register(command({ source: "plugin" as unknown as SlashCommand["source"] })),
+      registry.register(
+        command({ source: "plugin" as unknown as SlashCommand["source"] }),
+      ),
     ).toThrow(/source/);
   });
 
@@ -103,9 +107,7 @@ describe("list —— 发现 UI 用的元数据视图", () => {
   it("available 返回 false → 过滤（codex flags 门控）", () => {
     const registry = createCommandRegistry();
     registry.register(command({ name: "visible" }));
-    registry.register(
-      command({ name: "hidden", available: () => false }),
-    );
+    registry.register(command({ name: "hidden", available: () => false }));
     expect(registry.list(fakeApi()).map((c) => c.name)).toEqual(["visible"]);
   });
 
@@ -128,7 +130,11 @@ describe("execute —— 分发（DSH execute 语义）", () => {
         },
       }),
     );
-    const result = await registry.execute("/compact 参数", fakeApi(), new AbortController().signal);
+    const result = await registry.execute(
+      "/compact 参数",
+      fakeApi(),
+      new AbortController().signal,
+    );
     expect(result).toEqual({ kind: "success", text: "ok" });
     expect(seen).toBe("参数");
   });
@@ -146,7 +152,11 @@ describe("execute —— 分发（DSH execute 语义）", () => {
         },
       }),
     );
-    const result = await registry.execute("/watcher-x", fakeApi(), new AbortController().signal);
+    const result = await registry.execute(
+      "/watcher-x",
+      fakeApi(),
+      new AbortController().signal,
+    );
     expect(result).toBeNull();
     expect(called).toBe(false);
   });
@@ -154,7 +164,13 @@ describe("execute —— 分发（DSH execute 语义）", () => {
   it("非命令形态（无斜杠）→ null", async () => {
     const registry = createCommandRegistry();
     registry.register(command());
-    expect(await registry.execute("compact", fakeApi(), new AbortController().signal)).toBeNull();
+    expect(
+      await registry.execute(
+        "compact",
+        fakeApi(),
+        new AbortController().signal,
+      ),
+    ).toBeNull();
   });
 
   it("别名命中（别名只认不显）", async () => {
@@ -170,7 +186,9 @@ describe("execute —— 分发（DSH execute 语义）", () => {
         },
       }),
     );
-    expect(await registry.execute("/exit", fakeApi(), new AbortController().signal)).toEqual({
+    expect(
+      await registry.execute("/exit", fakeApi(), new AbortController().signal),
+    ).toEqual({
       kind: "success",
     });
     expect(called).toBe(true);
@@ -181,7 +199,13 @@ describe("execute —— 分发（DSH execute 语义）", () => {
     registry.register(
       command({ handler: () => ({ kind: "error", text: "no args allowed" }) }),
     );
-    expect(await registry.execute("/compact", fakeApi(), new AbortController().signal)).toEqual({
+    expect(
+      await registry.execute(
+        "/compact",
+        fakeApi(),
+        new AbortController().signal,
+      ),
+    ).toEqual({
       kind: "error",
       text: "no args allowed",
     });
@@ -194,7 +218,13 @@ describe("execute —— 分发（DSH execute 语义）", () => {
         handler: async () => ({ kind: "success", text: "async done" }),
       }),
     );
-    expect(await registry.execute("/compact", fakeApi(), new AbortController().signal)).toEqual({
+    expect(
+      await registry.execute(
+        "/compact",
+        fakeApi(),
+        new AbortController().signal,
+      ),
+    ).toEqual({
       kind: "success",
       text: "async done",
     });

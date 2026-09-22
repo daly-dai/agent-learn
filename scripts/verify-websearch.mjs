@@ -85,7 +85,9 @@ console.log(`  HTTP ${res.status}   ${Date.now() - started}ms`);
 if (!res.ok) {
   console.log("\n--- 响应前 800 字 ---");
   console.log(text.slice(0, 800));
-  console.log("\n结论：❌ 端点不可用 → 搜索方案要改道（DDG 免费后端 / 第三方搜索 API）。");
+  console.log(
+    "\n结论：❌ 端点不可用 → 搜索方案要改道（DDG 免费后端 / 第三方搜索 API）。",
+  );
   process.exit(1);
 }
 
@@ -98,12 +100,16 @@ try {
 }
 
 const blocks = payload.content ?? [];
-console.log(`  content 块类型：${blocks.map((b) => b.type).join(", ") || "(空)"}`);
+console.log(
+  `  content 块类型：${blocks.map((b) => b.type).join(", ") || "(空)"}`,
+);
 
 const searchResult = blocks.find((b) => b.type === "web_search_tool_result");
 if (!searchResult) {
   console.log("\n⚠️ 端点通了，但**没有 web_search_tool_result 块**。");
-  console.log("   可能是：模型名不对（试 A5_MODEL=...）/ 该 key 没开通搜索 / 工具名变了。");
+  console.log(
+    "   可能是：模型名不对（试 A5_MODEL=...）/ 该 key 没开通搜索 / 工具名变了。",
+  );
   console.log("\n--- 响应前 800 字 ---");
   console.log(text.slice(0, 800));
   process.exit(1);
@@ -115,4 +121,6 @@ for (const item of items.slice(0, 3)) {
   console.log(`   - ${item.title ?? "(无标题)"}`);
   console.log(`     ${item.url ?? ""}`);
 }
-console.log("\n结论：✅ 端点可用 —— A5 搜索方案照原样开工（复用现有 key，零新增配置）。");
+console.log(
+  "\n结论：✅ 端点可用 —— A5 搜索方案照原样开工（复用现有 key，零新增配置）。",
+);

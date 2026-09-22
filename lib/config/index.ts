@@ -91,7 +91,10 @@ const PROVIDERS: Record<string, ProviderConfig> = {
     // 搜索走 Anthropic 兼容端点（`/anthropic/v1/messages`），
     // 和上面的 OpenAI 兼容端点**不是一条路**。见 ProviderConfig.search 的说明。
     search: {
-      baseUrl: env("DEEPSEEK_SEARCH_BASE_URL", "https://api.deepseek.com/anthropic/v1"),
+      baseUrl: env(
+        "DEEPSEEK_SEARCH_BASE_URL",
+        "https://api.deepseek.com/anthropic/v1",
+      ),
       model: env("DEEPSEEK_SEARCH_MODEL", "deepseek-v4-flash"),
     },
     contextWindow: num("CONTEXT_WINDOW", 1_000_000),
@@ -136,7 +139,10 @@ export const config = {
     /** 参考开源项目根（C15 仓库更新面板：E:\agents-read 下的 git clone） */
     reposRoot: env("REPOS_ROOT", "E:\\agents-read"),
     /** 仓库更新基线（C15：记录每个仓库上次更新到的 commit，增量总结用；gitignore） */
-    repoBaselines: env("REPO_BASELINE_DIR", resolve(process.cwd(), ".repo-updates")),
+    repoBaselines: env(
+      "REPO_BASELINE_DIR",
+      resolve(process.cwd(), ".repo-updates"),
+    ),
   },
 
   /** 引擎行为（压缩阈值随 provider 走，见 config.provider） */
@@ -217,6 +223,8 @@ export function shouldCompact(
 }
 
 /** 压缩时保留多少条最近消息（教学版简单规则；二期改按 token 预算） */
-export function compactKeepRecent(provider: ProviderConfig = config.provider): number {
+export function compactKeepRecent(
+  provider: ProviderConfig = config.provider,
+): number {
   return provider.keepRecentMessages;
 }

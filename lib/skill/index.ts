@@ -351,9 +351,7 @@ const MAX_LISTED_DIAGNOSTICS = 5;
  *
  * 带路径是因为**修它要打开那个文件** —— 只给名字，用户还得自己去找。
  */
-function renderDiagnosticNote(
-  diagnostics: readonly SkillDiagnostic[],
-): string {
+function renderDiagnosticNote(diagnostics: readonly SkillDiagnostic[]): string {
   const listed = diagnostics.slice(0, MAX_LISTED_DIAGNOSTICS);
   const rest = diagnostics.length - listed.length;
 

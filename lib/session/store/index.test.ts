@@ -21,20 +21,30 @@ import type { AgentMessage, SessionEntry } from "../../types";
 type MessageEntry = Extract<SessionEntry, { type: "message" }>;
 
 /** 触发准备 + 落盘（B2 ③：prepareCompaction + commitCompaction 两步） */
-async function compact(store: JsonlSessionStore, maxTokens: number, keepRecent: number) {
+async function compact(
+  store: JsonlSessionStore,
+  maxTokens: number,
+  keepRecent: number,
+) {
   const prep = store.prepareCompaction(maxTokens, keepRecent);
   if (!prep) return undefined;
-  return store.commitCompaction(prep, summarizeEntries(prep.messagesToSummarize));
+  return store.commitCompaction(
+    prep,
+    summarizeEntries(prep.messagesToSummarize),
+  );
 }
 
 function makeStore(): { store: JsonlSessionStore; cleanup: () => void } {
   const dir = mkdtempSync(join(tmpdir(), "session-store-test-"));
-  const store = new JsonlSessionStore(
-    join(dir, "test.jsonl"),
-    dir,
-    "test-session",
-  );
-  return { store, cleanup: () => rmSync(dir, { recursive: true, force: true }) };
+  const store = new JsonlSessionStore({
+    filePath: join(dir, "test.jsonl"),
+    cwd: dir,
+    sessionId: "test-session",
+  });
+  return {
+    store,
+    cleanup: () => rmSync(dir, { recursive: true, force: true }),
+  };
 }
 
 /** 造一条带 toolCall 的 assistant 消息 */
@@ -380,7 +390,9 @@ describe("线性日志 —— 新写的条目不再带 parentId", () => {
     try {
       await store.appendMessage(createUserMessage("新话"));
 
-      const messageEntry = store.getEntries().find((e) => e.type === "message")!;
+      const messageEntry = store
+        .getEntries()
+        .find((e) => e.type === "message")!;
 
       // 留着一个没人读的 parentId，就是又一次犯「写了没人读的字段」那个病
       // （同族：header.version / TraceSnapshot / message_update.message / 出网的 leafId）

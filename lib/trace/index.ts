@@ -81,28 +81,41 @@ export type TraceMeta = {
 export class TraceRecorder {
   readonly entries: TraceEntry[] = [];
 
+  readonly runId: string;
+  readonly model: string;
+  readonly sessionId: string;
+  readonly startedAt: number;
+  private readonly filePath: string;
+
   private seq = 0;
   private currentTurn?: number;
   // 用 promise 链保证 JSONL 追加顺序（并发 appendFile 会乱序）
   private writeChain: Promise<void> = Promise.resolve();
 
-  private constructor(
-    readonly runId: string,
-    readonly model: string,
-    readonly sessionId: string,
-    readonly startedAt: number,
-    private readonly filePath: string,
-  ) {}
+  private constructor(params: {
+    runId: string;
+    model: string;
+    sessionId: string;
+    startedAt: number;
+    filePath: string;
+  }) {
+    this.runId = params.runId;
+    this.model = params.model;
+    this.sessionId = params.sessionId;
+    this.startedAt = params.startedAt;
+    this.filePath = params.filePath;
+  }
 
   static create(dir: string, model: string, sessionId: string): TraceRecorder {
     const runId = generateRunId();
-    return new TraceRecorder(
+    // 五个字段四个是字符串：用具名对象传参，调用点读起来就知道谁是谁
+    return new TraceRecorder({
       runId,
       model,
       sessionId,
-      Date.now(),
-      join(dir, traceFileName(sessionId, runId)),
-    );
+      startedAt: Date.now(),
+      filePath: join(dir, traceFileName(sessionId, runId)),
+    });
   }
 
   /** 初始化：确保目录存在，写一条 trace_start 元信息 */
@@ -169,7 +182,9 @@ export function traceFileName(sessionId: string, runId: string): string {
 }
 
 /** 解析失败返回 undefined（老轨迹文件名里没有会话前缀 → 归不到任何会话） */
-export function parseTraceFileName(fileName: string): { sessionId: string; runId: string } | undefined {
+export function parseTraceFileName(
+  fileName: string,
+): { sessionId: string; runId: string } | undefined {
   if (!fileName.endsWith(".jsonl")) return undefined;
 
   const body = fileName.slice(0, -".jsonl".length);
@@ -200,7 +215,10 @@ export async function readTrace(filePath: string): Promise<TraceEntry[]> {
     .split("\n")
     .filter(Boolean)
     .map((line) => JSON.parse(line) as TraceEntry & { type?: string })
-    .filter((entry): entry is TraceEntry => entry.type === undefined && "event" in entry);
+    .filter(
+      (entry): entry is TraceEntry =>
+        entry.type === undefined && "event" in entry,
+    );
 }
 
 /** 首行读这么多字节就够（trace_start 约 150 字节，留 6 倍余量） */
@@ -217,7 +235,9 @@ const TAIL_BYTES = 2048;
  *
  * 坏文件返回 undefined（不挂掉整个列表）。
  */
-export async function readTraceMeta(filePath: string): Promise<TraceMeta | undefined> {
+export async function readTraceMeta(
+  filePath: string,
+): Promise<TraceMeta | undefined> {
   const handle = await open(filePath, "r").catch(() => undefined);
   if (!handle) return undefined;
 
@@ -267,7 +287,11 @@ function parseLine<T>(line: string): T | undefined {
   }
 }
 
-async function readChunk(handle: FileHandle, position: number, length: number): Promise<string> {
+async function readChunk(
+  handle: FileHandle,
+  position: number,
+  length: number,
+): Promise<string> {
   if (length <= 0) return "";
   const buffer = Buffer.alloc(length);
   const { bytesRead } = await handle.read(buffer, 0, length, position);

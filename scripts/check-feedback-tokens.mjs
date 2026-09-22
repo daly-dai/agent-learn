@@ -142,10 +142,13 @@ function main() {
   }
 
   if (process.argv.includes("--list")) {
-    console.log(`扫描 ${files.length} 个 CSS 文件；反馈档只许：${FEED_TOKENS.join(" / ")}`);
+    console.log(
+      `扫描 ${files.length} 个 CSS 文件；反馈档只许：${FEED_TOKENS.join(" / ")}`,
+    );
     if (allowed.length > 0) {
       console.log(`\n已豁免 ${allowed.length} 处（都写了理由）：`);
-      for (const hit of allowed) console.log(`  ✓ ${hit.where}  [${hit.token}] ${hit.selector}`);
+      for (const hit of allowed)
+        console.log(`  ✓ ${hit.where}  [${hit.token}] ${hit.selector}`);
     }
   }
 

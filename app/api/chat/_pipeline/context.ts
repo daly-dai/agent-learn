@@ -61,11 +61,11 @@ export function computeContextPressure(
  * createRequestContext 不调它：那个要参数化 sessionDir（测试传临时目录）。
  */
 export function createSessionStore(sessionId: string): JsonlSessionStore {
-  return new JsonlSessionStore(
-    join(config.paths.sessions, `${sessionId}.jsonl`),
-    config.paths.workspace,
+  return new JsonlSessionStore({
+    filePath: join(config.paths.sessions, `${sessionId}.jsonl`),
+    cwd: config.paths.workspace,
     sessionId,
-  );
+  });
 }
 
 export async function createRequestContext(params: {
@@ -75,12 +75,16 @@ export async function createRequestContext(params: {
   traceDir: string;
   modelLabel: string;
 }): Promise<RequestContext> {
-  const store = new JsonlSessionStore(
-    join(params.sessionDir, `${params.sessionId}.jsonl`),
-    params.workspaceRoot,
+  const store = new JsonlSessionStore({
+    filePath: join(params.sessionDir, `${params.sessionId}.jsonl`),
+    cwd: params.workspaceRoot,
+    sessionId: params.sessionId,
+  });
+  const recorder = TraceRecorder.create(
+    params.traceDir,
+    params.modelLabel,
     params.sessionId,
   );
-  const recorder = TraceRecorder.create(params.traceDir, params.modelLabel, params.sessionId);
   await recorder.init();
   return { store, recorder };
 }

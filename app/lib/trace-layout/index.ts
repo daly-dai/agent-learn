@@ -136,6 +136,9 @@ function groupByRun(records: TraceRecord[]): Map<number, TraceRecord[]> {
 /** `runIndex:turn` → 该轮指令预览（轮次号跨 run 重复，所以键必须带 runIndex） */
 function promptLookup(fold: TraceFold): Map<string, string> {
   return new Map(
-    fold.outline.turns.map((turn) => [`${turn.runIndex}:${turn.turn}`, turn.prompt]),
+    fold.outline.turns.map((turn) => [
+      `${turn.runIndex}:${turn.turn}`,
+      turn.prompt,
+    ]),
   );
 }

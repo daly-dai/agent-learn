@@ -204,7 +204,15 @@ export function useCommandMenu({
       return;
     }
     onSend(raw.trim());
-  }, [input, disabled, commandsLoaded, commands, onSend, onError, onRunCommand]);
+  }, [
+    input,
+    disabled,
+    commandsLoaded,
+    commands,
+    onSend,
+    onError,
+    onRunCommand,
+  ]);
 
   /** textarea onKeyDown：面板打开时 ↑↓ 移高亮 / Enter 选中 / Esc 关闭；
    *  否则回车发送（Shift+Enter 换行；中文输入法选词的回车不算发送） */
@@ -245,7 +253,13 @@ export function useCommandMenu({
       e.preventDefault();
       submit();
     },
-    [commandMenuOpen, filteredCommands, commandActiveIndex, pickCommand, submit],
+    [
+      commandMenuOpen,
+      filteredCommands,
+      commandActiveIndex,
+      pickCommand,
+      submit,
+    ],
   );
 
   /** textarea onBlur：焦点移到补全面板内（点命令项）不算失焦；移出则关闭 */

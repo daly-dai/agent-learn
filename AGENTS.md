@@ -114,9 +114,12 @@
 
 > 从 `会话检查点.md` 收编（2026-09-18 该文件退役）。**这些是"每次会话都可能踩"的操作知识，所以放在自动加载的本文件里。**
 
-**沙箱**
+**沙箱** ⚠️ **2026-09-22 大改：这些结论全都随「会话的沙箱模式」变，先看模式再照做**
+- ⭐ **受限模式（`workspace-write` / 只读）下，Node 完全起不了子进程** —— `node -e "execSync('git --version')"` → `EPERM spawnSync C:\Windows\system32\cmd.exe`。**危险之处是它会伪装**：vitest 挂在 vite 加载配置（`optimizeSafeRealPathSync` 里 `exec("net use")`）、husky 初始化报 `git command not found`、git 相关用例红 5 条（`spawnSync git EPERM`）—— **每一条看着都像"代码/测试坏了"，其实全是沙箱**。判据：**先跑一次 `execSync('git --version')`**，不行就说明是模式问题，别再往代码上找。
+- ⭐ **`danger-full-access` 下这些全部消失**（2026-09-22 实测）：`node node_modules/vitest/vitest.mjs run --pool=threads` → **748/748 全绿、不需要任何 shim**；`pnpm dev` 能起且 `GET /` 200；`prettier .` 不再撞 `.tmp_pdf` 的 EPERM。
+- **要真跑起来，加 `danger-full-access`**；给了之后 `pnpm test` / husky / `prettier .` 都正常。
+- **`pnpm <script>` 会撞 store 版本**：DSH 自带的 pnpm 是 **11**，而本仓库 `node_modules` 是 **pnpm 10** 装的 ⇒ 报 `runDepsStatusCheck` 或 `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`（**不是脚本坏了**）。正解：`& 'C:\Users\25082\AppData\Local\pnpm\pnpm.CMD' <script>`。**别为此 `pnpm install` 整库重装**（会重建 node_modules 且把 lockfile 搅动）。
 - **沙箱起不了常驻 dev server**（`next dev` fork 报 EPERM）——约 30 秒短暂窗口可 curl 冒烟；**浏览器交互验证必须用户自己跑 `pnpm dev`**。
-- **沙箱里能跑 vitest，但要走这条路**：`pnpm test` 挂在 vite 加载配置这一步（`optimizeSafeRealPathSync` 在 Windows 上 `exec("net use")`，撞命名管道 → `spawn EPERM`，**不是测试失败**）→ 授权 `danger-full-access` 后跑 `node node_modules/vitest/vitest.mjs run --pool=threads`（6 秒跑完全套）。**意义：AI 能自己跑 TDD——先看到红，再看到绿。**
 - `tsc --noEmit` 沙箱可跑（exit 0）。
 
 **真机验收（浏览器里让模型跑命令）** ⚠️ 2026-09-20 连栽两次，教训写在这里
@@ -144,5 +147,8 @@
 
 ```bash
 pnpm dev                                        # 开发（浏览器 localhost:3000）
+pnpm lint / pnpm lint:fix                       # ESLint（C45 接入；改完代码先跑这个）
+pnpm format / pnpm format:check                 # Prettier（C45 接入；md 不在范围内，见 .prettierignore）
 node node_modules/typescript/bin/tsc --noEmit   # 类型检查（沙箱里 pnpm 被拦时用这个）
 ```
+> ⚠️ 上面三个 `pnpm <script>` 若报 `runDepsStatusCheck` / `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`，不是脚本坏了 —— 是 DSH 自带的 pnpm 11 与本仓库的 pnpm 10 store 不兼容，改用 `& 'C:\Users\25082\AppData\Local\pnpm\pnpm.CMD' <script>`。

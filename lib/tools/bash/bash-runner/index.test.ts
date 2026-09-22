@@ -56,7 +56,8 @@ describe("buildWindowsCommandLine", () => {
   });
 
   it("中文命令经 base64 往返不变", () => {
-    const command = 'Get-Content -Path "精读走读-04-pi-压缩对照.md" -Encoding UTF8';
+    const command =
+      'Get-Content -Path "精读走读-04-pi-压缩对照.md" -Encoding UTF8';
     const line = buildWindowsCommandLine(command);
     const b64 = line.split("EncodedCommand ")[1];
     expect(Buffer.from(b64, "base64").toString("utf16le")).toBe(command);

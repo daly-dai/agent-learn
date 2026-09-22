@@ -20,7 +20,11 @@ import {
   type TurnSeparator,
   type TraceViewItem,
 } from "@/app/lib/trace-layout";
-import type { TraceFold, TraceRecord, TraceRecordKind } from "@/app/lib/trace-steps";
+import type {
+  TraceFold,
+  TraceRecord,
+  TraceRecordKind,
+} from "@/app/lib/trace-steps";
 import { formatClock, formatMs, formatTokens } from "@/app/lib/format";
 import { useStickyScroll } from "@/app/lib/use-sticky-scroll";
 import styles from "./index.module.css";
@@ -130,9 +134,51 @@ function renderTurn(item: TurnSeparator) {
   return (
     <div key={item.key} className={styles.turn}>
       <span className={styles.n}>T{item.turn}</span>
-      {item.prompt ? <span className={styles.preview}>{item.prompt}</span> : null}
+      {item.prompt ? (
+        <span className={styles.preview}>{item.prompt}</span>
+      ) : null}
     </div>
   );
+}
+
+const PEN_CLASS: Record<TraceRecordKind, string> = {
+  user: "pen-user",
+  model: "pen-model",
+  tool: "pen-tool",
+  error: "pen-error",
+  signal: "pen-signal",
+};
+
+/**
+ * 摘要行的正文区，三种形态取一：
+ *   工具/错误 → 入参 + 出参摘要；有正文 → 正文；只调工具没正文 → 占位说明。
+ */
+function bodyOf(record: TraceRecord, isTool: boolean) {
+  if (isTool) {
+    return (
+      <>
+        <span className={styles.tool}>{record.label}</span>
+        <div className={styles.io}>
+          <span className={styles.k}>入参</span>
+          <span className={styles.v}>{record.argsText || "—"}</span>
+        </div>
+        <div
+          className={`${styles.io} ${record.kind === "error" ? styles.err : ""}`}
+        >
+          <span className={styles.k}>出参</span>
+          <span className={styles.v}>{record.resultText || "（无输出）"}</span>
+        </div>
+      </>
+    );
+  }
+
+  if (record.text) {
+    return <div className={styles.text}>{record.text}</div>;
+  }
+
+  /* 只调工具、没有正文的助手消息（真实存在：助手消息里只有 toolCall 块）。
+     措辞沿用 DSH ui-trajectory 的 `（仅工具调用）`——不自创文案。 */
+  return <div className={styles.quiet}>（仅工具调用）</div>;
 }
 
 function renderRecord(record: TraceRecord, meta: TraceMeta | undefined) {
@@ -146,27 +192,7 @@ function renderRecord(record: TraceRecord, meta: TraceMeta | undefined) {
       <summary className={styles.row} data-trace-id={record.id}>
         <span className={styles.label}>{labelOf(record)}</span>
 
-        <div className={styles.body}>
-          {isTool ? (
-            <>
-              <span className={styles.tool}>{record.label}</span>
-              <div className={styles.io}>
-                <span className={styles.k}>入参</span>
-                <span className={styles.v}>{record.argsText || "—"}</span>
-              </div>
-              <div className={`${styles.io} ${record.kind === "error" ? styles.err : ""}`}>
-                <span className={styles.k}>出参</span>
-                <span className={styles.v}>{record.resultText || "（无输出）"}</span>
-              </div>
-            </>
-          ) : record.text ? (
-            <div className={styles.text}>{record.text}</div>
-          ) : (
-            /* 只调工具、没有正文的助手消息（真实存在：助手消息里只有 toolCall 块）。
-               措辞沿用 DSH ui-trajectory 的 `（仅工具调用）`——不自创文案。 */
-            <div className={styles.quiet}>（仅工具调用）</div>
-          )}
-        </div>
+        <div className={styles.body}>{bodyOf(record, isTool)}</div>
 
         <span className={styles.data}>{dataOf(record, meta)}</span>
       </summary>
@@ -198,14 +224,6 @@ function expanded(record: TraceRecord, isTool: boolean) {
 }
 
 // ============ 小纯函数 ============
-
-const PEN_CLASS: Record<TraceRecordKind, string> = {
-  user: "pen-user",
-  model: "pen-model",
-  tool: "pen-tool",
-  error: "pen-error",
-  signal: "pen-signal",
-};
 
 function labelOf(record: TraceRecord): string {
   if (record.kind === "user") return "指令";

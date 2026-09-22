@@ -31,7 +31,10 @@ import type {
 import { config } from "../../config";
 
 /** 造一条来源（真实 provider 给的就是这个形状） */
-function source(url: string, extra: Partial<WebSearchSource> = {}): WebSearchSource {
+function source(
+  url: string,
+  extra: Partial<WebSearchSource> = {},
+): WebSearchSource {
   return { url, ...extra };
 }
 
@@ -40,7 +43,11 @@ function result(
   urls: string[],
   extra: Partial<WebSearchResult> = {},
 ): WebSearchResult {
-  return { sources: urls.map((url) => source(url)), truncated: false, ...extra };
+  return {
+    sources: urls.map((url) => source(url)),
+    truncated: false,
+    ...extra,
+  };
 }
 
 /** 记录调用并按查询返回预置结果的 provider 桩 */
@@ -125,7 +132,10 @@ describe("mergeSearchResults —— round-robin + 去重 + 上限", () => {
   });
 
   it("长度不齐时不越界", () => {
-    const merged = mergeSearchResults([result(["a1", "a2", "a3"]), result(["b1"])], 8);
+    const merged = mergeSearchResults(
+      [result(["a1", "a2", "a3"]), result(["b1"])],
+      8,
+    );
     expect(merged.sources.map((s) => s.url)).toEqual(["a1", "b1", "a2", "a3"]);
   });
 
@@ -289,9 +299,9 @@ describe("web_search —— 编排", () => {
     const provider = stubProvider(async () => {
       throw new Error("没有可用的 API key");
     });
-    await expect(
-      runSearch({ queries: ["x"] }, { provider }),
-    ).rejects.toThrow(/API key/);
+    await expect(runSearch({ queries: ["x"] }, { provider })).rejects.toThrow(
+      /API key/,
+    );
   });
 
   it("参数不合法时**不调用 provider**", async () => {

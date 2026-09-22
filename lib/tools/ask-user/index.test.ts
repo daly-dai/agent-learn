@@ -61,9 +61,9 @@ describe("parseOptions —— 单个问题的选项校验", () => {
   });
 
   it("重复选项抛错", () => {
-    expect(() =>
-      parseOptions([{ label: "红" }, { label: "红" }]),
-    ).toThrow(/重复的选项/);
+    expect(() => parseOptions([{ label: "红" }, { label: "红" }])).toThrow(
+      /重复的选项/,
+    );
   });
 
   it("选项数小于 2 抛错", () => {
@@ -107,7 +107,9 @@ describe("ask_user_question.execute —— 请求-响应", () => {
 
   it("全部跳过（空数组）返回引导文案", async () => {
     const tool = createAskUserTool({ onAskUser: async () => [] });
-    const result = await tool.execute({ questions: [{ question: "有人吗？" }] });
+    const result = await tool.execute({
+      questions: [{ question: "有人吗？" }],
+    });
     expect(result.details).toMatchObject({ skipped: true });
     if (result.content[0].type === "text") {
       expect(result.content[0].text).toBe(SKIPPED_TEXT);
@@ -121,7 +123,9 @@ describe("ask_user_question.execute —— 请求-响应", () => {
   });
 
   it("非空回答（如模型给的自定义文本）原样呈现", async () => {
-    const tool = createAskUserTool({ onAskUser: async () => ["我选自定义：绿色"] });
+    const tool = createAskUserTool({
+      onAskUser: async () => ["我选自定义：绿色"],
+    });
     const result = await tool.execute({
       questions: [{ question: "自定义答案？" }],
     });

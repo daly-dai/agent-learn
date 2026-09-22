@@ -36,7 +36,6 @@ import type { StreamFrame } from "./frames";
 import { buildSystemPrompt } from "./prompt";
 import { createPipelineTools } from "./tools";
 import { maybeCompact } from "./compact";
-import { askUserAnswer } from "./ask-user";
 import { computeContextPressure } from "./context";
 
 export type RunPipelineParams = {
@@ -58,15 +57,8 @@ export type RunPipelineParams = {
 
 // 运行整个 pipeline：用户消息 + 落盘 + Agent Loop + 压缩 + 推 done
 export async function runPipeline(params: RunPipelineParams) {
-  const {
-    model,
-    userMessage,
-    store,
-    recorder,
-    send,
-    signal,
-    toolContext,
-  } = params;
+  const { model, userMessage, store, recorder, send, signal, toolContext } =
+    params;
 
   // 1) 用户消息生命周期事件：既进 SSE（前端画气泡），也进轨迹（黑匣子）
   const userStart = { type: "message_start" as const, message: userMessage };
@@ -105,12 +97,18 @@ export async function runPipeline(params: RunPipelineParams) {
   //       ② 带 `source` 标记的注入件不再被扫（防递归 / 防伪造）
   //       ③ 查不中静默当普通文本（`/usr/bin`、`5/8` 天然查不中 —— 我们查名单，不用正则猜）
   if (userMessage.role === "user" && userMessage.source === undefined) {
-    for (const skill of findSkillInvocations(messageText(userMessage), skills)) {
+    for (const skill of findSkillInvocations(
+      messageText(userMessage),
+      skills,
+    )) {
       const injected = createSkillInvocationMessage(skill);
       // 事件推给前端 —— 界面上那块"已加载技能 X"就来自它。
       // ⚠️ **不需要新帧**（详案落点 10 判断有误，2026-09-16 T4 施工时核正）：`done` 发的是
       // `store.buildContext()`（全量历史），注入件已经落盘 ⇒ 它在 done 之后照样留在界面里。
-      const injectedStart = { type: "message_start" as const, message: injected };
+      const injectedStart = {
+        type: "message_start" as const,
+        message: injected,
+      };
       const injectedEnd = { type: "message_end" as const, message: injected };
       for (const event of [injectedStart, injectedEnd]) {
         recorder.record(event);

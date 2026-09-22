@@ -72,10 +72,7 @@ export type CompactionSummaryMessage = {
 };
 
 export type AgentMessage =
-  | UserMessage
-  | AssistantMessage
-  | ToolResultMessage
-  | CompactionSummaryMessage;
+  UserMessage | AssistantMessage | ToolResultMessage | CompactionSummaryMessage;
 
 // --- 用量 ---
 
@@ -136,7 +133,12 @@ export type AgentEvent =
       originalArgs: Record<string, unknown>;
       args: Record<string, unknown>;
     }
-  | { type: "compaction"; summary: string; tokensBefore: number; firstKeptEntryId: string };
+  | {
+      type: "compaction";
+      summary: string;
+      tokensBefore: number;
+      firstKeptEntryId: string;
+    };
 
 // --- 任务（Phase 5 task 面板） ---
 // todo 是会话事件不是独立存储（DSH 走读 07）：模型通过 todo_write 工具

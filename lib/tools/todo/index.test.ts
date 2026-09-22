@@ -36,9 +36,9 @@ describe("validateTodos —— 整表校验", () => {
     expect(() => validateTodos([{ content: "", status: "pending" }])).toThrow(
       /content 不能为空/,
     );
-    expect(() => validateTodos([{ content: "   ", status: "pending" }])).toThrow(
-      /content 不能为空/,
-    );
+    expect(() =>
+      validateTodos([{ content: "   ", status: "pending" }]),
+    ).toThrow(/content 不能为空/);
   });
 
   it("重复 content 抛错", () => {
@@ -51,12 +51,12 @@ describe("validateTodos —— 整表校验", () => {
   });
 
   it("非法 status 抛错", () => {
-    expect(() =>
-      validateTodos([{ content: "x", status: "doing" }]),
-    ).toThrow(/status 必须是/);
-    expect(() =>
-      validateTodos([{ content: "x", status: undefined }]),
-    ).toThrow(/status 必须是/);
+    expect(() => validateTodos([{ content: "x", status: "doing" }])).toThrow(
+      /status 必须是/,
+    );
+    expect(() => validateTodos([{ content: "x", status: undefined }])).toThrow(
+      /status 必须是/,
+    );
   });
 
   it("两个 in_progress 抛错（教学版固定单 active）", () => {

@@ -63,10 +63,10 @@ export function createGrepTool(workspaceRoot: string): RegisteredTool {
         }
         const lines = content.split("\n");
         for (let i = 0; i < lines.length; i++) {
-          if (regex.test(lines[i])) {
-            matches.push(`${rel}:${i + 1}: ${truncate(lines[i].trim(), 200)}`);
-            if (matches.length >= maxResults) break;
-          }
+          // 提前返回式守卫：不匹配就下一行，匹配分支才留在这一层
+          if (!regex.test(lines[i])) continue;
+          matches.push(`${rel}:${i + 1}: ${truncate(lines[i].trim(), 200)}`);
+          if (matches.length >= maxResults) break;
         }
       }
 
@@ -82,7 +82,10 @@ export function createGrepTool(workspaceRoot: string): RegisteredTool {
               : "(无匹配)",
           ),
         ],
-        details: { count: matches.length, truncated: matches.length >= maxResults },
+        details: {
+          count: matches.length,
+          truncated: matches.length >= maxResults,
+        },
       };
     },
   };

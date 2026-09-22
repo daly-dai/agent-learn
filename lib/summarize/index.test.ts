@@ -9,10 +9,7 @@
 // ============================================================
 
 import { describe, expect, it } from "vitest";
-import {
-  generateSummary,
-  serializeConversation,
-} from "./index";
+import { generateSummary, serializeConversation } from "./index";
 import {
   createAssistantMessage,
   createCompactionSummaryMessage,
@@ -157,9 +154,7 @@ describe("generateSummary —— 调模型生成摘要", () => {
       timestamp: Date.now(),
     }));
 
-    expect(
-      await generateSummary(model, [createUserMessage("x")]),
-    ).toBeNull();
+    expect(await generateSummary(model, [createUserMessage("x")])).toBeNull();
   });
 
   it("模型返回 aborted → null", async () => {
@@ -171,16 +166,12 @@ describe("generateSummary —— 调模型生成摘要", () => {
       timestamp: Date.now(),
     }));
 
-    expect(
-      await generateSummary(model, [createUserMessage("x")]),
-    ).toBeNull();
+    expect(await generateSummary(model, [createUserMessage("x")])).toBeNull();
   });
 
   it("空输出 → null（DSH D9：fail-closed，不落半截摘要）", async () => {
     const model = new FakeModel(() => createAssistantMessage([text("   ")]));
 
-    expect(
-      await generateSummary(model, [createUserMessage("x")]),
-    ).toBeNull();
+    expect(await generateSummary(model, [createUserMessage("x")])).toBeNull();
   });
 });

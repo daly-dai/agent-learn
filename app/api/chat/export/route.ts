@@ -9,7 +9,8 @@
 // 安全：sessionId 拼进文件路径，必须过 isValidSessionId 白名单（同 route.ts）
 // ============================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { isValidSessionId, config } from "@/lib";

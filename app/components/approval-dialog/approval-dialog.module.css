@@ -140,7 +140,9 @@
 }
 
 .approvalDeny:hover {
-  background: var(--feed-hover); /* C35：原来借的是「面」（--plate），白底画白 */
+  background: var(
+    --feed-hover
+  ); /* C35：原来借的是「面」（--plate），白底画白 */
   color: var(--pen-error);
   border-color: var(--pen-error);
 }

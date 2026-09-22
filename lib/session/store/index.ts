@@ -24,8 +24,13 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { appendFile, rm } from "node:fs/promises";
 import { dirname } from "node:path";
-import type { AgentMessage, SessionEntry, SessionStats, TodoItem } from "../../types";
-import { createCompactionSummaryMessage, isTextContent, text } from "../../message";
+import type {
+  AgentMessage,
+  SessionEntry,
+  SessionStats,
+  TodoItem,
+} from "../../types";
+import { createCompactionSummaryMessage, isTextContent } from "../../message";
 
 type MessageEntry = Extract<SessionEntry, { type: "message" }>;
 export type CompactionEntry = Extract<SessionEntry, { type: "compaction" }>;
@@ -55,14 +60,23 @@ export class JsonlSessionStore {
   private readonly entries: SessionEntry[] = [];
   private counter = 0;
 
-  constructor(
-    private readonly filePath: string,
-    private readonly cwd: string,
-    private readonly sessionId: string,
+  private readonly filePath: string;
+  private readonly cwd: string;
+  private readonly sessionId: string;
+  private readonly title?: string;
+
+  constructor(params: {
+    filePath: string;
+    cwd: string;
+    sessionId: string;
     // Phase 2 多会话：新建会话时给一个显示名（title）；读旧文件时头里的
     // title 原样保留在 entries 里，不需要这里再传。
-    private readonly title?: string,
-  ) {
+    title?: string;
+  }) {
+    this.filePath = params.filePath;
+    this.cwd = params.cwd;
+    this.sessionId = params.sessionId;
+    this.title = params.title;
     this.loadOrCreate();
   }
 
@@ -180,7 +194,7 @@ export class JsonlSessionStore {
     // 的保留区第一条」开始，包含上次保留的最近消息 + 之后的新消息。
     let prevCompaction: CompactionEntry | undefined;
     let summarizeStart = 0; // messageEntries 里第一个要摘要的消息下标
-    
+
     for (const entry of path) {
       if (entry.type !== "compaction") continue;
       prevCompaction = entry;

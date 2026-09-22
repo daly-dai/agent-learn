@@ -35,7 +35,10 @@ function record(partial: Partial<TraceRecord> & { id: string }): TraceRecord {
  * 唯一的例外是 `turn === 0`：那是"还没见过 turn_start"（轨迹从中间开始），
  * 真实折叠里它不会进 outline，这里也照实不造。
  */
-function fold(records: TraceRecord[], promptByTurn: Record<string, string> = {}): TraceFold {
+function fold(
+  records: TraceRecord[],
+  promptByTurn: Record<string, string> = {},
+): TraceFold {
   const turns: TraceFold["outline"]["turns"] = [];
   const seen = new Set<string>();
 
@@ -92,7 +95,12 @@ describe("buildTraceView：层次与分隔", () => {
       [meta("run_a")],
     );
 
-    expect(shape(view.items)).toEqual(["run:0(2)", "turn:0.1", "rec:0:2", "rec:0:3"]);
+    expect(shape(view.items)).toEqual([
+      "run:0(2)",
+      "turn:0.1",
+      "rec:0:2",
+      "rec:0:3",
+    ]);
   });
 
   it("同一轮内多条记录只出一个轮次分隔", () => {
@@ -105,7 +113,9 @@ describe("buildTraceView：层次与分隔", () => {
       [meta("run_a")],
     );
 
-    expect(shape(view.items).filter((s) => s.startsWith("turn"))).toEqual(["turn:0.1"]);
+    expect(shape(view.items).filter((s) => s.startsWith("turn"))).toEqual([
+      "turn:0.1",
+    ]);
   });
 
   it("轮次切换时插入新的轮次分隔，并从 outline 取指令预览", () => {
@@ -118,7 +128,10 @@ describe("buildTraceView：层次与分隔", () => {
     );
 
     const turns = view.items.filter((item) => item.kind === "turn");
-    expect(turns.map((item) => item.prompt)).toEqual(["第一轮的指令", "第二轮的指令"]);
+    expect(turns.map((item) => item.prompt)).toEqual([
+      "第一轮的指令",
+      "第二轮的指令",
+    ]);
   });
 
   it("⭐ 轮次号在每个 run 内重新计数：run 1 的第 1 轮不能被当成 run 0 的重复而漏掉", () => {
@@ -143,11 +156,16 @@ describe("buildTraceView：层次与分隔", () => {
     ]);
     // 「第 1 轮」出现两次，但各自取到自己 run 的预览
     const turns = view.items.filter((item) => item.kind === "turn");
-    expect(turns.map((item) => item.prompt)).toEqual(["第一次的指令", "第二次的指令"]);
+    expect(turns.map((item) => item.prompt)).toEqual([
+      "第一次的指令",
+      "第二次的指令",
+    ]);
   });
 
   it("轮次号为 0（轨迹从中间开始，没见过 turn_start）→ 分隔条照出，prompt 空串", () => {
-    const view = buildTraceView(fold([record({ id: "0:9", turn: 0 })]), [meta("run_a")]);
+    const view = buildTraceView(fold([record({ id: "0:9", turn: 0 })]), [
+      meta("run_a"),
+    ]);
 
     expect(shape(view.items)).toEqual(["run:0(1)", "turn:0.0", "rec:0:9"]);
     const turn = view.items.find((item) => item.kind === "turn");
@@ -155,7 +173,9 @@ describe("buildTraceView：层次与分隔", () => {
   });
 
   it("run 元信息带上分隔条（视图要显示开始时间 / 是否中断）", () => {
-    const view = buildTraceView(fold([record({ id: "0:2" })]), [meta("run_a", false)]);
+    const view = buildTraceView(fold([record({ id: "0:2" })]), [
+      meta("run_a", false),
+    ]);
     const run = view.items[0];
     expect(run.kind === "run" && run.meta?.completed).toBe(false);
     expect(run.kind === "run" && run.meta?.runId).toBe("run_a");
@@ -169,14 +189,17 @@ describe("buildTraceView：层次与分隔", () => {
 
 describe("buildTraceView：空 run", () => {
   it("⭐ 不过滤时，0 条记录的 run 也要出现（崩掉的残 run 最需要被看见）", () => {
-    const view = buildTraceView(
-      fold([record({ id: "0:2" })]),
-      [meta("run_a"), meta("run_b", false), meta("run_c")],
-    );
-
-    expect(view.items.filter((item) => item.kind === "run").map((item) => item.shown)).toEqual([
-      1, 0, 0,
+    const view = buildTraceView(fold([record({ id: "0:2" })]), [
+      meta("run_a"),
+      meta("run_b", false),
+      meta("run_c"),
     ]);
+
+    expect(
+      view.items
+        .filter((item) => item.kind === "run")
+        .map((item) => item.shown),
+    ).toEqual([1, 0, 0]);
   });
 
   it("「只看错误」时，没有错误的 run 不占空壳", () => {
@@ -221,7 +244,9 @@ describe("buildTraceView：只看错误", () => {
 
   it("⭐ counts 是总量，不随过滤变化（读数描述的是这次运行）", () => {
     const all = buildTraceView(mixed, [meta("run_a")]).counts;
-    const errorsOnly = buildTraceView(mixed, [meta("run_a")], { onlyErrors: true }).counts;
+    const errorsOnly = buildTraceView(mixed, [meta("run_a")], {
+      onlyErrors: true,
+    }).counts;
 
     expect(errorsOnly).toEqual(all);
     expect(all).toEqual({ runs: 1, turns: 2, steps: 4, errors: 1 });
@@ -230,7 +255,9 @@ describe("buildTraceView：只看错误", () => {
   it("shown 是「当前可见条数」，与它下面真正渲染的行数一致", () => {
     const view = buildTraceView(mixed, [meta("run_a")], { onlyErrors: true });
     const run = view.items.find((item) => item.kind === "run");
-    const recordsBelow = view.items.filter((item) => item.kind === "record").length;
+    const recordsBelow = view.items.filter(
+      (item) => item.kind === "record",
+    ).length;
 
     expect(run?.kind === "run" && run.shown).toBe(recordsBelow);
   });

@@ -29,7 +29,9 @@ function logsDir(): string {
 }
 
 /** 解析文件名 "<日期>-<项目>.md" → entry；不符合约定的返回 null */
-export function parseLogFileName(fileName: string): Omit<UpdateLogEntry, "fileName"> | null {
+export function parseLogFileName(
+  fileName: string,
+): Omit<UpdateLogEntry, "fileName"> | null {
   const match = /^(\d{4}-\d{2}-\d{2})-([^.]+)\.md$/.exec(fileName);
   if (!match) return null;
   return { date: match[1], repoName: match[2] };
@@ -49,7 +51,9 @@ export async function listUpdateLogs(): Promise<UpdateLogEntry[]> {
     }
     // 倒序：最新的（日期大）在前；同日期按项目名排
     entries.sort((a, b) =>
-      a.date === b.date ? a.repoName.localeCompare(b.repoName) : b.date.localeCompare(a.date),
+      a.date === b.date
+        ? a.repoName.localeCompare(b.repoName)
+        : b.date.localeCompare(a.date),
     );
     return entries;
   } catch {
@@ -98,13 +102,16 @@ export type UpdateLogWithContent = {
  * 每次更新落盘一个文件，这里把它们全部读回来，旧记录依然可见。
  * 读取失败的单条跳过（不阻塞整体）；没有历史 → 空数组。
  */
-export async function readAllLogs(repoName: string): Promise<UpdateLogWithContent[]> {
+export async function readAllLogs(
+  repoName: string,
+): Promise<UpdateLogWithContent[]> {
   const all = await listUpdateLogs();
   const mine = all.filter((e) => e.repoName === repoName);
   const result: UpdateLogWithContent[] = [];
   for (const entry of mine) {
     const content = await readLog(entry.fileName);
-    if (content) result.push({ date: entry.date, fileName: entry.fileName, content });
+    if (content)
+      result.push({ date: entry.date, fileName: entry.fileName, content });
   }
   return result;
 }

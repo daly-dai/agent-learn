@@ -88,7 +88,9 @@
 }
 
 /* 流式输出时的笔尖：接在最后一行文字后面，所以做成伪元素而不是独立节点 */
-.reply:global(.is-live) > :global(.markdown-body):last-child > :last-child::after {
+.reply:global(.is-live)
+  > :global(.markdown-body):last-child
+  > :last-child::after {
   content: "";
   display: inline-block;
   width: 7px;
@@ -291,7 +293,9 @@
 
 .apparatusToggle:hover {
   color: var(--ink);
-  background: var(--feed-hover); /* C35：原来借「面」（--paper），而工具卡是 --plate */
+  background: var(
+    --feed-hover
+  ); /* C35：原来借「面」（--paper），而工具卡是 --plate */
 }
 
 .apparatusBody {

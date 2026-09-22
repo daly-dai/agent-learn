@@ -99,7 +99,9 @@ function fetched(overrides: Partial<RenderFetchInput> = {}): RenderFetchInput {
 describe("renderFetchOutput —— 头 + 声明 + 正文 + 截断提示", () => {
   it("头一行是 Fetched <url> (HTTP <status>)", () => {
     const { text } = renderFetchOutput(fetched());
-    expect(text.startsWith("Fetched https://example.com/page (HTTP 200)")).toBe(true);
+    expect(text.startsWith("Fetched https://example.com/page (HTTP 200)")).toBe(
+      true,
+    );
   });
 
   it("头里是**重定向之后**的最终地址（不是模型给的那个）", () => {
@@ -152,9 +154,7 @@ describe("renderFetchOutput —— 头 + 声明 + 正文 + 截断提示", () => 
   it("正好等于上限 → 不算截断（边界不多切一个字符）", () => {
     const base = renderFetchOutput(fetched({ maxChars: 200_000 }));
     const exact = base.text.length;
-    const { text, truncated } = renderFetchOutput(
-      fetched({ maxChars: exact }),
-    );
+    const { text, truncated } = renderFetchOutput(fetched({ maxChars: exact }));
     expect(truncated).toBe(false);
     expect(text).toBe(base.text);
   });

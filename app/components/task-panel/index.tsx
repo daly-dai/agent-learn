@@ -59,7 +59,9 @@ export function TaskPanel({ todos, sessionId }: TaskPanelProps) {
   // 当前任务 = 唯一的 in_progress；全完成时头部直接显示"全部完成"
   const current = todos.find((t) => t.status === "in_progress");
   // 头部摘要：当前任务 → 全完成文案 → 最后一条，按这个优先级回退
-  const summary = current?.content ?? (allDone ? "全部完成" : todos[todos.length - 1]?.content ?? "");
+  const summary =
+    current?.content ??
+    (allDone ? "全部完成" : (todos[todos.length - 1]?.content ?? ""));
 
   const handleDismiss = () => {
     setDismissed(true);
@@ -105,7 +107,9 @@ export function TaskPanel({ todos, sessionId }: TaskPanelProps) {
               // 状态动态类：todo-<status>（全局，JSX 拼字符串）决定文本的删除线/加粗/颜色
               className={`${styles.item} todo-${todo.status}`}
             >
-              <span className={`${styles.status} ${styles[`status_${todo.status}`]}`}>
+              <span
+                className={`${styles.status} ${styles[`status_${todo.status}`]}`}
+              >
                 {STATUS_LABEL[todo.status]}
               </span>
               <span className={styles.text}>{todo.content}</span>

@@ -18,7 +18,8 @@
 //   ⋯→删除    → 行内确认条：Esc 或取消退出，红字「删除」真删
 // ============================================================
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
+import type { RunPhase } from "../../lib/run-fold";
 import type { SessionSummary } from "../../lib/use-sessions";
 import { formatClock } from "../../lib/format";
 import { useSessionRunPhase } from "../../lib/run-store";
@@ -48,6 +49,16 @@ type SessionRowProps = {
   onCancelDelete: () => void;
 };
 
+/**
+ * B22 状态点的悬停说明。三种形态各有说法（与行内状态点注释一一对应）：
+ * running → 正在执行；done → 上次运行已完成；等待类（approval / ask）→ 等待你的确认。
+ */
+function phaseTitle(phase: RunPhase): string {
+  if (phase === "running") return "正在执行";
+  if (phase === "done") return "上次运行已完成";
+  return "等待你的确认";
+}
+
 export function SessionRow({
   session,
   current,
@@ -76,99 +87,104 @@ export function SessionRow({
   // 别的会话每帧更新时本行 selector 求值结果不变 → 不重渲。
   const phase = useSessionRunPhase(session.id);
 
+  // 行内容三态互斥，优先级：删除确认 > 重命名编辑 > 正常展示。
+  // （原先是嵌套三目，"哪一态"要数冒号才看得出来，改成显式分支。）
+  let rowBody: ReactNode;
+  if (confirmingDelete) {
+    /* 行内删除确认（2026-08-28，替代居中 ConfirmDialog 弹框）：
+       复用行内重命名的"状态替换行内容"模式——点 ⋯→删除后，
+       该行原地变成确认条，不遮罩、不打断阅读、操作就近。
+       全站从此零模态弹框（审批/提问本就钉底部，删除就地确认）。 */
+    rowBody = (
+      <div
+        className={styles.sessionConfirm}
+        role="alert"
+        onClick={(e) => e.stopPropagation()}
+        /* Esc 取消：与重命名模式对齐（重命名有 Esc/失焦取消）。
+           焦点在确认条内（默认在取消按钮），Esc 冒泡到容器 */
+        onKeyDown={(e) => {
+          if (e.key === "Escape") onCancelDelete();
+        }}
+      >
+        <span className={styles.confirmText}>删除后不可恢复</span>
+        <div className={styles.confirmActions}>
+          <button
+            ref={cancelRef}
+            type="button"
+            className={styles.confirmCancel}
+            onClick={onCancelDelete}
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            className={styles.confirmDelete}
+            onClick={onConfirmDelete}
+          >
+            删除
+          </button>
+        </div>
+      </div>
+    );
+  } else if (editing) {
+    rowBody = (
+      <input
+        className={styles.sessionRenameInput}
+        value={draft}
+        placeholder="会话名称"
+        autoFocus
+        onChange={(e) => onRenameDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") onCommitRename();
+          if (e.key === "Escape") onCancelRename();
+        }}
+        onBlur={onCancelRename}
+        onClick={(e) => e.stopPropagation()}
+      />
+    );
+  } else {
+    rowBody = (
+      <>
+        {/* V2 二次调整（2026-08-26，抄 DSH 会话列表）：
+            不再显示 session 文件 id。没标题时回退到首条消息
+            （preview），再没有才显示「未命名会话」——原始 id
+            （s_2026-08-26T..._xxx）是存储细节，不是给人看的名字 */}
+        <div className={styles.sessionTitle}>
+          {session.title ?? session.preview ?? "未命名会话"}
+        </div>
+        {session.title && session.preview && (
+          <div className={styles.sessionPreview}>{session.preview}</div>
+        )}
+        <div className={styles.sessionMeta}>
+          {/* B22 状态点：只显示非当前会话（当前会话主体界面已有状态展示）。
+              派生规则（用户拍板 2026-09-02）：
+                running            → loading 呼吸点
+                waiting-approval / waiting-ask → 黄点（等你操作）
+                done               → 绿点（上次跑完了，保持到下次 startRun）
+                idle / error       → 不显示（error 由会话内横幅展示） */}
+          {!current && phase !== "idle" && phase !== "error" && (
+            <span
+              className={styles.sessionDot}
+              data-phase={phase}
+              title={phaseTitle(phase)}
+              role="status"
+            />
+          )}
+          {/* 2026-09-01：条数已删（占空间 + /clear 后要刷新才更新，
+              用户拍板"不要展示多少条了"）——只留时间 */}
+          <span>{formatClock(session.updatedAt)}</span>
+        </div>
+      </>
+    );
+  }
+
   return (
     <div
       className={`${styles.sessionItem}${current ? " is-current" : ""}`}
       // 编辑/确认态中禁点：避免"正在改这一行时误切会话"
       onClick={() => !editing && !confirmingDelete && onSelect()}
     >
-      {confirmingDelete ? (
-        /* 行内删除确认（2026-08-28，替代居中 ConfirmDialog 弹框）：
-           复用行内重命名的"状态替换行内容"模式——点 ⋯→删除后，
-           该行原地变成确认条，不遮罩、不打断阅读、操作就近。
-           全站从此零模态弹框（审批/提问本就钉底部，删除就地确认）。 */
-        <div
-          className={styles.sessionConfirm}
-          role="alert"
-          onClick={(e) => e.stopPropagation()}
-          /* Esc 取消：与重命名模式对齐（重命名有 Esc/失焦取消）。
-             焦点在确认条内（默认在取消按钮），Esc 冒泡到容器 */
-          onKeyDown={(e) => {
-            if (e.key === "Escape") onCancelDelete();
-          }}
-        >
-          <span className={styles.confirmText}>删除后不可恢复</span>
-          <div className={styles.confirmActions}>
-            <button
-              ref={cancelRef}
-              type="button"
-              className={styles.confirmCancel}
-              onClick={onCancelDelete}
-            >
-              取消
-            </button>
-            <button
-              type="button"
-              className={styles.confirmDelete}
-              onClick={onConfirmDelete}
-            >
-              删除
-            </button>
-          </div>
-        </div>
-      ) : editing ? (
-        <input
-          className={styles.sessionRenameInput}
-          value={draft}
-          placeholder="会话名称"
-          autoFocus
-          onChange={(e) => onRenameDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") onCommitRename();
-            if (e.key === "Escape") onCancelRename();
-          }}
-          onBlur={onCancelRename}
-          onClick={(e) => e.stopPropagation()}
-        />
-      ) : (
-        <>
-          {/* V2 二次调整（2026-08-26，抄 DSH 会话列表）：
-              不再显示 session 文件 id。没标题时回退到首条消息
-              （preview），再没有才显示「未命名会话」——原始 id
-              （s_2026-08-26T..._xxx）是存储细节，不是给人看的名字 */}
-          <div className={styles.sessionTitle}>
-            {session.title ?? session.preview ?? "未命名会话"}
-          </div>
-          {session.title && session.preview && (
-            <div className={styles.sessionPreview}>{session.preview}</div>
-          )}
-          <div className={styles.sessionMeta}>
-            {/* B22 状态点：只显示非当前会话（当前会话主体界面已有状态展示）。
-                派生规则（用户拍板 2026-09-02）：
-                  running            → loading 呼吸点
-                  waiting-approval / waiting-ask → 黄点（等你操作）
-                  done               → 绿点（上次跑完了，保持到下次 startRun）
-                  idle / error       → 不显示（error 由会话内横幅展示） */}
-            {!current && phase !== "idle" && phase !== "error" && (
-              <span
-                className={styles.sessionDot}
-                data-phase={phase}
-                title={
-                  phase === "running"
-                    ? "正在执行"
-                    : phase === "done"
-                      ? "上次运行已完成"
-                      : "等待你的确认"
-                }
-                role="status"
-              />
-            )}
-            {/* 2026-09-01：条数已删（占空间 + /clear 后要刷新才更新，
-                用户拍板"不要展示多少条了"）——只留时间 */}
-            <span>{formatClock(session.updatedAt)}</span>
-          </div>
-        </>
-      )}
+      {rowBody}
 
       {!editing && !confirmingDelete && (
         /* V2（2026-08-26）：⋯ 菜单（重命名/删除，34px 命中区）。

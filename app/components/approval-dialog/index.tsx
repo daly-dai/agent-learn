@@ -39,7 +39,7 @@ export function ApprovalDialog({ request, onApprove }: ApprovalDialogProps) {
   // 键盘快捷键（抄 Reasonix：卡片出现期间 Y/A/P/N 可操作；
   // 输入框/文本域聚焦时不抢键——用户可能在打字）
   useEffect(() => {
-    if (!request) return;
+    if (!request) return undefined;
     const onKey = (e: KeyboardEvent) => {
       // 前置判定提炼到 app/lib/keys.ts（纯函数层，可单测）：
       // 修饰键组合让路、焦点在编辑区让路（用户在打字，不抢键）

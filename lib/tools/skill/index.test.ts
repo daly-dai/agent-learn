@@ -18,6 +18,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createSkillTool } from "./index";
 
+let root: string;
+
 async function writeSkill(
   dirName: string,
   skillMd: string,
@@ -33,7 +35,6 @@ async function writeSkill(
   }
 }
 
-let root: string;
 let tool: ReturnType<typeof createSkillTool>;
 
 beforeAll(async () => {
@@ -63,7 +64,10 @@ Handoff instructions.
 `,
   );
 
-  const manyFiles = Array.from({ length: 12 }, (_, i) => `f${String(i).padStart(2, "0")}.txt`);
+  const manyFiles = Array.from(
+    { length: 12 },
+    (_, i) => `f${String(i).padStart(2, "0")}.txt`,
+  );
   await writeSkill(
     "many-files",
     `---
@@ -86,7 +90,8 @@ afterAll(async () => {
 describe("skill 工具 —— 加载一个技能", () => {
   it("正文 + 技能目录绝对路径 + 文件清单一起给模型（Q5 定的形状）", async () => {
     const result = await tool.execute({ name: "code-review" });
-    const text = result.content[0].type === "text" ? result.content[0].text : "";
+    const text =
+      result.content[0].type === "text" ? result.content[0].text : "";
 
     expect(text).toContain('<skill_content name="code-review">');
     expect(text).toContain("Two-axis review of the diff.");
@@ -112,14 +117,18 @@ describe("skill 工具 —— 加载一个技能", () => {
   });
 
   it("未知名字 → 抛错（引擎把错误变成 isError 的 toolResult 回给模型，不静默）", async () => {
-    await expect(tool.execute({ name: "frontend-desgin" })).rejects.toThrow(/frontend-desgin/);
+    await expect(tool.execute({ name: "frontend-desgin" })).rejects.toThrow(
+      /frontend-desgin/,
+    );
   });
 
   it("隐藏技能 → 抛错：disable-model-invocation 的语义就是「模型不许自己喊」", async () => {
     // 依据 DSH（本机 dsh-tool-skill/lib/index.js:147）：
     //   if (!isModelInvocable(skill)) throw new Error('… is not available for model invocation')
     // 用户仍可以用 /handoff 触发（手势路径），但模型不能自己把它拉进来。
-    await expect(tool.execute({ name: "handoff" })).rejects.toThrow(/模型自己加载|disable-model-invocation/);
+    await expect(tool.execute({ name: "handoff" })).rejects.toThrow(
+      /模型自己加载|disable-model-invocation/,
+    );
   });
 
   it("没给 name（模型偶尔会漏参数）→ 抛错说清要什么", async () => {

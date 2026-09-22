@@ -253,7 +253,9 @@
 }
 
 .row:hover {
-  background: var(--feed-hover); /* C35：原来借「面」（--plate），而视图是 --paper */
+  background: var(
+    --feed-hover
+  ); /* C35：原来借「面」（--plate），而视图是 --paper */
 }
 
 .label {

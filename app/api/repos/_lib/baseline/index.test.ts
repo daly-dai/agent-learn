@@ -8,9 +8,7 @@
 // ============================================================
 
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 
 // ---- 先 mock config，再 import 被测模块（vitest 的 hoist 要求）----
 // 坑（2026-09-01 修）：vi.mock 工厂会被提升到文件顶部执行，工厂里引用
@@ -65,7 +63,11 @@ describe("baseline —— 仓库更新基线", () => {
   });
 
   it("缺 lastKnownCommit 字段的 JSON 返回 null", () => {
-    writeFileSync(baselinePath("pi"), JSON.stringify({ updatedAt: "2026-01-01" }), "utf8");
+    writeFileSync(
+      baselinePath("pi"),
+      JSON.stringify({ updatedAt: "2026-01-01" }),
+      "utf8",
+    );
     return expect(readBaseline("pi")).resolves.toBeNull();
   });
 

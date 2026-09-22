@@ -8,11 +8,7 @@
 // ============================================================
 
 import { describe, expect, it } from "vitest";
-import {
-  isSlashCommandLine,
-  parseSlashName,
-  validateSubmission,
-} from ".";
+import { isSlashCommandLine, parseSlashName, validateSubmission } from ".";
 
 describe("parseSlashName —— 解析一行命令（codex parse_slash_name 形状）", () => {
   it("裸命令：/compact → name + 空 rest", () => {

@@ -17,7 +17,8 @@
 //   { type: "error", message }      出错信息
 // ============================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import {
   createUserMessage,
   isValidSessionId,
@@ -54,7 +55,11 @@ export const runtime = "nodejs";
 
 // 路径与行为配置：全部来自 lib/config.ts（唯一入口，环境变量可覆盖）。
 // 工作区根目录 / 轨迹目录 / 会话目录 / 压缩阈值 / 审批超时都收编在这里。
-const { workspace: workspaceRoot, traces: traceDir, sessions: sessionDir } = config.paths;
+const {
+  workspace: workspaceRoot,
+  traces: traceDir,
+  sessions: sessionDir,
+} = config.paths;
 // 工具注册表【不在这里建单例】（贴 pi create-harness）：
 // 它在每次 POST 请求内组装，业务 hooks 闭包捕获当次的 store/send。
 //
@@ -76,7 +81,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
 
     text = body?.text;
-    
+
     if (typeof body?.sessionId === "string" && body.sessionId.trim()) {
       sessionId = body.sessionId.trim();
       // 安全：sessionId 会拼进文件路径，必须过白名单校验（见 sessionManager）
@@ -184,7 +189,10 @@ export async function POST(req: NextRequest) {
         // error 只在失败时带（JSON.stringify 会丢掉 undefined 的键）。
         // completed 与 summary.error 是两件事：前者 = 文件写完了，
         // 后者 = 这次运行跑得怎么样——崩掉的 run 是「文件完整 + 有 error」。
-        await recorder.end({ messages: recorder.entries.length, error: runError });
+        await recorder.end({
+          messages: recorder.entries.length,
+          error: runError,
+        });
         controller.close();
       }
     },

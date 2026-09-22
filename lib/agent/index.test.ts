@@ -19,7 +19,12 @@
 import { describe, expect, it } from "vitest";
 import { runAgentLoop } from "./index";
 import { ToolRegistry } from "../tools";
-import { createAssistantMessage, createUserMessage, messageText, text } from "../message";
+import {
+  createAssistantMessage,
+  createUserMessage,
+  messageText,
+  text,
+} from "../message";
 import { FakeModel } from "../testing/fake-model";
 import type {
   AgentEvent,
@@ -130,13 +135,19 @@ describe("runAgentLoop —— 正常路径", () => {
     // 事件含工具执行起止
     const toolStart = events.find((e) => e.type === "tool_execution_start");
     const toolEnd = events.find((e) => e.type === "tool_execution_end");
-    expect(toolStart?.type === "tool_execution_start" && toolStart.toolName).toBe("echo");
-    expect(toolEnd?.type === "tool_execution_end" && toolEnd.isError).toBe(false);
+    expect(
+      toolStart?.type === "tool_execution_start" && toolStart.toolName,
+    ).toBe("echo");
+    expect(toolEnd?.type === "tool_execution_end" && toolEnd.isError).toBe(
+      false,
+    );
 
     // ReAct 记忆闭环：第二轮模型请求的 messages 里必须包含第一条 toolResult
     expect(model.calls).toHaveLength(2);
     const secondCallMessages = model.calls[1].messages;
-    const seenResults = secondCallMessages.filter((m) => m.role === "toolResult");
+    const seenResults = secondCallMessages.filter(
+      (m) => m.role === "toolResult",
+    );
     expect(seenResults).toHaveLength(1);
     expect((seenResults[0] as ToolResultMessage).toolCallId).toBe("tool-1");
   });
@@ -191,7 +202,9 @@ describe("runAgentLoop —— 审批（beforeToolCall）", () => {
       (m): m is ToolResultMessage => m.role === "toolResult",
     );
     expect(blockedResult?.isError).toBe(true);
-    expect(messageText(blockedResult!)).toContain("Tool call blocked: 政策不允许");
+    expect(messageText(blockedResult!)).toContain(
+      "Tool call blocked: 政策不允许",
+    );
     expect(blockedResult?.details).toEqual({
       blocked: true,
       reason: "政策不允许",
@@ -199,7 +212,9 @@ describe("runAgentLoop —— 审批（beforeToolCall）", () => {
 
     // 审计事件：action=block 且带原始参数
     const permission = events.find((e) => e.type === "tool_permission");
-    expect(permission?.type === "tool_permission" && permission.action).toBe("block");
+    expect(permission?.type === "tool_permission" && permission.action).toBe(
+      "block",
+    );
     expect(
       permission?.type === "tool_permission" && permission.originalArgs,
     ).toEqual({ value: "x" });
@@ -243,9 +258,9 @@ describe("runAgentLoop —— 审批（beforeToolCall）", () => {
     expect(permission?.type === "tool_permission" && permission.args).toEqual({
       value: "new",
     });
-    expect(
-      permission?.type === "tool_permission" && permission.action,
-    ).toBe("rewrite");
+    expect(permission?.type === "tool_permission" && permission.action).toBe(
+      "rewrite",
+    );
   });
 
   it("不传 beforeToolCall → 默认全部放行，不发 tool_permission 事件", async () => {
@@ -294,7 +309,9 @@ describe("runAgentLoop —— 容错与护栏", () => {
 
     // 工具结束事件也标记 isError
     const toolEnd = events.find((e) => e.type === "tool_execution_end");
-    expect(toolEnd?.type === "tool_execution_end" && toolEnd.isError).toBe(true);
+    expect(toolEnd?.type === "tool_execution_end" && toolEnd.isError).toBe(
+      true,
+    );
 
     // 循环继续：模型第二轮仍被调用，且能看到错误结果
     expect(model.calls).toHaveLength(2);
@@ -350,7 +367,9 @@ describe("runAgentLoop —— 容错与护栏", () => {
       return { content: [text("不该执行")] };
     });
 
-    const { newMessages, events } = await runAgentLoop(baseOptions({ model, registry }));
+    const { newMessages, events } = await runAgentLoop(
+      baseOptions({ model, registry }),
+    );
 
     // 错误消息原样交付，工具不被调用
     expect(newMessages).toHaveLength(1);

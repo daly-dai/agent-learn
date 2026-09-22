@@ -11,9 +11,16 @@
 // 本模块无内存态，方法直接打文件系统，所以可以作为模块级单例使用。
 // ============================================================
 
-import { readFile, readdir, rename as renameFile, rm, stat, writeFile } from "node:fs/promises";
+import {
+  readFile,
+  readdir,
+  rename as renameFile,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { join } from "node:path";
-import type { AgentMessage, SessionEntry } from "../../types";
+import type { SessionEntry } from "../../types";
 import { messageText } from "../../message";
 import { JsonlSessionStore } from "../store";
 // 审批侧车（<id>.approval.jsonl）的路径定义在权限层——delete 要连它一起删，
@@ -68,7 +75,12 @@ export class SessionManager {
     const id = generateSessionId();
     // 复用 JsonlSessionStore 写头：文件不存在时 loadOrCreate 会建目录 + 写头。
     // 实例用完即弃（没有消息可读），这只是「借它的写头逻辑」。
-    new JsonlSessionStore(this.sessionPath(id), this.cwd, id, title);
+    new JsonlSessionStore({
+      filePath: this.sessionPath(id),
+      cwd: this.cwd,
+      sessionId: id,
+      title,
+    });
     return id;
   }
 
@@ -88,7 +100,9 @@ export class SessionManager {
     }
     // title 为空串 = 清除显示名，回退用 id
     lines[0] = JSON.stringify(
-      title.trim() ? { ...header, title: title.trim() } : { ...header, title: undefined },
+      title.trim()
+        ? { ...header, title: title.trim() }
+        : { ...header, title: undefined },
     );
 
     // 原子替换（C18 A 档 ②）：先写同目录临时文件，再 rename 覆盖。
@@ -153,12 +167,16 @@ async function summarizeSessionFile(
       const entry = JSON.parse(line) as SessionEntry;
       if (entry.type === "session") {
         title = entry.title;
-      } else if (entry.type === "message" && preview === undefined) {
-        // 预览是单行展示：messageText 保留结构（模型/摘要用），
-        // 这里把换行压成空格再截断，避免会话列表出现换行。
-        if (entry.message.role === "user") {
-          preview = truncate(messageText(entry.message).replace(/\n/g, " "), 60);
-        }
+        continue;
+      }
+      // 预览是单行展示：messageText 保留结构（模型/摘要用），
+      // 这里把换行压成空格再截断，避免会话列表出现换行。
+      if (
+        entry.type === "message" &&
+        preview === undefined &&
+        entry.message.role === "user"
+      ) {
+        preview = truncate(messageText(entry.message).replace(/\n/g, " "), 60);
       }
     }
 

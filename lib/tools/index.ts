@@ -54,7 +54,7 @@ export class ToolRegistry {
    */
   guidelines(): Array<{ name: string; text: string }> {
     const collected: Array<{ name: string; text: string }> = [];
-    
+
     for (const tool of this.tools.values()) {
       for (const text of tool.guidelines ?? []) {
         collected.push({ name: tool.name, text });

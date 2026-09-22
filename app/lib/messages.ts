@@ -16,7 +16,10 @@ export function appendDelta(
   const content = [...last.content];
   const lastBlock = content[content.length - 1];
   if (lastBlock && lastBlock.type === "text") {
-    content[content.length - 1] = { ...lastBlock, text: lastBlock.text + delta };
+    content[content.length - 1] = {
+      ...lastBlock,
+      text: lastBlock.text + delta,
+    };
   } else {
     content.push({ type: "text", text: delta });
   }

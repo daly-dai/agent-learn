@@ -61,7 +61,9 @@ export function createEditTool(workspaceRoot: string): RegisteredTool {
       }
 
       const updated =
-        content.slice(0, first) + newText + content.slice(first + oldText.length);
+        content.slice(0, first) +
+        newText +
+        content.slice(first + oldText.length);
       await writeFile(filePath, updated, "utf8");
       return {
         content: [text(`已在 ${args.path} 中替换 1 处。`)],

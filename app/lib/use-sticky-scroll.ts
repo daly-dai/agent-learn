@@ -34,7 +34,7 @@ export function useStickyScroll(
   // 的 effect 依赖它），所以流式更新时能拿到最新的停靠状态。
   useEffect(() => {
     const box = ref.current;
-    if (!box) return;
+    if (!box) return undefined;
     const onScroll = () => {
       stickyRef.current =
         box.scrollHeight - box.scrollTop - box.clientHeight <
@@ -44,5 +44,6 @@ export function useStickyScroll(
     return () => box.removeEventListener("scroll", onScroll);
   }, [ref]);
 
+  // eslint-disable-next-line react-hooks/refs -- 本 hook 的契约就是"读当前粘底状态"；改成 state 会让每次滚动重渲整个消息列表（B17 专门优化掉的）→ 见池子 C46
   return stickyRef.current;
 }

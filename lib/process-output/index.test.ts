@@ -105,7 +105,9 @@ describe("readPwshErrors —— 把 CLIXML 解成人话", () => {
 
   it("不认得的输入 → null（不吞信息：调用方照原样用）", () => {
     // 真样本的同一次会话里，*另一个* bash 调用的结果就是这种普通文本
-    expect(readPwshErrors("review-lib.diff : 3682\nreview-app.diff : 2860\n")).toBeNull();
+    expect(
+      readPwshErrors("review-lib.diff : 3682\nreview-app.diff : 2860\n"),
+    ).toBeNull();
     expect(readPwshErrors("")).toBeNull();
   });
 
@@ -122,11 +124,15 @@ describe("stripPwshClixml —— 从输出里摘掉机器话（正文原样留�
   });
 
   it("正文夹着 CLIXML：两段正文都在、顺序不变", () => {
-    const stripped = stripPwshClixml(`前面的正文\n${REAL_PWSH_STDERR}\n后面的正文`);
+    const stripped = stripPwshClixml(
+      `前面的正文\n${REAL_PWSH_STDERR}\n后面的正文`,
+    );
     expect(stripped).toContain("前面的正文");
     expect(stripped).toContain("后面的正文");
     expect(stripped).not.toContain("#< CLIXML");
     expect(stripped).not.toContain('<S S="Error">');
-    expect(stripped.indexOf("前面的正文")).toBeLessThan(stripped.indexOf("后面的正文"));
+    expect(stripped.indexOf("前面的正文")).toBeLessThan(
+      stripped.indexOf("后面的正文"),
+    );
   });
 });

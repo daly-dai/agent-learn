@@ -10,7 +10,8 @@
 // 找不到（run 已结束/已清理）→ 404。
 // ============================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { runControllers } from "@/lib/runControl";
 
 export const runtime = "nodejs";

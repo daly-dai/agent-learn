@@ -18,7 +18,11 @@
 import { useEffect, useState } from "react";
 import type { TraceMeta } from "@/lib/trace";
 import { fetchTraceRun, fetchTraceRuns } from "@/app/services/chat";
-import { foldTrace, type TraceFold, type TraceRun } from "@/app/lib/trace-steps";
+import {
+  foldTrace,
+  type TraceFold,
+  type TraceRun,
+} from "@/app/lib/trace-steps";
 
 const LIVE_POLL_MS = 2_000;
 
@@ -48,7 +52,7 @@ export function useTraces(
   const { enabled, live } = options;
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) return undefined;
 
     const controller = new AbortController();
     let cancelled = false;
@@ -81,7 +85,9 @@ export function useTraces(
 
     void load();
     // live 变化（run 开始/结束）也会重跑本 effect → 结束时自动补一次完整加载
-    const timer = live ? setInterval(() => void load(), LIVE_POLL_MS) : undefined;
+    const timer = live
+      ? setInterval(() => void load(), LIVE_POLL_MS)
+      : undefined;
 
     return () => {
       cancelled = true;

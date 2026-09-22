@@ -100,8 +100,8 @@ const CLIXML_MARKER = "#< CLIXML";
 export function readPwshErrors(text: string): PwshErrorReport | null {
   if (!text.includes(CLIXML_MARKER)) return null;
 
-  const entries = [...text.matchAll(/<S S="Error">([\s\S]*?)<\/S>/g)].map((match) =>
-    decodeClixmlEntry(match[1]),
+  const entries = [...text.matchAll(/<S S="Error">([\s\S]*?)<\/S>/g)].map(
+    (match) => decodeClixmlEntry(match[1]),
   );
   if (entries.length === 0) return null;
 

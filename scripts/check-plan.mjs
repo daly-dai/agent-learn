@@ -50,7 +50,12 @@ function readPool() {
   text.split(/\r?\n/).forEach((line, index) => {
     const id = line.match(/^\| ([A-Z]+\d+) \|/);
     if (!id) return;
-    const cells = line.trimEnd().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+    const cells = line
+      .trimEnd()
+      .replace(/^\|/, "")
+      .replace(/\|$/, "")
+      .split("|")
+      .map((c) => c.trim());
     rows.push({
       id: id[1],
       cellCount: cells.length,
@@ -58,7 +63,9 @@ function readPool() {
       acceptance: cells[4] ?? "", // 第 5 格 =「验收」—— **定案的门禁就是这一格**
       status: lastCell(line), // 第 6 格 =「状态」（值域只有四个）
       // 行内引用的详案文件 —— 用来查悬空引用
-      planRefs: [...line.matchAll(/doc\/plan\/[A-Za-z0-9._-]+\.md/g)].map((m) => m[0]),
+      planRefs: [...line.matchAll(/doc\/plan\/[A-Za-z0-9._-]+\.md/g)].map(
+        (m) => m[0],
+      ),
       line: index + 1,
     });
   });
@@ -68,7 +75,9 @@ function readPool() {
 /** 迭代 = `doc/iteration/*.md`，成员来自头部那行 `> **成员**：…`。 */
 function readIterations() {
   const found = [];
-  for (const name of readdirSync(ITERATION_DIR).filter((f) => f.endsWith(".md"))) {
+  for (const name of readdirSync(ITERATION_DIR).filter((f) =>
+    f.endsWith(".md"),
+  )) {
     const text = readFileSync(join(ITERATION_DIR, name), "utf8");
     if (/\*\*例外\*\*：/.test(text)) {
       found.push({ name, members: [], selfHosting: true });
@@ -76,7 +85,10 @@ function readIterations() {
     }
     const header = text.match(/^> \*\*成员\*\*：(.+)$/m);
     const members = header
-      ? header[1].split("·").map((s) => s.trim()).filter(Boolean)
+      ? header[1]
+          .split("·")
+          .map((s) => s.trim())
+          .filter(Boolean)
       : [];
     found.push({ name, members, selfHosting: false });
   }
@@ -112,7 +124,9 @@ function check(pool, iterations) {
   const byId = new Map(pool.map((row) => [row.id, row]));
 
   for (const iteration of iterations) {
-    const expected = iteration.selfHosting ? null : iterationCode(iteration.name);
+    const expected = iteration.selfHosting
+      ? null
+      : iterationCode(iteration.name);
     for (const id of iteration.members) {
       const row = byId.get(id);
       if (!row) {
@@ -120,11 +134,14 @@ function check(pool, iterations) {
         continue;
       }
       if (!expected) continue;
-      const ok = statusIteration(row.status) === expected || row.status === "进行中" || row.status === "已交付";
+      const ok =
+        statusIteration(row.status) === expected ||
+        row.status === "进行中" ||
+        row.status === "已交付";
       if (!ok) {
         problems.push(
           `需求池 ${id}（PLAN.md:${row.line}）状态是「${row.status}」，但它已在 ${iteration.name} —— ` +
-            `应写成「已纳入 ${expected}」（或 进行中 / 已交付）`
+            `应写成「已纳入 ${expected}」（或 进行中 / 已交付）`,
         );
       }
     }
@@ -136,15 +153,21 @@ function check(pool, iterations) {
       const owner = `${code.toLowerCase()}.md`;
       const iteration = iterations.find((i) => i.name === owner);
       if (!iteration) {
-        problems.push(`需求池 ${row.id}（PLAN.md:${row.line}）写「${row.status}」，但没有 ${owner} 这个迭代文件`);
+        problems.push(
+          `需求池 ${row.id}（PLAN.md:${row.line}）写「${row.status}」，但没有 ${owner} 这个迭代文件`,
+        );
       } else if (!iteration.members.includes(row.id)) {
-        problems.push(`需求池 ${row.id} 写「${row.status}」，但 ${owner} 的成员行里没有它`);
+        problems.push(
+          `需求池 ${row.id} 写「${row.status}」，但 ${owner} 的成员行里没有它`,
+        );
       }
       continue;
     }
     const absorbed = statusAbsorbedBy(row.status);
     if (absorbed && !byId.has(absorbed)) {
-      problems.push(`需求池 ${row.id}（PLAN.md:${row.line}）写「${row.status}」，但池子里没有 ${absorbed} 这一项`);
+      problems.push(
+        `需求池 ${row.id}（PLAN.md:${row.line}）写「${row.status}」，但池子里没有 ${absorbed} 这一项`,
+      );
     }
   }
 
@@ -158,7 +181,7 @@ function checkStatusDomain(pool) {
     if (!STATUS_RE.test(row.status)) {
       problems.push(
         `需求池 ${row.id}（PLAN.md:${row.line}）状态是「${row.status}」，不在值域里` +
-          `（未开始 / 已纳入 <迭代或另一项> / 进行中 / 已交付）`
+          `（未开始 / 已纳入 <迭代或另一项> / 进行中 / 已交付）`,
       );
     }
   }
@@ -178,7 +201,7 @@ function checkRowShape(pool) {
     if (row.cellCount !== POOL_CELL_COUNT) {
       problems.push(
         `需求池 ${row.id}（PLAN.md:${row.line}）有 ${row.cellCount} 格，应为 ${POOL_CELL_COUNT} 格` +
-          `（ID / 做什么 / 依据 / 详细设计 / 验收 / 状态）—— 多出来的通常是没删干净的旧状态`
+          `（ID / 做什么 / 依据 / 详细设计 / 验收 / 状态）—— 多出来的通常是没删干净的旧状态`,
       );
     }
   }
@@ -191,7 +214,9 @@ function checkPlanFileRefs(pool) {
   for (const row of pool) {
     for (const ref of row.planRefs) {
       if (!existsSync(join(ROOT, ref))) {
-        problems.push(`需求池 ${row.id}（PLAN.md:${row.line}）指向 ${ref}，但那个文件不存在`);
+        problems.push(
+          `需求池 ${row.id}（PLAN.md:${row.line}）指向 ${ref}，但那个文件不存在`,
+        );
       }
     }
   }
@@ -208,11 +233,13 @@ function checkPlanFileRefs(pool) {
 function checkOrphanPlanFiles() {
   const problems = [];
   const planText = readFileSync(join(ROOT, "PLAN.md"), "utf8");
-  for (const name of readdirSync(join(ROOT, "doc", "plan")).filter((f) => f.endsWith(".md"))) {
+  for (const name of readdirSync(join(ROOT, "doc", "plan")).filter((f) =>
+    f.endsWith(".md"),
+  )) {
     if (planText.includes(name)) continue;
     problems.push(
       `doc/plan/${name} 在 PLAN.md 里没有任何地方提到它 —— ` +
-        `要么给它挂个入口（需求池行 /「横切文档」表 /「地基」小节），要么搬去 doc/plan-archive/`
+        `要么给它挂个入口（需求池行 /「横切文档」表 /「地基」小节），要么搬去 doc/plan-archive/`,
     );
   }
   return problems;
@@ -243,12 +270,12 @@ function checkAbsorbedTargetAlive(pool) {
     if (target.status === "已交付") {
       problems.push(
         `需求池 ${row.id}（PLAN.md:${row.line}）写「${row.status}」，但 ${absorbed} 已经是「已交付」` +
-          ` —— 指针指向一个收工的容器：跟着它一起处置（已交付 / 未开始），或改指还在跑的项`
+          ` —— 指针指向一个收工的容器：跟着它一起处置（已交付 / 未开始），或改指还在跑的项`,
       );
     } else if (chained) {
       problems.push(
         `需求池 ${row.id}（PLAN.md:${row.line}）写「${row.status}」，而 ${absorbed} 自己也写「${target.status}」` +
-          ` —— 指针套指针，拉直成「已纳入 ${chained}」`
+          ` —— 指针套指针，拉直成「已纳入 ${chained}」`,
       );
     }
   }
@@ -284,19 +311,23 @@ function reportCurrentIterations(iterations, pool) {
     .map((iteration) => ({
       name: iteration.name,
       total: iteration.members.length,
-      pending: iteration.members.filter((id) => byId.get(id)?.status !== "已交付"),
+      pending: iteration.members.filter(
+        (id) => byId.get(id)?.status !== "已交付",
+      ),
     }))
     .filter((iteration) => iteration.pending.length > 0);
 
   if (running.length === 0) {
     console.log(
       "当前没有在跑的迭代（池子里没有「已纳入 I<n>」的行）—— 起新一批：从池子挑成员（三格齐）" +
-        " → 建 doc/iteration/i<n>.md（头部写「> **成员**：…」）→ 那几格标「已纳入 I<n>」"
+        " → 建 doc/iteration/i<n>.md（头部写「> **成员**：…」）→ 那几格标「已纳入 I<n>」",
     );
     return;
   }
   for (const iteration of running) {
-    console.log(`当前在跑：${iteration.name}（${iteration.pending.length}/${iteration.total} 未交付：${iteration.pending.join(" · ")}）`);
+    console.log(
+      `当前在跑：${iteration.name}（${iteration.pending.length}/${iteration.total} 未交付：${iteration.pending.join(" · ")}）`,
+    );
   }
 }
 
@@ -316,13 +347,17 @@ function main() {
 
   if (process.argv.includes("--list")) {
     const absorbed = pool.filter((row) => statusAbsorbedBy(row.status)).length;
-    const inIteration = pool.filter((row) => statusIteration(row.status)).length;
+    const inIteration = pool.filter((row) =>
+      statusIteration(row.status),
+    ).length;
     console.log(
       `池子 ${pool.length} 行：未开始 ${count(/^未开始$/)} / 已纳入 ${inIteration + absorbed}` +
-        `（迭代 ${inIteration} · 被并入 ${absorbed}）/ 进行中 ${count(/^进行中$/)} / 已交付 ${count(/^已交付$/)}`
+        `（迭代 ${inIteration} · 被并入 ${absorbed}）/ 进行中 ${count(/^进行中$/)} / 已交付 ${count(/^已交付$/)}`,
     );
     for (const iteration of iterations) {
-      console.log(`  ${iteration.name}：${iteration.selfHosting ? "（self-hosting 例外）" : iteration.members.join(" · ") || "（空）"}`);
+      console.log(
+        `  ${iteration.name}：${iteration.selfHosting ? "（self-hosting 例外）" : iteration.members.join(" · ") || "（空）"}`,
+      );
     }
   }
 

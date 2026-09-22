@@ -23,10 +23,7 @@
 // ============================================================
 
 import { useCallback, useEffect } from "react";
-import {
-  useRunStore,
-  useSessionRun,
-} from "./run-store";
+import { useRunStore, useSessionRun } from "./run-store";
 import type { RunState } from "./run-fold";
 
 // 类型 re-export：approval-dialog / ask-user-card 从这里 import，
@@ -57,8 +54,7 @@ export function useAgentRun(sessionId: string) {
     [sessionId],
   );
   const answerAsk = useCallback(
-    (answers: string[]) =>
-      useRunStore.getState().answerAsk(sessionId, answers),
+    (answers: string[]) => useRunStore.getState().answerAsk(sessionId, answers),
     [sessionId],
   );
   const setError = useCallback(

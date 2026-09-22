@@ -24,7 +24,10 @@ function asked(id: string, toolName = "bash"): ApprovalReceipt {
   };
 }
 
-function decided(id: string, outcome: "approved" | "denied" = "approved"): ApprovalReceipt {
+function decided(
+  id: string,
+  outcome: "approved" | "denied" = "approved",
+): ApprovalReceipt {
   return {
     phase: "decided",
     approvalId: id,
@@ -78,9 +81,7 @@ describe("replayApprovalReceipts —— 成对校验（纯函数）", () => {
   });
 
   it("孤儿 decided（没有 ask）→ 报错", () => {
-    const { errors } = replayApprovalReceipts([
-      decided("tool-orphan"),
-    ]);
+    const { errors } = replayApprovalReceipts([decided("tool-orphan")]);
     expect(errors.some((e) => e.includes("没有匹配的 ask"))).toBe(true);
   });
 

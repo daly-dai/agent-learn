@@ -19,8 +19,8 @@ export type PendingAsk = {
 
 const g = globalThis as { __userAnswers?: Map<string, PendingAsk> };
 
-export const userAnswers: Map<string, PendingAsk> =
-  (g.__userAnswers ??= new Map());
+export const userAnswers: Map<string, PendingAsk> = (g.__userAnswers ??=
+  new Map());
 
 /** 生成一个带 runId 前缀的 key（便于 run 结束时按 runId 清理挂起提问） */
 export function makeAskKey(runId: string): string {
@@ -35,7 +35,7 @@ export function clearRun(runId: string): void {
   for (const [key, pending] of userAnswers) {
     if (key.startsWith(prefix)) {
       userAnswers.delete(key);
-      pending.resolve(([] as unknown[]) as string[]); // 空数组 = 未回答
+      pending.resolve([] as unknown[] as string[]); // 空数组 = 未回答
     }
   }
 }

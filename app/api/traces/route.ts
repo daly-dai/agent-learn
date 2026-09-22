@@ -12,7 +12,8 @@
 // 安全：sessionId 拼进文件名前缀，必须过 isValidSessionId 白名单（同 chat/export）。
 // ============================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { config, isValidSessionId, listTraceFiles, readTraceMeta } from "@/lib";
 import type { TraceMeta } from "@/lib";
 
@@ -25,7 +26,9 @@ export async function GET(req: NextRequest) {
   }
 
   const files = await listTraceFiles(config.paths.traces, sessionId);
-  const metas = await Promise.all(files.map((file) => readTraceMeta(file.path)));
+  const metas = await Promise.all(
+    files.map((file) => readTraceMeta(file.path)),
+  );
 
   // readTraceMeta 返回 undefined = "这个文件不是轨迹"（空文件/首行不是 trace_start），
   // 那是**分类**不是失败，所以直接不列。崩掉的 run 走的是另一条路：文件是轨迹、

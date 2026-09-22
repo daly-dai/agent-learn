@@ -66,11 +66,7 @@ export function SessionList({
       <div className={styles.sidebarHead}>
         <span className={styles.sidebarTitle}>会话</span>
         <span className={styles.sidebarCount}>{sessions.length}</span>
-        <button
-          className={styles.sidebarNew}
-          type="button"
-          onClick={onCreate}
-        >
+        <button className={styles.sidebarNew} type="button" onClick={onCreate}>
           ＋ 新建
         </button>
       </div>

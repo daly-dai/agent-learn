@@ -29,19 +29,28 @@ function ctx(overrides: Partial<ApprovalContext> = {}): ApprovalContext {
 
 describe("decideToolCall —— secret/秘密 硬拦截", () => {
   it("write_file 含 secret 文件名 → block（不弹框）", async () => {
-    const r = await decideToolCall(call("write_file", { path: "secret-key.txt" }), ctx());
+    const r = await decideToolCall(
+      call("write_file", { path: "secret-key.txt" }),
+      ctx(),
+    );
     expect(r.action).toBe("block");
   });
 
   it("write_note 含 秘密 文件名 → block", async () => {
-    const r = await decideToolCall(call("write_note", { fileName: "秘密笔记.md" }), ctx());
+    const r = await decideToolCall(
+      call("write_note", { fileName: "秘密笔记.md" }),
+      ctx(),
+    );
     expect(r.action).toBe("block");
   });
 
   it("write_file 普通文件名 → 不拦截（走后续判定 → request）", async () => {
     // 收紧：断言精确到 request（需要弹框），而不是"不是 block"——
     // not.toBe("block") 会把误 allow 也放行，测不出"走了后续判定"
-    const r = await decideToolCall(call("write_file", { path: "notes.md" }), ctx());
+    const r = await decideToolCall(
+      call("write_file", { path: "notes.md" }),
+      ctx(),
+    );
     expect(r.action).toBe("request");
   });
 });
@@ -55,12 +64,18 @@ describe("decideToolCall —— 分级模式", () => {
   });
 
   it("never 模式 + 需确认工具 → block", async () => {
-    const r = await decideToolCall(call("write_file", { path: "x.ts" }), ctx({ getApprovalMode: () => "never" }));
+    const r = await decideToolCall(
+      call("write_file", { path: "x.ts" }),
+      ctx({ getApprovalMode: () => "never" }),
+    );
     expect(r.action).toBe("block");
   });
 
   it("never 模式 + 只读工具 → allow（不在确认名单）", async () => {
-    const r = await decideToolCall(call("read_file", { path: "x.ts" }), ctx({ getApprovalMode: () => "never" }));
+    const r = await decideToolCall(
+      call("read_file", { path: "x.ts" }),
+      ctx({ getApprovalMode: () => "never" }),
+    );
     expect(r.action).toBe("allow");
   });
 });

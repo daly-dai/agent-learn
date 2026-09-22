@@ -12,7 +12,10 @@ import type { CompleteInput, TeachingModel } from "./model";
 // 加上这个延迟后，SSE 流式输出才能"看得见"——否则所有事件瞬间发完，看不出先后。
 // 如果不需要演示流式，把 DELAY 改成 0 即可。
 const DELAY_MS = 350;
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const sleep = (ms: number) =>
+  new Promise((r) => {
+    setTimeout(r, ms);
+  });
 
 export class MockModel implements TeachingModel {
   async complete(input: CompleteInput): Promise<AssistantMessage> {
@@ -77,7 +80,8 @@ export class MockModel implements TeachingModel {
             name: "write_note",
             arguments: {
               fileName,
-              content: "Agent Loop = context -> model -> tool execution -> tool result -> next model request.",
+              content:
+                "Agent Loop = context -> model -> tool execution -> tool result -> next model request.",
             },
           },
         ],
@@ -89,11 +93,11 @@ export class MockModel implements TeachingModel {
     return createAssistantMessage([
       text(
         "statve 收到你的问题。\n\n" +
-        "当前 MockModel 会在你提到以下内容时调用工具：\n" +
-        "• **列出文件** → 调用 list_files\n" +
-        "• **读取/查看** → 调用 read_file\n" +
-        "• **写笔记/保存** → 调用 write_note\n\n" +
-        '其他问题会直接回答。试试说「列出工作区文件」或「读取 agent-notes.md」。',
+          "当前 MockModel 会在你提到以下内容时调用工具：\n" +
+          "• **列出文件** → 调用 list_files\n" +
+          "• **读取/查看** → 调用 read_file\n" +
+          "• **写笔记/保存** → 调用 write_note\n\n" +
+          "其他问题会直接回答。试试说「列出工作区文件」或「读取 agent-notes.md」。",
       ),
     ]);
   }
@@ -109,7 +113,9 @@ export class MockModel implements TeachingModel {
     }
 
     if (toolResult.toolName === "list_files") {
-      return createAssistantMessage([text(`我已经列出工作区文件：\n${output}`)]);
+      return createAssistantMessage([
+        text(`我已经列出工作区文件：\n${output}`),
+      ]);
     }
 
     if (toolResult.toolName === "read_file") {

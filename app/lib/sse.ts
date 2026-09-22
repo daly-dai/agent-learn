@@ -71,7 +71,7 @@ export async function readStream(
     const { done, value } = await reader.read();
 
     if (done) break;
-    
+
     buffer += decoder.decode(value, { stream: true });
 
     let sep: number;
@@ -80,9 +80,9 @@ export async function readStream(
       const raw = buffer.slice(0, sep).trim();
 
       buffer = buffer.slice(sep + 2);
-      
+
       if (!raw.startsWith("data:")) continue;
-      
+
       onFrame(JSON.parse(raw.slice(5).trim()) as StreamFrame);
     }
   }

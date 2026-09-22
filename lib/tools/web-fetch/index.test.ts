@@ -19,7 +19,9 @@ import { describe, expect, it } from "vitest";
 import { createWebFetchTool, type WebFetchToolDeps } from ".";
 
 /** 假 DNS：只认表里的域名（同 `fetcher/index.test.ts` 的写法） */
-function fakeLookup(table: Record<string, string[]>): WebFetchToolDeps["lookup"] {
+function fakeLookup(
+  table: Record<string, string[]>,
+): WebFetchToolDeps["lookup"] {
   return async (hostname: string) => {
     const found = table[hostname];
     if (!found) throw new Error(`ENOTFOUND ${hostname}`);
@@ -64,9 +66,7 @@ const PAGE_URL = "https://example.com/page";
 
 describe("web_fetch —— 参数校验", () => {
   it("缺 url → 抛错并说清要什么", async () => {
-    await expect(
-      createWebFetchTool({}).execute({}),
-    ).rejects.toThrow(/url/);
+    await expect(createWebFetchTool({}).execute({})).rejects.toThrow(/url/);
   });
 
   it("url 是空串 / 全空白 → 同样拒绝（不发请求）", async () => {
@@ -77,9 +77,9 @@ describe("web_fetch —— 参数校验", () => {
   });
 
   it("url 不是字符串 → 拒绝（模型偶尔会传数字）", async () => {
-    await expect(
-      createWebFetchTool({}).execute({ url: 42 }),
-    ).rejects.toThrow(/url/);
+    await expect(createWebFetchTool({}).execute({ url: 42 })).rejects.toThrow(
+      /url/,
+    );
   });
 });
 
@@ -87,7 +87,10 @@ describe("web_fetch —— 按内容类型分流", () => {
   it("抓 HTML → 转成 Markdown，带抓取头", async () => {
     const { fetchImpl } = stubFetch({
       [PAGE_URL]: () =>
-        page("<html><body><h1>标题</h1><p>正文</p></body></html>", "text/html; charset=utf-8"),
+        page(
+          "<html><body><h1>标题</h1><p>正文</p></body></html>",
+          "text/html; charset=utf-8",
+        ),
     });
     const text = await runFetch(
       { url: PAGE_URL },
@@ -164,7 +167,10 @@ describe("web_fetch —— 安全", () => {
   it("loopback 被拦（放行档下没有人把关，见详案 §7.3）", async () => {
     const { fetchImpl, calls } = stubFetch({});
     await expect(
-      runFetch({ url: "http://127.0.0.1:8080/admin" }, { fetch: fetchImpl, lookup: publicDns }),
+      runFetch(
+        { url: "http://127.0.0.1:8080/admin" },
+        { fetch: fetchImpl, lookup: publicDns },
+      ),
     ).rejects.toThrow(/loopback/);
     expect(calls).toEqual([]);
   });
@@ -172,7 +178,10 @@ describe("web_fetch —— 安全", () => {
   it("非 http/https 被拦（file: / javascript:）", async () => {
     const { fetchImpl, calls } = stubFetch({});
     await expect(
-      runFetch({ url: "file:///etc/passwd" }, { fetch: fetchImpl, lookup: publicDns }),
+      runFetch(
+        { url: "file:///etc/passwd" },
+        { fetch: fetchImpl, lookup: publicDns },
+      ),
     ).rejects.toThrow(/http/);
     expect(calls).toEqual([]);
   });

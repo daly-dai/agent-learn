@@ -62,7 +62,9 @@ describe("measureTagDepth —— 嵌套深度粗扫", () => {
 
 describe("htmlToText —— 转换、清洗、限额", () => {
   it("标题/粗体/链接转成 Markdown", () => {
-    const result = htmlToText("<h1>标题</h1><p>正文 <strong>粗</strong> <a href='https://a.com'>链接</a></p>");
+    const result = htmlToText(
+      "<h1>标题</h1><p>正文 <strong>粗</strong> <a href='https://a.com'>链接</a></p>",
+    );
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.text).toContain("# 标题");
@@ -161,9 +163,7 @@ describe("htmlToText —— 丢弃不可见内容（抄 DSH 的 removeNonVisible
 
   it("hidden 属性 → 整块丢掉", () => {
     // 真实场景：折叠面板、按条件渲染但已经进了 DOM 的区块。
-    const result = htmlToText(
-      '<div hidden>折叠里的补充说明</div><p>正文</p>',
-    );
+    const result = htmlToText("<div hidden>折叠里的补充说明</div><p>正文</p>");
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.text).toContain("正文");

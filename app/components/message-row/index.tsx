@@ -9,7 +9,6 @@ import { memo, useState } from "react";
 import type {
   AgentMessage,
   CompactionSummaryMessage,
-  TextContent,
   ToolCallContent,
   ToolResultMessage,
 } from "@/lib/types";

@@ -42,10 +42,7 @@ export function Nameplate({ runId, model, phase, turn }: NameplateProps) {
 
       <div className={styles.plateRight}>
         {runId && (
-          <span
-            className={styles.readoutRun}
-            title={`run ${runId} · ${model}`}
-          >
+          <span className={styles.readoutRun} title={`run ${runId} · ${model}`}>
             <span className={styles.model}>{model}</span>
             <span className={styles.plateRule} />
             <span className={styles.run}>run {shortId(runId)}</span>

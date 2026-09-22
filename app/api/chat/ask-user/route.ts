@@ -5,7 +5,8 @@
 // onAskUser（lib/userAnswers.ts），工具结果回模型继续。
 // ============================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { userAnswers } from "@/lib/userAnswers";
 
 export const runtime = "nodejs";

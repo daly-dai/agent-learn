@@ -13,7 +13,8 @@
 // 找不到挂起的确认（已超时/已处理）→ 404，前端提示「操作已超时」。
 // ============================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { toolApprovals } from "@/lib/toolApproval";
 import { config } from "@/lib/config";
 import {
@@ -25,7 +26,8 @@ export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null);
-  const toolCallId = typeof body?.toolCallId === "string" ? body.toolCallId : "";
+  const toolCallId =
+    typeof body?.toolCallId === "string" ? body.toolCallId : "";
   const allow = body?.allow === true;
   const sessionOpt = body?.session === true;
   const persist = body?.persist === true;

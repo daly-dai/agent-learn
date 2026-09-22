@@ -35,7 +35,9 @@ export const COMMAND_FACTORIES: readonly (() => SlashCommand)[] = [
 
 /** 查询用：命令列表元数据（不注册、不建注册表，只从工厂取定义） */
 export function commandDescriptors(): CommandDescriptor[] {
-  return sortByName(COMMAND_FACTORIES.map((factory) => toDescriptor(factory())));
+  return sortByName(
+    COMMAND_FACTORIES.map((factory) => toDescriptor(factory())),
+  );
 }
 
 /** 面板要显示的一整套入口 */

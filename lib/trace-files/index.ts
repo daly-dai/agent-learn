@@ -32,9 +32,14 @@ export type TraceFile = {
  * 匹配方式是"**先解析文件名、再比 sessionId**"，不是 `startsWith(sessionId)`——
  * 否则 `s_a` 会把 `s_ab` 的文件也算进来（前缀包含 ≠ 同一个会话）。
  */
-export async function listTraceFiles(traceDir: string, sessionId: string): Promise<TraceFile[]> {
+export async function listTraceFiles(
+  traceDir: string,
+  sessionId: string,
+): Promise<TraceFile[]> {
   // 目录不存在 = 这个工作区还没跑过 agent，不是错误
-  const entries = await readdir(traceDir, { withFileTypes: true }).catch(() => []);
+  const entries = await readdir(traceDir, { withFileTypes: true }).catch(
+    () => [],
+  );
   const files: TraceFile[] = [];
 
   for (const entry of entries) {

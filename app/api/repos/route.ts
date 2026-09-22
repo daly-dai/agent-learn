@@ -16,7 +16,8 @@
 // 见 AGENTS.md 11.7 业务模块探索模式）——删掉本功能 = 删 app/api/repos + app/repos + app/services/repos。
 // ============================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { REPOS, findRepo } from "./_lib/registry";
 import {
   checkRemoteAhead,
@@ -98,7 +99,11 @@ export async function POST(req: NextRequest) {
     const base = baseline?.lastKnownCommit;
 
     // ③ 增量 commit 列表（命令固定，分支来自 registry）
-    const commits = await getNewCommits(repo.path, repo.branch, base);
+    const commits = await getNewCommits({
+      repoPath: repo.path,
+      branch: repo.branch,
+      base,
+    });
 
     if (commits.length === 0) {
       // 已是最新：基线仍在（无新增），返回 updated=false
@@ -106,7 +111,11 @@ export async function POST(req: NextRequest) {
     }
 
     // ④ 生成总结（降级不阻塞：degraded=true 时页面显示"跳过总结"）
-    const summary = await summarizeUpdate(repo.name, repo.note, commits);
+    const summary = await summarizeUpdate({
+      repoName: repo.name,
+      note: repo.note,
+      commits,
+    });
 
     // ⑤ 快进合并（--ff-only：参考仓库不该有本地提交）
     await fastForward(repo.path, repo.branch);

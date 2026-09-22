@@ -39,12 +39,21 @@ afterEach(() => {
 // ---- 造行 ----
 
 const startLine = (runId = "run_x", sessionId = "s_test"): string =>
-  JSON.stringify({ type: "trace_start", runId, model: "deepseek-chat", sessionId, ts: 1_000 });
+  JSON.stringify({
+    type: "trace_start",
+    runId,
+    model: "deepseek-chat",
+    sessionId,
+    ts: 1_000,
+  });
 
 // ⚠️ 不给 summary 设默认值：助手一旦"顺手塞" messages: 3，
 // "只有 error、没有 messages" 这个组合就**无法表达**了，而且断言失败时
 // 报错（expected 3 to be undefined）完全不指向真因。助手不该发明数据。
-const endLine = (runId = "run_x", summary: Record<string, unknown> = {}): string =>
+const endLine = (
+  runId = "run_x",
+  summary: Record<string, unknown> = {},
+): string =>
   JSON.stringify({ type: "trace_end", runId, ts: 2_000, seq: 5, ...summary });
 
 const entryLine = (seq: number): string =>
@@ -56,7 +65,11 @@ const entryLine = (seq: number): string =>
     event: { type: "turn_start", turn: 1 },
   });
 
-async function writeTraceFile(dir: string, name: string, lines: string[]): Promise<string> {
+async function writeTraceFile(
+  dir: string,
+  name: string,
+  lines: string[],
+): Promise<string> {
   const path = join(dir, name);
   await writeFile(path, `${lines.join("\n")}\n`, "utf8");
   return path;
@@ -66,8 +79,13 @@ async function writeTraceFile(dir: string, name: string, lines: string[]): Promi
 
 describe("文件名即会话归属", () => {
   it("traceFileName / parseTraceFileName 往返一致", () => {
-    const name = traceFileName("s_2026-09-14T07-00-05-195Z_abc123", "run_2026-09-14T07-00-05-195Z_xyz789");
-    expect(name).toBe("s_2026-09-14T07-00-05-195Z_abc123.run_2026-09-14T07-00-05-195Z_xyz789.jsonl");
+    const name = traceFileName(
+      "s_2026-09-14T07-00-05-195Z_abc123",
+      "run_2026-09-14T07-00-05-195Z_xyz789",
+    );
+    expect(name).toBe(
+      "s_2026-09-14T07-00-05-195Z_abc123.run_2026-09-14T07-00-05-195Z_xyz789.jsonl",
+    );
     expect(parseTraceFileName(name)).toEqual({
       sessionId: "s_2026-09-14T07-00-05-195Z_abc123",
       runId: "run_2026-09-14T07-00-05-195Z_xyz789",
@@ -75,7 +93,9 @@ describe("文件名即会话归属", () => {
   });
 
   it("老轨迹文件名（<runId>.jsonl，没有会话前缀）解析不出来 → 归不到会话", () => {
-    expect(parseTraceFileName("run_2026-08-19T07-00-05-195Z_i88i3v.jsonl")).toBeUndefined();
+    expect(
+      parseTraceFileName("run_2026-08-19T07-00-05-195Z_i88i3v.jsonl"),
+    ).toBeUndefined();
   });
 
   it("非法/无关文件名返回 undefined（不抛）", () => {
@@ -119,7 +139,10 @@ describe("TraceRecorder 落盘", () => {
     await recorder.end();
 
     expect(recorder.entries.map((entry) => entry.seq)).toEqual([1, 2]);
-    expect(recorder.entries.map((entry) => entry.event.type)).toEqual(["turn_start", "turn_start"]);
+    expect(recorder.entries.map((entry) => entry.event.type)).toEqual([
+      "turn_start",
+      "turn_start",
+    ]);
   });
 });
 
@@ -168,7 +191,11 @@ describe("readTraceMeta：只读首末两行", () => {
     ]);
 
     const meta = await readTraceMeta(path);
-    expect(meta).toMatchObject({ runId: "run_x", sessionId: "s_test", completed: false });
+    expect(meta).toMatchObject({
+      runId: "run_x",
+      sessionId: "s_test",
+      completed: false,
+    });
     expect(meta?.summary).toBeUndefined();
   });
 
@@ -188,19 +215,31 @@ describe("readTraceMeta：只读首末两行", () => {
     const path = await writeTraceFile(dir, traceFileName("s_test", "run_x"), [
       startLine(),
       "{ 这一行不是合法 JSON —— 全量 parse 的实现会在这里抛",
-      JSON.stringify({ type: "trace_end", runId: "假的", ts: 9, seq: 99, messages: 999 }),
+      JSON.stringify({
+        type: "trace_end",
+        runId: "假的",
+        ts: 9,
+        seq: 99,
+        messages: 999,
+      }),
       endLine("run_x", { messages: 3 }),
     ]);
 
     const meta = await readTraceMeta(path);
     // 取的是最后一行，不是中间那条假的
-    expect(meta).toMatchObject({ runId: "run_x", completed: true, summary: { messages: 3 } });
+    expect(meta).toMatchObject({
+      runId: "run_x",
+      completed: true,
+      summary: { messages: 3 },
+    });
   });
 
   it("坏文件返回 undefined（不挂掉整个列表）", async () => {
     const dir = makeDir();
     const empty = await writeTraceFile(dir, "s_test.run_a.jsonl", []);
-    const notTrace = await writeTraceFile(dir, "s_test.run_b.jsonl", ['{"type":"session","id":"x"}']);
+    const notTrace = await writeTraceFile(dir, "s_test.run_b.jsonl", [
+      '{"type":"session","id":"x"}',
+    ]);
 
     expect(await readTraceMeta(empty)).toBeUndefined();
     expect(await readTraceMeta(notTrace)).toBeUndefined();

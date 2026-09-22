@@ -48,5 +48,9 @@ export async function writeBaseline(
     lastKnownCommit,
     updatedAt: new Date().toISOString(),
   };
-  await writeFile(baselinePath(repoName), JSON.stringify(baseline, null, 2), "utf8");
+  await writeFile(
+    baselinePath(repoName),
+    JSON.stringify(baseline, null, 2),
+    "utf8",
+  );
 }

@@ -117,7 +117,9 @@ export async function checkRemoteAhead(
 ): Promise<boolean | null> {
   try {
     const [remote, local] = await Promise.all([
-      runGit(repoPath, ["ls-remote", "origin", branch], { timeoutMs: CHECK_TIMEOUT_MS }),
+      runGit(repoPath, ["ls-remote", "origin", branch], {
+        timeoutMs: CHECK_TIMEOUT_MS,
+      }),
       getHeadCommit(repoPath),
     ]);
     const remoteHash = parseLsRemoteHash(remote.stdout);
@@ -144,12 +146,13 @@ export async function fetchRemote(repoPath: string): Promise<void> {
  * 把 `-n 20 origin/main` 拼成单个参数，git 会把整串当"一个值"解析，
  * 报 "not an integer"。execFile 参数数组的意义就在这：每个 token 单独传。
  */
-export async function getNewCommits(
-  repoPath: string,
-  branch: string,
-  base?: string,
-  limit = 20,
-): Promise<string[]> {
+export async function getNewCommits(params: {
+  repoPath: string;
+  branch: string;
+  base?: string;
+  limit?: number;
+}): Promise<string[]> {
+  const { repoPath, branch, base, limit = 20 } = params;
   const args = ["log", "--oneline", "--no-merges"];
   if (base) {
     // 增量：基线之后的提交
@@ -174,12 +177,13 @@ export async function fastForward(
 }
 
 /** 判断仓库是否落后远端（有新增 commit 返回 true） */
-export async function isBehind(
-  repoPath: string,
-  branch: string,
-  base?: string,
-  limit = 20,
-): Promise<boolean> {
-  const commits = await getNewCommits(repoPath, branch, base, limit);
+export async function isBehind(params: {
+  repoPath: string;
+  branch: string;
+  base?: string;
+  limit?: number;
+}): Promise<boolean> {
+  const { repoPath, branch, base, limit = 20 } = params;
+  const commits = await getNewCommits({ repoPath, branch, base, limit });
   return commits.length > 0;
 }

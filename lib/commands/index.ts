@@ -171,7 +171,8 @@ export function createCommandRegistry(): CommandRegistry {
  * 查询命令列表不需要注册表实例，从工厂拿元数据即可。
  */
 export function toDescriptor(spec: SlashCommand): CommandDescriptor {
-  const { name, description, source, aliases, supportsInlineArgs, inputHint } = spec;
+  const { name, description, source, aliases, supportsInlineArgs, inputHint } =
+    spec;
   return { name, description, source, aliases, supportsInlineArgs, inputHint };
 }
 

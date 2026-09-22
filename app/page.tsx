@@ -141,7 +141,8 @@ export default function Home() {
 
   // 审批模式（B1-②）：页面挂载时读服务端当前值；切换调接口（运行时生效，
   // 重启恢复 config 默认）。参考项目都有此入口（pi /settings、DSH /permission）
-  const [approvalMode, setApprovalModeState] = useState<ApprovalMode>("suggest");
+  const [approvalMode, setApprovalModeState] =
+    useState<ApprovalMode>("suggest");
 
   useEffect(() => {
     getApprovalMode()
@@ -158,7 +159,7 @@ export default function Home() {
         /* 切换失败保持原状 */
       });
   }, []);
-  
+
   const transcriptRef = useRef<HTMLDivElement>(null); // 转录稿容器，新消息到达时滚到底
 
   // ---- 滚动跟随（吸底）----
@@ -221,7 +222,10 @@ export default function Home() {
   // 否则每次渲染都全量重跑 derivePhase/currentTurn）：
   //   phase  状态灯相位（待命/思考中/执行工具/输出中）—— 看最近一条事件推断
   //   turn   当前进行到第几轮 —— 从 turn_start 事件数出来
-  const phase = useMemo(() => derivePhase(observed, loading), [observed, loading]);
+  const phase = useMemo(
+    () => derivePhase(observed, loading),
+    [observed, loading],
+  );
   const turn = useMemo(() => currentTurn(observed), [observed]);
 
   return (
@@ -277,60 +281,62 @@ export default function Home() {
               代价：切走再回来，转录稿的滚动位置会丢（组件卸载了）。
               一期先接受；要保住就得两个都挂着用 visibility 藏，不值当。 */}
           {tab === "chat" ? (
-          <div className={styles.transcript} ref={transcriptRef}>
-            <div className={styles.reel}>
-              {/* 空态 → 起手式引导；有消息 → 逐条渲染。
+            <div className={styles.transcript} ref={transcriptRef}>
+              <div className={styles.reel}>
+                {/* 空态 → 起手式引导；有消息 → 逐条渲染。
                   attached：工具结果行从属于上一条消息（视觉上缩进连接）
                   live：最后一条且正在加载 → 流式增长动画 + 思考中占位 */}
-              {messages.length === 0 ? (
-                <Overture onPick={pickSeed} />
-              ) : (
-                messages.map((msg, i) => {
-                  // B17③：toolOutputs 只下发给"含 toolCall 的 assistant 行"。
-                  // 为什么不能全量传：toolOutputs 是每帧新对象，MessageRow 又
-                  // 是 memo 组件——若每行都收新引用，memo 浅比较全部失效，
-                  // 流式就退回全树重渲。只有渲染 toolCall 的行才消费它
-                  // （bash 实时输出挂在 ToolCallLine 下），其余行传 undefined。
-                  const needsLiveOutput =
-                    msg.role === "assistant" &&
-                    msg.content.some((block) => block.type === "toolCall");
-                  return (
-                    <MessageRow
-                      key={`${msg.role}-${msg.timestamp}-${i}`}
-                      message={msg}
-                      attached={i > 0 && msg.role === "toolResult"}
-                      live={loading && i === messages.length - 1}
-                      toolOutputs={needsLiveOutput ? toolOutputs : undefined}
-                    />
-                  );
-                })
-              )}
-              {/* 上下文压缩进行中（B2）：后端在调模型生成摘要，给用户明确反馈，
+                {messages.length === 0 ? (
+                  <Overture onPick={pickSeed} />
+                ) : (
+                  messages.map((msg, i) => {
+                    // B17③：toolOutputs 只下发给"含 toolCall 的 assistant 行"。
+                    // 为什么不能全量传：toolOutputs 是每帧新对象，MessageRow 又
+                    // 是 memo 组件——若每行都收新引用，memo 浅比较全部失效，
+                    // 流式就退回全树重渲。只有渲染 toolCall 的行才消费它
+                    // （bash 实时输出挂在 ToolCallLine 下），其余行传 undefined。
+                    const needsLiveOutput =
+                      msg.role === "assistant" &&
+                      msg.content.some((block) => block.type === "toolCall");
+                    return (
+                      <MessageRow
+                        key={`${msg.role}-${msg.timestamp}-${i}`}
+                        message={msg}
+                        attached={i > 0 && msg.role === "toolResult"}
+                        live={loading && i === messages.length - 1}
+                        toolOutputs={needsLiveOutput ? toolOutputs : undefined}
+                      />
+                    );
+                  })
+                )}
+                {/* 上下文压缩进行中（B2）：后端在调模型生成摘要，给用户明确反馈，
                   而不是让 transcript 停在原地像卡住 */}
-              {compacting && (
-                <div className={styles.compacting} role="status">
-                  <span className={styles.compactingLabel}>上下文超出上限</span>
-                  <span>正在压缩上下文，请稍候…</span>
-                </div>
-              )}
-              {/* C13 命令执行状态：渲染在消息流末尾（跟 compacting 同位置），
+                {compacting && (
+                  <div className={styles.compacting} role="status">
+                    <span className={styles.compactingLabel}>
+                      上下文超出上限
+                    </span>
+                    <span>正在压缩上下文，请稍候…</span>
+                  </div>
+                )}
+                {/* C13 命令执行状态：渲染在消息流末尾（跟 compacting 同位置），
                   不叠在输入框上。执行中提示 / 无变化的兜底结果文案
                   （压缩成功时卡片即反馈，文案为空） */}
-              {commandRunning && (
-                <div className={styles.compacting} role="status">
-                  <span className={styles.compactingLabel}>命令</span>
-                  <span>正在执行，请稍候…</span>
-                </div>
-              )}
-              {commandFeedback && (
-                <div className={styles.compacting} role="status">
-                  <span>{commandFeedback}</span>
-                </div>
-              )}
-              {/* 待确认卡片（B1-④）已从消息流移到底部决策区（2026-08-26，
+                {commandRunning && (
+                  <div className={styles.compacting} role="status">
+                    <span className={styles.compactingLabel}>命令</span>
+                    <span>正在执行，请稍候…</span>
+                  </div>
+                )}
+                {commandFeedback && (
+                  <div className={styles.compacting} role="status">
+                    <span>{commandFeedback}</span>
+                  </div>
+                )}
+                {/* 待确认卡片（B1-④）已从消息流移到底部决策区（2026-08-26，
                   用户要求"像 askUser 悬浮在输入框位置"）——见下方 decisionBar */}
+              </div>
             </div>
-          </div>
           ) : (
             <TraceViewer
               fold={traces.fold}
@@ -389,9 +395,7 @@ export default function Home() {
             )}
             <form
               className={`${styles.console}${
-                pendingApproval || pendingAsk
-                  ? ` ${styles.consoleCovered}`
-                  : ""
+                pendingApproval || pendingAsk ? ` ${styles.consoleCovered}` : ""
               }`}
               onSubmit={(e) => {
                 e.preventDefault();
@@ -418,10 +422,7 @@ export default function Home() {
                     放在 textarea **之前**：consoleFrame 是两列 grid，它 grid-column
                     1/-1、自然落在第一行，textarea 与右侧按钮仍在第二行 */}
                 {armedSkill && (
-                  <SkillChip
-                    name={armedSkill.name}
-                    onClear={clearArmedSkill}
-                  />
+                  <SkillChip name={armedSkill.name} onClear={clearArmedSkill} />
                 )}
                 <textarea
                   className={styles.consoleInput}
@@ -492,7 +493,10 @@ export default function Home() {
 function derivePhase(observed: ObservedEvent[], loading: boolean): Phase {
   if (!loading) return "idle";
   const last = observed[observed.length - 1]?.event;
-  if (last?.type === "tool_execution_start" || last?.type === "tool_execution_end") {
+  if (
+    last?.type === "tool_execution_start" ||
+    last?.type === "tool_execution_end"
+  ) {
     return "tool";
   }
   if (last?.type === "message_update") return "streaming";

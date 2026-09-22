@@ -16,12 +16,7 @@
 // ============================================================
 
 import { describe, expect, it } from "vitest";
-import {
-  decoderForCharset,
-  fetchUrl,
-  parseCharset,
-  type FetchDeps,
-} from ".";
+import { decoderForCharset, fetchUrl, parseCharset, type FetchDeps } from ".";
 
 /** 假 DNS：只认表里的域名 */
 function fakeLookup(table: Record<string, string[]>): FetchDeps["lookup"] {
@@ -136,9 +131,15 @@ describe("fetchUrl —— 闸门、重定向、限额", () => {
   it("重定向打转 → 超过跳数上限就停（不是无限跟）", async () => {
     const { fetchImpl } = stubFetch({
       "https://example.com/a": () =>
-        new Response(null, { status: 302, headers: { location: "https://example.com/b" } }),
+        new Response(null, {
+          status: 302,
+          headers: { location: "https://example.com/b" },
+        }),
       "https://example.com/b": () =>
-        new Response(null, { status: 302, headers: { location: "https://example.com/a" } }),
+        new Response(null, {
+          status: 302,
+          headers: { location: "https://example.com/a" },
+        }),
     });
 
     const result = await fetchUrl("https://example.com/a", {
@@ -175,9 +176,15 @@ describe("fetchUrl —— 闸门、重定向、限额", () => {
   it("重定向链留档：chain = [原始, …中间, 最终]（C24 ⑥）", async () => {
     const { fetchImpl } = stubFetch({
       "https://example.com/a": () =>
-        new Response(null, { status: 301, headers: { location: "https://example.com/b" } }),
+        new Response(null, {
+          status: 301,
+          headers: { location: "https://example.com/b" },
+        }),
       "https://example.com/b": () =>
-        new Response(null, { status: 302, headers: { location: "https://www.example.com/c" } }),
+        new Response(null, {
+          status: 302,
+          headers: { location: "https://www.example.com/c" },
+        }),
       "https://www.example.com/c": () => new Response("done", { status: 200 }),
     });
 
@@ -255,7 +262,8 @@ describe("fetchUrl —— 闸门、重定向、限额", () => {
     // 信息（403 的"需要登录"、429 的"慢一点"）。
     // 这条以前钉的是「404 → http-error」，方向反了，随语义一起改。
     const { fetchImpl } = stubFetch({
-      "https://example.com/missing": () => new Response("nope", { status: 404 }),
+      "https://example.com/missing": () =>
+        new Response("nope", { status: 404 }),
     });
 
     const result = await fetchUrl("https://example.com/missing", {
@@ -314,7 +322,10 @@ describe("fetchUrl —— 闸门、重定向、限额", () => {
       return new Response("ok", { status: 200 });
     };
 
-    await fetchUrl("https://example.com/", { fetch: fetchImpl, lookup: publicDns });
+    await fetchUrl("https://example.com/", {
+      fetch: fetchImpl,
+      lookup: publicDns,
+    });
 
     expect(seen[0]?.redirect).toBe("manual");
   });

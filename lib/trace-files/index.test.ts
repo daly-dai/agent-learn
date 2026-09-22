@@ -43,7 +43,10 @@ describe("listTraceFiles", () => {
 
     const files = await listTraceFiles(dir, "s_target");
     expect(files.map((file) => file.runId)).toEqual([RUN_EARLY, RUN_LATE]);
-    expect(files.map((file) => file.sessionId)).toEqual(["s_target", "s_target"]);
+    expect(files.map((file) => file.sessionId)).toEqual([
+      "s_target",
+      "s_target",
+    ]);
     expect(files[0].path).toBe(join(dir, traceFileName("s_target", RUN_EARLY)));
   });
 
@@ -86,7 +89,9 @@ describe("listTraceFiles", () => {
 
   it("目录不存在 → 空数组（不是抛错）", async () => {
     const dir = makeDir();
-    expect(await listTraceFiles(join(dir, "根本没有这个目录"), "s_target")).toEqual([]);
+    expect(
+      await listTraceFiles(join(dir, "根本没有这个目录"), "s_target"),
+    ).toEqual([]);
   });
 
   it("没有轨迹的会话 → 空数组", async () => {

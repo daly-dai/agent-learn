@@ -45,7 +45,11 @@ describe("COMMAND_FACTORIES —— 命令清单单一事实源", () => {
 describe("commandDescriptors —— 查询（不注册、不建注册表）", () => {
   it("返回全部命令的元数据视图，按名排序", () => {
     const descriptors = commandDescriptors();
-    expect(descriptors.map((c) => c.name)).toEqual(["clear", "compact", "export"]);
+    expect(descriptors.map((c) => c.name)).toEqual([
+      "clear",
+      "compact",
+      "export",
+    ]);
     for (const command of descriptors) {
       expect(command.source).toBe("builtin");
       expect(command.description.length).toBeGreaterThan(0);

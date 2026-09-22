@@ -19,7 +19,11 @@ export async function createFixtureWorkspace(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "statve-test-"));
   await writeFile(join(root, "a.txt"), "hello world", "utf8");
   await mkdir(join(root, "notes"), { recursive: true });
-  await writeFile(join(root, "notes", "b.md"), "# Title\ncontent line\n", "utf8");
+  await writeFile(
+    join(root, "notes", "b.md"),
+    "# Title\ncontent line\n",
+    "utf8",
+  );
   await mkdir(join(root, "sub"), { recursive: true });
   await writeFile(join(root, "sub", "deep.txt"), "deep content", "utf8");
   await writeFile(join(root, ".hidden"), "hidden", "utf8");

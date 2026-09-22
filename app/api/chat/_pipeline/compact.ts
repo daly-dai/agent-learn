@@ -37,5 +37,10 @@ export async function maybeCompact(params: {
   // 压缩开始：先推 compacting 帧，让前端知道"后端在忙压缩"，不是卡死。
   // 压缩（尤其调模型生成摘要）耗时几秒~几十秒，这段时间 SSE 无其他帧。
   params.onCompacting(prep.tokensBefore);
-  await summarizeAndCommit(params.store, params.model, prep, params.signal);
+  await summarizeAndCommit({
+    store: params.store,
+    model: params.model,
+    prep,
+    signal: params.signal,
+  });
 }

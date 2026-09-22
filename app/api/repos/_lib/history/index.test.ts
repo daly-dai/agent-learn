@@ -10,7 +10,6 @@
 
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 // ---- 先 mock config 再 import 被测模块 ----
@@ -31,7 +30,12 @@ vi.mock("@/lib/config", () => ({
   },
 }));
 
-import { listUpdateLogs, parseLogFileName, readAllLogs, readLatestLog } from ".";
+import {
+  listUpdateLogs,
+  parseLogFileName,
+  readAllLogs,
+  readLatestLog,
+} from ".";
 
 beforeAll(() => {
   rmSync(tempDir, { recursive: true, force: true });

@@ -12,7 +12,8 @@
 // ============================================================
 
 import { describe, expect, it } from "vitest";
-import { createToolRegistry, ToolRegistry } from ".";
+import type { ToolRegistry } from ".";
+import { createToolRegistry } from ".";
 
 /** 组装一次注册表。hooks 是业务回调（todo/ask-user 用），这层用不到，给空对象 */
 function registry(): ToolRegistry {
@@ -25,18 +26,24 @@ function registry(): ToolRegistry {
 
 describe("createToolRegistry —— 组装出来的工具清单", () => {
   it("两个 web 工具都真的在里面（A5 第 ⑦ 步的注册）", () => {
-    const names = registry().definitions().map((def) => def.name);
+    const names = registry()
+      .definitions()
+      .map((def) => def.name);
     expect(names).toContain("web_fetch");
     expect(names).toContain("web_search");
   });
 
   it("skill 工具真的在里面（C8 T2 的注册）", () => {
-    const names = registry().definitions().map((def) => def.name);
+    const names = registry()
+      .definitions()
+      .map((def) => def.name);
     expect(names).toContain("skill");
   });
 
   it("工具名**不重复**（重名会被 Map 静默覆盖，少一个工具也不报错）", () => {
-    const names = registry().definitions().map((def) => def.name);
+    const names = registry()
+      .definitions()
+      .map((def) => def.name);
     expect(new Set(names).size).toBe(names.length);
   });
 

@@ -1,0 +1,25 @@
+# 为什么不格式化 markdown：Prettier 会重排表格（对齐竖线），
+# 而 PLAN.md 的需求池表是 scripts/check-plan.mjs 的解析对象，
+# 几十份文档的表格式重排没有任何收益、只有巨大的 diff。详见 doc/plan/c45-lint-format.md 4.3。
+*.md
+
+# 机器目录 / 生成物（Prettier 不读 .gitignore，得在这儿再来一遍）
+.next/
+out/
+build/
+coverage/
+node_modules/
+.pnpm-store/
+.reasonix/
+.repo-updates/
+.sessions/
+.traces/
+.tmp_pdf
+.tmp_pdf/**
+.tmp-lint
+.tmp-lint/**
+workspace/
+
+# 锁文件 / 自动生成的声明文件
+pnpm-lock.yaml
+next-env.d.ts

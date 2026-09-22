@@ -47,29 +47,17 @@ export type ApprovalContext = {
 /**
  * 纯决策：一次工具调用该放行/拦截/弹框/改写。
  * 不推帧、不写日志、不碰全局——副作用留给调用方。
+ *
+ * 这里只做**编排**：三条分支各有一件事、各有一个名字（硬性策略 /
+ * 分级模式 / 人工确认），细节在下面那几个小函数里。
  */
 export async function decideToolCall(
   call: ToolCallContent,
   ctx: ApprovalContext,
 ): Promise<ApprovalDecision> {
   // --- 硬性策略：secret/秘密 永不弹框，直接拦 ---
-  if (call.name === "write_note" || call.name === "write_file") {
-    // 取要检查的路径：write_note 用 fileName，write_file 用 path。
-    // 不用嵌套三元——两层 ? : 叠在一起难读，if/else 直白。
-    let target = "";
-    if (typeof call.arguments.fileName === "string") {
-      target = call.arguments.fileName;
-    } else if (typeof call.arguments.path === "string") {
-      target = call.arguments.path;
-    }
-
-    if (/secret|秘密/i.test(target)) {
-      return {
-        action: "block",
-        reason: "权限策略：不允许写入包含 secret/秘密 的文件。",
-      };
-    }
-  }
+  const secretBlock = blockSecretWrite(call);
+  if (secretBlock) return secretBlock;
 
   // --- 分级模式（抄 pi defaultProjectTrust / CodeWhale approval_mode）---
   const needsConfirm = (TOOLS_NEEDING_CONFIRM as readonly string[]).includes(
@@ -88,31 +76,68 @@ export async function decideToolCall(
   }
 
   // --- 人工确认（suggest 默认）---
-  if (needsConfirm) {
-    // 只读命令放行：bash 静态分析证明只读 → 不弹框直接执行。
-    if (call.name === "bash") {
-      const command =
-        typeof call.arguments.command === "string"
-          ? call.arguments.command
-          : "";
-      if (ctx.isReadOnlyBash(command)) {
-        return { action: "allow" };
-      }
-    }
+  if (needsConfirm) return confirmOrRequest(call, ctx);
 
-    // 记忆放行：一直允许（磁盘规则）→ 本会话允许（内存记忆）。
-    // 判定顺序 = 信任强度从高到低：持久 > 会话 > 弹框。
-    if (await ctx.isPersistApproved(ctx.sessionDir, call.name)) {
-      return { action: "allow" };
-    }
-    if (ctx.isSessionApproved(ctx.sessionId, call.name)) {
-      return { action: "allow" };
-    }
+  return applyDefaultArguments(call);
+}
 
-    // 需要弹框：返回 request，由调用方推帧 + 等用户决定
-    return { action: "request" };
+/**
+ * 硬性策略：写文件类工具的目标里出现 secret/秘密 → 永不弹框，直接拦。
+ * 不需要拦时返回 undefined，调用方继续往下走。
+ */
+function blockSecretWrite(call: ToolCallContent): ApprovalDecision | undefined {
+  if (call.name !== "write_note" && call.name !== "write_file") {
+    return undefined;
   }
 
+  // 取要检查的路径：write_note 用 fileName，write_file 用 path。
+  // 不用嵌套三元——两层 ? : 叠在一起难读，if/else 直白。
+  let target = "";
+  if (typeof call.arguments.fileName === "string") {
+    target = call.arguments.fileName;
+  } else if (typeof call.arguments.path === "string") {
+    target = call.arguments.path;
+  }
+
+  if (!/secret|秘密/i.test(target)) return undefined;
+
+  return {
+    action: "block",
+    reason: "权限策略：不允许写入包含 secret/秘密 的文件。",
+  };
+}
+
+/**
+ * 需人工确认的工具（suggest 模式）：能证明安全就放行，否则弹框。
+ * 判定顺序 = 信任强度从高到低：只读 bash → 持久记忆 → 会话记忆 → 弹框。
+ */
+async function confirmOrRequest(
+  call: ToolCallContent,
+  ctx: ApprovalContext,
+): Promise<ApprovalDecision> {
+  // 只读命令放行：bash 静态分析证明只读 → 不弹框直接执行。
+  if (call.name === "bash") {
+    const command =
+      typeof call.arguments.command === "string" ? call.arguments.command : "";
+    if (ctx.isReadOnlyBash(command)) {
+      return { action: "allow" };
+    }
+  }
+
+  // 记忆放行：一直允许（磁盘规则）→ 本会话允许（内存记忆）。
+  if (await ctx.isPersistApproved(ctx.sessionDir, call.name)) {
+    return { action: "allow" };
+  }
+  if (ctx.isSessionApproved(ctx.sessionId, call.name)) {
+    return { action: "allow" };
+  }
+
+  // 需要弹框：返回 request，由调用方推帧 + 等用户决定
+  return { action: "request" };
+}
+
+/** 无需确认的工具：list_files 缺 path 时补默认值，其余直接放行 */
+function applyDefaultArguments(call: ToolCallContent): ApprovalDecision {
   // list_files 没有 path 参数时补齐默认值
   if (call.name === "list_files" && typeof call.arguments.path !== "string") {
     return {

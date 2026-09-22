@@ -112,7 +112,9 @@ describe("cleanBashOutput —— 只信 stderr，stdout 里的同形文本是内
   });
 
   it("顺带把报错条数交出来（T3 的判据要用，别让它再解一遍）", () => {
-    expect(cleanBashOutput(REAL_PWSH_STDERR, REAL_PWSH_STDERR).pwshErrorCount).toBe(20);
+    expect(
+      cleanBashOutput(REAL_PWSH_STDERR, REAL_PWSH_STDERR).pwshErrorCount,
+    ).toBe(20);
     expect(cleanBashOutput("普通输出", "").pwshErrorCount).toBe(0);
   });
 });
@@ -196,7 +198,9 @@ describe("selfMergedStreamNote —— 命令自己合并流时给一句提示", 
 
   it("带空格、带重定向目标的写法也认（别指望模型写成标准形态）", () => {
     expect(selfMergedStreamNote("cmd 2> &1")).not.toBe("");
-    expect(selfMergedStreamNote("cmd 2>&1 | Select-Object -Last 5")).not.toBe("");
+    expect(selfMergedStreamNote("cmd 2>&1 | Select-Object -Last 5")).not.toBe(
+      "",
+    );
   });
 
   it("误报是可接受的代价：文本里「写着」这串字符也会提示一句", () => {
@@ -230,7 +234,9 @@ describe("bash execute —— 工具定义的五条既有行为（B19）", () =>
       cancelled: false,
       truncated: false,
     };
-    vi.spyOn(BashRunner.prototype, "run").mockImplementation(async () => runResult);
+    vi.spyOn(BashRunner.prototype, "run").mockImplementation(
+      async () => runResult,
+    );
   });
 
   afterEach(() => {
@@ -245,7 +251,12 @@ describe("bash execute —— 工具定义的五条既有行为（B19）", () =>
   });
 
   it("被终止 → 正文后面接终止提示", async () => {
-    runResult = { ...runResult, exitCode: null, cancelled: true, output: "半截输出" };
+    runResult = {
+      ...runResult,
+      exitCode: null,
+      cancelled: true,
+      output: "半截输出",
+    };
     const result = await tool.execute({ command: "npm install" });
     expect(textOf(result)).toBe("半截输出\n[命令被终止：超时或用户取消]");
   });
@@ -274,7 +285,11 @@ describe("bash execute —— 工具定义的五条既有行为（B19）", () =>
 
   it("⭐ 退出码 0 但有 pwsh 报错：正文是人话摘要、尾巴点明「退出码是 0」", async () => {
     // 真样本那条命令的形状：stderr 全是 CLIXML、stdout 空、退出码 0
-    runResult = { ...runResult, output: REAL_PWSH_STDERR, stderr: REAL_PWSH_STDERR };
+    runResult = {
+      ...runResult,
+      output: REAL_PWSH_STDERR,
+      stderr: REAL_PWSH_STDERR,
+    };
     const body = textOf(await tool.execute({ command: "…" }));
     expect(body).toContain(`[pwsh 报错 ×20]`);
     expect(body).toContain(REAL_PWSH_MESSAGE);
@@ -291,14 +306,18 @@ describe("bash execute —— 工具定义的五条既有行为（B19）", () =>
 
   it("⭐ 命令里写了 2>&1 → 正文尾部多一句提示（与退出码标记可叠加）", async () => {
     runResult = { ...runResult, output: "ok\n" };
-    const body = textOf(await tool.execute({ command: "1..3 | % { Write-Error 'x' } 2>&1" }));
+    const body = textOf(
+      await tool.execute({ command: "1..3 | % { Write-Error 'x' } 2>&1" }),
+    );
     expect(body).toContain("ok\n");
     expect(body).toContain("[命令里用了 2>&1");
   });
 });
 
 /** 取工具结果里的那条文本（content 是联合类型，测试里只需要 text 分支） */
-function textOf(result: { content: Array<{ type: string; text?: string }> }): string {
+function textOf(result: {
+  content: Array<{ type: string; text?: string }>;
+}): string {
   const first = result.content[0];
   if (first.type !== "text" || first.text === undefined) {
     throw new Error(`期望一条 text 结果，实际是 ${first.type}`);

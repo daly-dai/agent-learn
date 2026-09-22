@@ -106,7 +106,11 @@ export function foldTrace(runs: TraceRun[]): TraceFold {
 
   return {
     records: state.records,
-    outline: { turns: state.turns, steps: state.records.length, errors: state.errors },
+    outline: {
+      turns: state.turns,
+      steps: state.records.length,
+      errors: state.errors,
+    },
   };
 }
 
@@ -146,7 +150,7 @@ function foldEvent(state: FoldState, entry: TraceEntry, id: string): void {
       foldMessageEnd(state, event, id);
       return;
     case "tool_execution_start":
-      openTool(state, event, id, entry.ts);
+      openTool({ state, event, id, startedAt: entry.ts });
       return;
     case "tool_execution_end":
       closeTool(state, event, entry.ts);
@@ -177,7 +181,13 @@ function openTurn(
 ): void {
   state.turn = event.turn;
   state.model = undefined;
-  state.turnItem = { turn: event.turn, runIndex: state.runIndex, id, prompt: "", response: "" };
+  state.turnItem = {
+    turn: event.turn,
+    runIndex: state.runIndex,
+    id,
+    prompt: "",
+    response: "",
+  };
   state.turns.push(state.turnItem);
 }
 
@@ -260,12 +270,13 @@ function foldMessageEnd(
   state.model = undefined;
 }
 
-function openTool(
-  state: FoldState,
-  event: Extract<AgentEvent, { type: "tool_execution_start" }>,
-  id: string,
-  startedAt: number,
-): void {
+function openTool(params: {
+  state: FoldState;
+  event: Extract<AgentEvent, { type: "tool_execution_start" }>;
+  id: string;
+  startedAt: number;
+}): void {
+  const { state, event, id, startedAt } = params;
   const record: TraceRecord = {
     id,
     kind: "tool",
@@ -275,7 +286,10 @@ function openTool(
     argsText: compactJson(event.args),
   };
   state.records.push(record);
-  state.openTools.set(`${state.runIndex}:${event.toolCallId}`, { record, startedAt });
+  state.openTools.set(`${state.runIndex}:${event.toolCallId}`, {
+    record,
+    startedAt,
+  });
 }
 
 /** 用 toolCallId 把 end 配回它的 start，填出参 + 耗时 */

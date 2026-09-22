@@ -82,7 +82,11 @@ describe("git.ts —— 命令封装（分支作参数传入）", () => {
   it("getNewCommits：无基线时返回最近 N 条（首刷）", async () => {
     const { dir, cleanup } = makeRepo();
     try {
-      const commits = await getNewCommits(dir, "main", undefined, 20);
+      const commits = await getNewCommits({
+        repoPath: dir,
+        branch: "main",
+        limit: 20,
+      });
       expect(commits.length).toBe(1);
       expect(commits[0]).toContain("first commit");
     } finally {
@@ -99,7 +103,11 @@ describe("git.ts —— 命令封装（分支作参数传入）", () => {
       // 模拟远端前进：origin/main 更新到 second（否则 firstCommit..origin/main 为空）
       run(["push", "origin", "main"]);
 
-      const newCommits = await getNewCommits(dir, "main", firstCommit);
+      const newCommits = await getNewCommits({
+        repoPath: dir,
+        branch: "main",
+        base: firstCommit,
+      });
       expect(newCommits.length).toBe(1);
       expect(newCommits[0]).toContain("second commit");
       // 基线的 first commit 不在增量里
@@ -113,21 +121,25 @@ describe("git.ts —— 命令封装（分支作参数传入）", () => {
     const { dir, cleanup, firstCommit, run } = makeRepo();
     try {
       // 落后于 firstCommit → false（origin/main 就是 firstCommit）
-      expect(await isBehind(dir, "main", firstCommit)).toBe(false);
+      expect(
+        await isBehind({ repoPath: dir, branch: "main", base: firstCommit }),
+      ).toBe(false);
 
       writeFileSync(join(dir, "c.txt"), "!");
       run(["add", "c.txt"]);
       run(["commit", "-m", "third commit"]);
       run(["push", "origin", "main"]); // 模拟远端前进
 
-      expect(await isBehind(dir, "main", firstCommit)).toBe(true);
+      expect(
+        await isBehind({ repoPath: dir, branch: "main", base: firstCommit }),
+      ).toBe(true);
     } finally {
       cleanup();
     }
   });
 
   it("fastForward：本地与远端分叉时 ff-only 拒绝（保护参考仓库）", async () => {
-    const { dir, remoteDir, cleanup, firstCommit, run } = makeRepo();
+    const { dir, remoteDir, cleanup, run } = makeRepo();
     try {
       // 本地 main 前进：firstCommit → local commit
       writeFileSync(join(dir, "local.txt"), "local");
@@ -140,7 +152,9 @@ describe("git.ts —— 命令封装（分支作参数传入）", () => {
       // 里的 fetch 会用远端 refs 覆盖它；必须真实 push 让远端前进）
       const cloneDir = mkdtempSync(join(tmpdir(), "repo-git-clone-"));
       try {
-        execFileSync("git", ["clone", remoteDir, cloneDir], { stdio: "ignore" });
+        execFileSync("git", ["clone", remoteDir, cloneDir], {
+          stdio: "ignore",
+        });
         const runClone = (args: string[]) =>
           execFileSync("git", args, { cwd: cloneDir, encoding: "utf8" });
         runClone(["config", "user.email", "test@example.com"]);
@@ -158,9 +172,7 @@ describe("git.ts —— 命令封装（分支作参数传入）", () => {
       // 本地 fetch → origin/main = remote commit；本地 main 与它分叉
       run(["fetch", "origin"]);
 
-      await expect(
-        fastForward(dir, "main"),
-      ).rejects.toThrow();
+      await expect(fastForward(dir, "main")).rejects.toThrow();
     } finally {
       cleanup();
     }

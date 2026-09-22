@@ -85,6 +85,7 @@ function parseIpv4(address: string): number[] | null {
   return bytes;
 }
 
+// eslint-disable-next-line complexity -- 查表型：每个分支对应一种输入格式（一段 CIDR 保留段），行尾注释本身就是那张表，拆成多个函数只会让读者在 N 个函数之间跳，见 doc/plan/c45-lint-format.md 4.1③
 function classifyIpv4(b: number[]): BlockedReason | null {
   const [a0, a1] = b;
 
@@ -110,6 +111,7 @@ function classifyIpv4(b: number[]): BlockedReason | null {
 
 /** 解析 IPv6 成 16 字节。支持 `::` 缩写、zone id（`fe80::1%eth0`）、
  *  以及尾部 IPv4 写法（`::ffff:127.0.0.1`）。解析不出返回 null。 */
+// eslint-disable-next-line complexity -- 查表型：每一步都是一个格式判定（去 zone / 换尾部 IPv4 / 认 `::`），顺序就是解析顺序，拆开就看不见这条链，见 doc/plan/c45-lint-format.md 4.1③
 function parseIpv6(address: string): number[] | null {
   let text = address;
   const zoneAt = text.indexOf("%");
@@ -133,7 +135,10 @@ function parseIpv6(address: string): number[] | null {
     ? text.slice(0, doubleColon).split(":").filter(Boolean)
     : text.split(":");
   const tail = hasShortform
-    ? text.slice(doubleColon + 2).split(":").filter(Boolean)
+    ? text
+        .slice(doubleColon + 2)
+        .split(":")
+        .filter(Boolean)
     : [];
 
   if (!hasShortform && head.length !== 8) return null;
@@ -157,6 +162,7 @@ function parseIpv6(address: string): number[] | null {
   return bytes;
 }
 
+// eslint-disable-next-line complexity -- 查表型：每个分支对应一类特殊前缀（IPv4-mapped / NAT64 / link-local / ULA / multicast），拆开就丢了对齐，见 doc/plan/c45-lint-format.md 4.1③
 function classifyIpv6(bytes: number[]): BlockedReason | null {
   const allZero = (from: number, to: number) =>
     bytes.slice(from, to).every((byte) => byte === 0);
@@ -236,7 +242,10 @@ export async function guardUrl(
   }
 
   if (url.protocol !== "http:" && url.protocol !== "https:") {
-    return fail("scheme", `${blockedReasonText("scheme")}（收到 ${url.protocol}//）`);
+    return fail(
+      "scheme",
+      `${blockedReasonText("scheme")}（收到 ${url.protocol}//）`,
+    );
   }
   if (url.username || url.password) {
     return fail("credentials", blockedReasonText("credentials"));
@@ -257,10 +266,16 @@ export async function guardUrl(
   try {
     addresses = await lookup(hostname);
   } catch {
-    return fail("resolve-failed", `${blockedReasonText("resolve-failed")}：${hostname}`);
+    return fail(
+      "resolve-failed",
+      `${blockedReasonText("resolve-failed")}：${hostname}`,
+    );
   }
   if (addresses.length === 0) {
-    return fail("resolve-failed", `${blockedReasonText("resolve-failed")}：${hostname}`);
+    return fail(
+      "resolve-failed",
+      `${blockedReasonText("resolve-failed")}：${hostname}`,
+    );
   }
 
   // ⭐ 多地址时**任一被拦就拦**——DNS 可以同时返回公网和内网（多 A 记录 /
@@ -268,7 +283,10 @@ export async function guardUrl(
   for (const address of addresses) {
     const reason = classifyAddress(address);
     if (reason) {
-      return fail(reason, `域名 ${hostname} 解析到 ${address}（${blockedReasonText(reason)}）`);
+      return fail(
+        reason,
+        `域名 ${hostname} 解析到 ${address}（${blockedReasonText(reason)}）`,
+      );
     }
   }
 

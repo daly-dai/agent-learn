@@ -34,12 +34,13 @@ import {
 } from "./index";
 
 /** 往技能根里写一个技能目录（dirName 就是它的身份） */
-async function writeSkill(
-  root: string,
-  dirName: string,
-  skillMd: string,
-  extraFiles: string[] = [],
-): Promise<void> {
+async function writeSkill(params: {
+  root: string;
+  dirName: string;
+  skillMd: string;
+  extraFiles?: string[];
+}): Promise<void> {
+  const { root, dirName, skillMd, extraFiles = [] } = params;
   const baseDir = join(root, dirName);
   await mkdir(baseDir, { recursive: true });
   await writeFile(join(baseDir, "SKILL.md"), skillMd, "utf8");
@@ -56,36 +57,36 @@ beforeAll(async () => {
   root = await mkdtemp(join(tmpdir(), "statve-skills-"));
 
   // ① 带转义引号的 description（code-review 真实形状）
-  await writeSkill(
+  await writeSkill({
     root,
-    "code-review",
-    `---
+    dirName: "code-review",
+    skillMd: `---
 name: code-review
 description: "Review the changes since a fixed point. Use when the user asks to \\"review since X\\"."
 ---
 
 Two-axis review of the diff.
 `,
-  );
+  });
 
   // ② 最简形态（tdd 真实形状）
-  await writeSkill(
+  await writeSkill({
     root,
-    "tdd",
-    `---
+    dirName: "tdd",
+    skillMd: `---
 name: tdd
 description: Test-driven development. Use when the user wants test-first.
 ---
 
 Write the test first.
 `,
-  );
+  });
 
   // ③ 额外键 + metadata 嵌套块 + 资源文件（xlsx 真实形状）
-  await writeSkill(
+  await writeSkill({
     root,
-    "xlsx",
-    `---
+    dirName: "xlsx",
+    skillMd: `---
 name: xlsx
 description: Create, read, edit Excel .xlsx workbooks and CSVs.
 version: 1.1.0
@@ -99,14 +100,14 @@ metadata:
 
 Spreadsheet instructions.
 `,
-    ["scripts/make.py", "LICENSE.txt"],
-  );
+    extraFiles: ["scripts/make.py", "LICENSE.txt"],
+  });
 
   // ④ 隐藏技能（handoff 真实形状：disable-model-invocation + argument-hint）
-  await writeSkill(
+  await writeSkill({
     root,
-    "handoff",
-    `---
+    dirName: "handoff",
+    skillMd: `---
 name: handoff
 description: Compact the current conversation into a handoff document.
 argument-hint: "What will the next session be used for?"
@@ -115,35 +116,39 @@ disable-model-invocation: true
 
 Handoff instructions.
 `,
-  );
+  });
 
   // ⑤ 目录名与 frontmatter name 不符（Q3 定案：按目录名加载 + 一条诊断）
-  await writeSkill(
+  await writeSkill({
     root,
-    "wrong-name",
-    `---
+    dirName: "wrong-name",
+    skillMd: `---
 name: something-else
 description: The frontmatter name does not match the directory name.
 ---
 
 Body of the misnamed skill.
 `,
-  );
+  });
 
   // ⑥ 缺 description（标准要求必填）→ 跳过 + 诊断
-  await writeSkill(
+  await writeSkill({
     root,
-    "no-description",
-    `---
+    dirName: "no-description",
+    skillMd: `---
 name: no-description
 ---
 
 Body without a description.
 `,
-  );
+  });
 
   // ⑦ 完全没有 frontmatter → 跳过 + 诊断
-  await writeSkill(root, "no-frontmatter", `Just a body, no frontmatter at all.\n`);
+  await writeSkill({
+    root,
+    dirName: "no-frontmatter",
+    skillMd: `Just a body, no frontmatter at all.\n`,
+  });
 
   // ⑧ 不是技能目录（用户会往技能根里放草稿/备份）→ 不加载，但**不是坏技能**
   await mkdir(join(root, "not-a-skill"), { recursive: true });
@@ -160,7 +165,9 @@ describe("loadSkills —— 扫技能根（身份 = 目录名，坏技能跳过�
     const xlsx = skills.find((s) => s.name === "xlsx");
 
     expect(xlsx).toBeDefined();
-    expect(xlsx?.description).toBe("Create, read, edit Excel .xlsx workbooks and CSVs.");
+    expect(xlsx?.description).toBe(
+      "Create, read, edit Excel .xlsx workbooks and CSVs.",
+    );
     expect(xlsx?.content).toBe("Spreadsheet instructions.");
     expect(xlsx?.baseDir).toBe(join(root, "xlsx"));
     expect(isAbsolute(xlsx?.baseDir ?? "")).toBe(true);
@@ -169,7 +176,7 @@ describe("loadSkills —— 扫技能根（身份 = 目录名，坏技能跳过�
     expect(xlsx?.modelInvocable).toBe(true);
   });
 
-  it("description 的双引号被去掉、内部的 \\\" 还原（真实样本就有转义引号）", () => {
+  it('description 的双引号被去掉、内部的 \\" 还原（真实样本就有转义引号）', () => {
     const { skills } = loadSkills(root);
     const codeReview = skills.find((s) => s.name === "code-review");
     expect(codeReview?.description).toBe(
@@ -195,7 +202,9 @@ describe("loadSkills —— 扫技能根（身份 = 目录名，坏技能跳过�
     expect(skills.some((s) => s.name === "wrong-name")).toBe(true);
     expect(skills.some((s) => s.name === "something-else")).toBe(false);
     expect(diagnostics).toHaveLength(1 + 2); // wrong-name + 缺 description + 无 frontmatter
-    expect(diagnostics.find((d) => d.name === "wrong-name")?.reason).toContain("something-else");
+    expect(diagnostics.find((d) => d.name === "wrong-name")?.reason).toContain(
+      "something-else",
+    );
   });
 
   it("缺 description → 跳过 + 诊断（一条坏技能不影响其余）", () => {
@@ -256,10 +265,10 @@ describe("parseFrontmatter —— 收尾必须是「真的收尾」", () => {
     const dir = await mkdtemp(join(tmpdir(), "statve-swallow-"));
 
     try {
-      await writeSkill(
-        dir,
-        "swallow",
-        `---
+      await writeSkill({
+        root: dir,
+        dirName: "swallow",
+        skillMd: `---
 name: swallow
 description: 忘了写收尾的技能
 
@@ -271,7 +280,7 @@ description: 忘了写收尾的技能
 
 后半段正文。
 `,
-      );
+      });
 
       const { skills, diagnostics } = loadSkills(dir);
 
@@ -294,10 +303,10 @@ description: 忘了写收尾的技能
     const dir = await mkdtemp(join(tmpdir(), "statve-legal-lines-"));
 
     try {
-      await writeSkill(
-        dir,
-        "legal",
-        `---
+      await writeSkill({
+        root: dir,
+        dirName: "legal",
+        skillMd: `---
 name: legal
 description: frontmatter 里混着空行、缩进子键和注释
 
@@ -310,7 +319,7 @@ metadata:
 
 正文。
 `,
-      );
+      });
 
       const { skills, diagnostics } = loadSkills(dir);
 
@@ -334,10 +343,10 @@ metadata:
     const dir = await mkdtemp(join(tmpdir(), "statve-boundary-"));
 
     try {
-      await writeSkill(
-        dir,
-        "boundary",
-        `---
+      await writeSkill({
+        root: dir,
+        dirName: "boundary",
+        skillMd: `---
 name: boundary
 description: 收尾忘了写，被吞掉的那半段正好只有标题
 
@@ -347,7 +356,7 @@ description: 收尾忘了写，被吞掉的那半段正好只有标题
 
 后半段正文。
 `,
-      );
+      });
 
       const { skills, diagnostics } = loadSkills(dir);
 
@@ -380,13 +389,17 @@ describe("buildSkillCatalog —— 只给模型看它调得动的（markdown 列
   it("markdown 形态 `- \`name\`: description`，前面一句引导语", () => {
     const { skills } = loadSkills(root);
     const catalog = buildSkillCatalog(skills);
-    expect(catalog).toContain("- `code-review`: Review the changes since a fixed point.");
+    expect(catalog).toContain(
+      "- `code-review`: Review the changes since a fixed point.",
+    );
     expect(catalog.split("\n")[0]).not.toContain("- `"); // 第一行是引导语，不是条目
   });
 
   it("disable-model-invocation 的技能一条都不出现（作者禁止模型自己喊）", () => {
     const { skills } = loadSkills(root);
-    expect(catalogEntryNames(buildSkillCatalog(skills))).not.toContain("handoff");
+    expect(catalogEntryNames(buildSkillCatalog(skills))).not.toContain(
+      "handoff",
+    );
   });
 
   it("⭐ 隐藏技能的名字出现在**别人的描述里**不算进清单（C43：子串匹配的假红）", () => {
@@ -520,7 +533,9 @@ describe("buildSkillCatalog —— 只给模型看它调得动的（markdown 列
 describe("renderSkillContent —— 两条路（工具 / 手势）共用的同一份形态", () => {
   it("含技能名、绝对目录、相对路径提示、正文", () => {
     const { skills } = loadSkills(root);
-    const block = renderSkillContent(skills.find((s) => s.name === "code-review")!);
+    const block = renderSkillContent(
+      skills.find((s) => s.name === "code-review")!,
+    );
 
     expect(block).toContain('<skill_content name="code-review">');
     expect(block).toContain(join(root, "code-review"));
@@ -550,7 +565,10 @@ describe("renderSkillContent —— 两条路（工具 / 手势）共用的同�
       content: "body",
       // 边界值构造：上限就是 10，真实技能今天最多十来个文件，
       // 超限那天必须有确定行为 —— 而这条行为只能在这里钉死。
-      files: Array.from({ length: 12 }, (_, i) => `f${String(i).padStart(2, "0")}.txt`),
+      files: Array.from(
+        { length: 12 },
+        (_, i) => `f${String(i).padStart(2, "0")}.txt`,
+      ),
       modelInvocable: true,
     };
     const block = renderSkillContent(many);
@@ -609,21 +627,22 @@ describe("findSkillInvocations —— 裸名手势（谁被 /名字 点到了）
 
   beforeAll(async () => {
     gestureRoot = await mkdtemp(join(tmpdir(), "statve-gesture-"));
-    await writeSkill(
-      gestureRoot,
-      "code-review",
-      "---\nname: code-review\ndescription: 两轴评审\n---\n\nbody\n",
-    );
-    await writeSkill(
-      gestureRoot,
-      "前端设计",
-      "---\nname: 前端设计\ndescription: 界面设计指导\n---\n\nbody\n",
-    );
-    await writeSkill(
-      gestureRoot,
-      "docs",
-      "---\nname: docs\ndescription: 文档查询（只为证明切法）\n---\n\nbody\n",
-    );
+    await writeSkill({
+      root: gestureRoot,
+      dirName: "code-review",
+      skillMd: "---\nname: code-review\ndescription: 两轴评审\n---\n\nbody\n",
+    });
+    await writeSkill({
+      root: gestureRoot,
+      dirName: "前端设计",
+      skillMd: "---\nname: 前端设计\ndescription: 界面设计指导\n---\n\nbody\n",
+    });
+    await writeSkill({
+      root: gestureRoot,
+      dirName: "docs",
+      skillMd:
+        "---\nname: docs\ndescription: 文档查询（只为证明切法）\n---\n\nbody\n",
+    });
     gestureSkills = loadSkills(gestureRoot).skills;
   });
 
@@ -637,7 +656,9 @@ describe("findSkillInvocations —— 裸名手势（谁被 /名字 点到了）
   }
 
   it("行首的 /名字 命中（面板选中后就是长这样）", () => {
-    expect(namesIn("/code-review 帮我评审这个 commit")).toEqual(["code-review"]);
+    expect(namesIn("/code-review 帮我评审这个 commit")).toEqual([
+      "code-review",
+    ]);
   });
 
   it("正文中间的 /名字 也命中（R3-3：扫整条消息，不只看行首）", () => {
@@ -701,39 +722,48 @@ describe("真实技能根（本机已装的技能）", () => {
   const realRoot = config.paths.skillsRoot;
   const installed = existsSync(realRoot);
 
-  it.skipIf(!installed)("每个技能都能自证：名字 = 目录名、目录绝对、正文已去掉 frontmatter", () => {
-    const { skills } = loadSkills(realRoot);
-    expect(skills.length).toBeGreaterThan(0);
-    for (const skill of skills) {
-      expect(skill.baseDir.endsWith(skill.name)).toBe(true);
-      expect(isAbsolute(skill.baseDir)).toBe(true);
-      expect(skill.content.startsWith("---")).toBe(false);
-      expect(skill.description.length).toBeGreaterThan(0);
-    }
-  });
+  it.skipIf(!installed)(
+    "每个技能都能自证：名字 = 目录名、目录绝对、正文已去掉 frontmatter",
+    () => {
+      const { skills } = loadSkills(realRoot);
+      expect(skills.length).toBeGreaterThan(0);
+      for (const skill of skills) {
+        expect(skill.baseDir.endsWith(skill.name)).toBe(true);
+        expect(isAbsolute(skill.baseDir)).toBe(true);
+        expect(skill.content.startsWith("---")).toBe(false);
+        expect(skill.description.length).toBeGreaterThan(0);
+      }
+    },
+  );
 
-  it.skipIf(!installed)("⭐ 隐藏技能两个条件同时成立：不在模型清单里、仍在技能列表里", () => {
-    // 这条是 Q3 的守卫，在真实数据上验：漏一个 → 模型会自己喊作者禁止它喊的技能；
-    // 多滤一个 → 面板里就少了它，用户打 /名字 也没反应。
-    const { skills } = loadSkills(realRoot);
-    const catalog = buildSkillCatalog(skills);
-    const hidden = skills.filter((skill) => !skill.modelInvocable);
+  it.skipIf(!installed)(
+    "⭐ 隐藏技能两个条件同时成立：不在模型清单里、仍在技能列表里",
+    () => {
+      // 这条是 Q3 的守卫，在真实数据上验：漏一个 → 模型会自己喊作者禁止它喊的技能；
+      // 多滤一个 → 面板里就少了它，用户打 /名字 也没反应。
+      const { skills } = loadSkills(realRoot);
+      const catalog = buildSkillCatalog(skills);
+      const hidden = skills.filter((skill) => !skill.modelInvocable);
 
-    for (const skill of hidden) {
-      // ⚠️ 判据是「**清单的条目里有没有它**」，不是「清单的文本里有没有这串字符」——
-      // 后者 2026-09-20 被真实数据打红过一次（见上面 `catalogEntryNames` 的注释与
-      // 那条 slidev/teach 用例）。这条跑的是**本机真实技能根**，用户随时会装新技能，
-      // 必须只用"性质"当判据，不能靠"今天恰好没有哪个描述提到它"。
-      expect(catalogEntryNames(catalog)).not.toContain(skill.name);
-      expect(findSkill(skills, skill.name)).toBeDefined();
-    }
-  });
+      for (const skill of hidden) {
+        // ⚠️ 判据是「**清单的条目里有没有它**」，不是「清单的文本里有没有这串字符」——
+        // 后者 2026-09-20 被真实数据打红过一次（见上面 `catalogEntryNames` 的注释与
+        // 那条 slidev/teach 用例）。这条跑的是**本机真实技能根**，用户随时会装新技能，
+        // 必须只用"性质"当判据，不能靠"今天恰好没有哪个描述提到它"。
+        expect(catalogEntryNames(catalog)).not.toContain(skill.name);
+        expect(findSkill(skills, skill.name)).toBeDefined();
+      }
+    },
+  );
 
-  it.skipIf(!installed)("真实技能的目录名不含路径分隔符（否则名字没法当 / 手势的命令名）", () => {
-    const { skills } = loadSkills(realRoot);
-    for (const skill of skills) {
-      expect(skill.name).not.toContain("/");
-      expect(skill.name).not.toContain("\\");
-    }
-  });
+  it.skipIf(!installed)(
+    "真实技能的目录名不含路径分隔符（否则名字没法当 / 手势的命令名）",
+    () => {
+      const { skills } = loadSkills(realRoot);
+      for (const skill of skills) {
+        expect(skill.name).not.toContain("/");
+        expect(skill.name).not.toContain("\\");
+      }
+    },
+  );
 });

@@ -31,12 +31,13 @@ import type { SlashCommand } from "../types";
  * 共享：生成摘要（MOCK/失败降级拼贴）+ 落盘 compaction entry。
  * maybeCompact（自动）与 compactNow（手动）共用——摘要逻辑只有一份。
  */
-export async function summarizeAndCommit(
-  store: JsonlSessionStore,
-  model: TeachingModel,
-  prep: CompactionPreparation,
-  signal: AbortSignal,
-): Promise<CompactionEntry> {
+export async function summarizeAndCommit(params: {
+  store: JsonlSessionStore;
+  model: TeachingModel;
+  prep: CompactionPreparation;
+  signal: AbortSignal;
+}): Promise<CompactionEntry> {
+  const { store, model, prep, signal } = params;
   let summary: string;
   if (config.modelSecrets.mockMode) {
     // 离线教学：不调模型，拼贴降级（信息还在，只是不省 token）
@@ -79,7 +80,7 @@ export async function compactNow(
   // maxTokens=0：任何非空上下文都超过阈值 → 无条件压（手动语义）
   const prep = store.prepareCompaction(0, compactKeepRecent());
   if (prep === undefined || prep.messagesToSummarize.length === 0) return null;
-  const entry = await summarizeAndCommit(store, model, prep, signal);
+  const entry = await summarizeAndCommit({ store, model, prep, signal });
   return {
     entry,
     summarizedCount: prep.messagesToSummarize.length,
@@ -97,7 +98,11 @@ export function createCompactCommand(): SlashCommand {
       if (inv.rawInput.trim().length > 0) {
         return { kind: "error", text: "用法: /compact（不接受参数）" };
       }
-      const outcome = await compactNow(inv.api.store, inv.api.model, inv.signal);
+      const outcome = await compactNow(
+        inv.api.store,
+        inv.api.model,
+        inv.signal,
+      );
       if (outcome === null) {
         return { kind: "success", text: "没有可压缩的历史。" };
       }

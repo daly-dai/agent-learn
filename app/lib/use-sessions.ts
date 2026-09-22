@@ -59,6 +59,7 @@ export function useSessions() {
   // 所以包一层 async load() 再调用——比 .then 链读起来更统一
   useEffect(() => {
     const controller = new AbortController();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 进 loading 要等 fetch，只能由 effect 驱动；改成派生值要推翻整个 hook 状态模型（重构级改动）→ 见池子 C46
     setLoading(true);
     async function load() {
       const list = await refresh(controller.signal);
@@ -122,5 +123,14 @@ export function useSessions() {
     [refresh],
   );
 
-  return { sessions, currentId, loading, refresh, select, create, rename, remove };
+  return {
+    sessions,
+    currentId,
+    loading,
+    refresh,
+    select,
+    create,
+    rename,
+    remove,
+  };
 }

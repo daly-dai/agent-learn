@@ -10,7 +10,8 @@
 // 命令不推送 SSE，保持"命令 = 独立动作"的简单语义。
 // ============================================================
 
-import { NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { isValidSessionId } from "@/lib";
 import { createCommands } from "../_pipeline/commands";
 import { createSessionStore } from "../_pipeline/context";
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
     { store, model: selected.model },
     req.signal, // 客户端断开 → 中止命令（/compact 的摘要生成响应取消）
   );
-  
+
   if (result === null) {
     // 区分两种"执行不了"（review 修复）：
     //   - 解析不出命令名（/、/foo/bar 路径、/9abc）= 不是命令形态，

@@ -16,11 +16,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { JsonlSessionStore } from "@/lib/session";
 import { FakeModel } from "@/lib/testing/fake-model";
-import {
-  createAssistantMessage,
-  createUserMessage,
-  text,
-} from "@/lib/message";
+import { createAssistantMessage, createUserMessage, text } from "@/lib/message";
 import { compactNow, createCompactCommand } from "./";
 import { createCommandRegistry } from "../index";
 import type { CommandApi } from "../types";
@@ -28,7 +24,11 @@ import type { CommandApi } from "../types";
 /** 真实 store（临时 jsonl）+ 假模型：压缩链路的完整闭环 */
 function makeDeps() {
   const dir = mkdtempSync(join(tmpdir(), "commands-compact-test-"));
-  const store = new JsonlSessionStore(join(dir, "test.jsonl"), dir, "test-session");
+  const store = new JsonlSessionStore({
+    filePath: join(dir, "test.jsonl"),
+    cwd: dir,
+    sessionId: "test-session",
+  });
   const model = new FakeModel(() =>
     createAssistantMessage([text("## Goal\n测试摘要")]),
   );
@@ -53,7 +53,11 @@ describe("compactNow —— 手动压缩共享逻辑（DSH compactNow 对齐）"
     try {
       await seedMessages(deps.store);
       const before = deps.store.getEntries().length;
-      const outcome = await compactNow(deps.store, deps.model, new AbortController().signal);
+      const outcome = await compactNow(
+        deps.store,
+        deps.model,
+        new AbortController().signal,
+      );
       expect(outcome).not.toBeNull();
       expect(outcome!.summarizedCount).toBe(2); // 10 条 - 保留 8 条
       expect(outcome!.tokensSummarized).toBeGreaterThan(0); // 本次压掉的 token
@@ -72,7 +76,11 @@ describe("compactNow —— 手动压缩共享逻辑（DSH compactNow 对齐）"
       await seedMessages(deps.store);
       await compactNow(deps.store, deps.model, new AbortController().signal);
       // 第二次：待压区为空（保留区 8 条都还是上次保留的）
-      const second = await compactNow(deps.store, deps.model, new AbortController().signal);
+      const second = await compactNow(
+        deps.store,
+        deps.model,
+        new AbortController().signal,
+      );
       expect(second).toBeNull();
     } finally {
       deps.cleanup();
@@ -94,7 +102,11 @@ describe("compactNow —— 手动压缩共享逻辑（DSH compactNow 对齐）"
   it("空会话（无消息）→ null（无可压历史）", async () => {
     const deps = makeDeps();
     try {
-      const outcome = await compactNow(deps.store, deps.model, new AbortController().signal);
+      const outcome = await compactNow(
+        deps.store,
+        deps.model,
+        new AbortController().signal,
+      );
       expect(outcome).toBeNull();
     } finally {
       deps.cleanup();
@@ -129,7 +141,11 @@ describe("/compact 命令（createCompactCommand + 注册表集成）", () => {
       await seedMessages(deps.store);
       const registry = createCommandRegistry();
       registry.register(createCompactCommand());
-      await registry.execute("/compact", apiOf(deps), new AbortController().signal);
+      await registry.execute(
+        "/compact",
+        apiOf(deps),
+        new AbortController().signal,
+      );
       const second = await registry.execute(
         "/compact",
         apiOf(deps),
@@ -152,7 +168,10 @@ describe("/compact 命令（createCompactCommand + 注册表集成）", () => {
         apiOf(deps),
         new AbortController().signal,
       );
-      expect(result).toEqual({ kind: "error", text: "用法: /compact（不接受参数）" });
+      expect(result).toEqual({
+        kind: "error",
+        text: "用法: /compact（不接受参数）",
+      });
     } finally {
       deps.cleanup();
     }

@@ -142,12 +142,18 @@ export async function fetchUrl(
         );
       }
 
+      // 提前返回式守卫：重定向却不给 Location 是坏响应，报错而不是猜
+      if (isRedirectWithoutLocation(response)) {
+        return fail(
+          "http-error",
+          `HTTP ${response.status} 但响应里没有 Location 头`,
+        );
+      }
+
       if (isRedirect(response.status)) {
-        const location = response.headers.get("location");
-        if (!location) {
-          return fail("http-error", `HTTP ${response.status} 但响应里没有 Location 头`);
-        }
-        // Location 可以是相对路径，用**当前**地址解析成绝对地址
+        // 上面的守卫已经排除了"缺 Location"这一种；Location 可以是相对路径，
+        // 用**当前**地址解析成绝对地址
+        const location = response.headers.get("location")!;
         current = new URL(location, guarded.url).href;
         continue; // 下一跳会重新过闸门
       }
@@ -190,7 +196,10 @@ export async function fetchUrl(
       };
     } catch (error) {
       if (isAbortError(error)) {
-        return fail("timeout", `请求超过 ${timeoutMs}ms 未完成：${guarded.url.href}`);
+        return fail(
+          "timeout",
+          `请求超过 ${timeoutMs}ms 未完成：${guarded.url.href}`,
+        );
       }
       return fail("network", `请求失败：${errorMessage(error)}`);
     } finally {
@@ -210,7 +219,24 @@ function fail(reason: FetchFailureReason, detail: string): FetchFailure {
 }
 
 function isRedirect(status: number): boolean {
-  return status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
+  return (
+    status === 301 ||
+    status === 302 ||
+    status === 303 ||
+    status === 307 ||
+    status === 308
+  );
+}
+
+/**
+ * 是重定向、却没带 `Location` 头 —— 坏响应（正常的重定向一定带）。
+ *
+ * 为什么不写成 `if (isRedirect(...)) { if (!location) ... }`：那是两层缩进，
+ * 顶到 max-depth 上限。把这条判据提成**一个名字**，主流程就是一个提前返回，
+ * 而且"重定向但缺 Location"这句话本身比嵌套里的 `!location` 好读。
+ */
+function isRedirectWithoutLocation(response: Response): boolean {
+  return isRedirect(response.status) && !response.headers.get("location");
 }
 
 function isAbortError(error: unknown): boolean {

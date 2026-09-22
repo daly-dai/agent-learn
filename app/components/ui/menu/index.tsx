@@ -63,13 +63,14 @@ export function Menu({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
   // side 对齐的固定定位坐标（视口坐标）。只在点击打开时量一次。
-  const [sideRect, setSideRect] = useState<{ left: number; top: number } | null>(
-    null,
-  );
+  const [sideRect, setSideRect] = useState<{
+    left: number;
+    top: number;
+  } | null>(null);
 
   // 点菜单外部关闭（mousedown 比 click 早，先关再让点击落空，不会误触发别的）
   useEffect(() => {
-    if (!open) return;
+    if (!open) return undefined;
     const onDown = (e: MouseEvent) => {
       if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
         setOpen(false);
@@ -81,7 +82,7 @@ export function Menu({
 
   // side 模式下滚动/缩放时关闭：fixed 面板不跟随滚动，浮错位置比关掉更糟
   useEffect(() => {
-    if (!open || align !== "side") return;
+    if (!open || align !== "side") return undefined;
     const close = () => setOpen(false);
     // capture: true —— 捕获阶段监听，滚动容器（.sessionList）的滚动也能拦到
     window.addEventListener("scroll", close, true);
@@ -120,7 +121,9 @@ export function Menu({
       (el): el is HTMLButtonElement => !!el && !el.disabled,
     );
     if (enabled.length === 0) return;
-    const current = enabled.indexOf(document.activeElement as HTMLButtonElement);
+    const current = enabled.indexOf(
+      document.activeElement as HTMLButtonElement,
+    );
     const next = enabled[(current + delta + enabled.length) % enabled.length];
     next.focus();
   }
@@ -129,7 +132,8 @@ export function Menu({
     const enabled = itemRefs.current.filter(
       (el): el is HTMLButtonElement => !!el && !el.disabled,
     );
-    if (enabled.length > 0) enabled[edge === "first" ? 0 : enabled.length - 1].focus();
+    if (enabled.length > 0)
+      enabled[edge === "first" ? 0 : enabled.length - 1].focus();
   }
 
   function onMenuKey(e: React.KeyboardEvent) {
@@ -206,7 +210,9 @@ export function Menu({
               onClick={() => pick(item)}
             >
               <span className={styles.itemLabel}>{item.label}</span>
-              {item.hint && <span className={styles.itemHint}>{item.hint}</span>}
+              {item.hint && (
+                <span className={styles.itemHint}>{item.hint}</span>
+              )}
             </button>
           ))}
         </div>

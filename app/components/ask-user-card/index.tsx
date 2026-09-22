@@ -18,7 +18,6 @@
 // ============================================================
 
 import { useState } from "react";
-import type { AskQuestion } from "@/lib/tools/ask-user";
 import type { PendingAsk } from "../../lib/use-agent-run";
 import styles from "./ask-user-card.module.css";
 
@@ -66,7 +65,9 @@ export function AskUserCard({ ask, onAnswer }: AskUserCardProps) {
         <span className={styles.signal} aria-hidden="true" />
         <span className={styles.title}>模型提问</span>
         {!isSingle && (
-          <span className={styles.progress}>{index + 1}/{total}</span>
+          <span className={styles.progress}>
+            {index + 1}/{total}
+          </span>
         )}
         <span className={styles.hint}>点选项或输入 · 返回上一题可改</span>
       </div>
@@ -131,7 +132,11 @@ export function AskUserCard({ ask, onAnswer }: AskUserCardProps) {
             ← 上一题
           </button>
         )}
-        <button type="button" className={styles.skipBtn} onClick={() => commit("")}>
+        <button
+          type="button"
+          className={styles.skipBtn}
+          onClick={() => commit("")}
+        >
           跳过
         </button>
         <button

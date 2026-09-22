@@ -39,10 +39,7 @@ afterEach(() => {
 
 /** 替换全局 fetch：捕获请求（url + init），返回固定 Response */
 function stubFetch(
-  responder: (
-    url: string,
-    init: RequestInit,
-  ) => Response | Promise<Response>,
+  responder: (url: string, init: RequestInit) => Response | Promise<Response>,
 ): { url: string; init: RequestInit; called: number } {
   const capture = { url: "", init: {} as RequestInit, called: 0 };
   vi.stubGlobal(
@@ -99,7 +96,10 @@ describe("toOpenAiMessages —— 进模型前转换", () => {
     const capture = stubFetch(() =>
       jsonResponse({
         choices: [
-          { message: { role: "assistant", content: "ok" }, finish_reason: "stop" },
+          {
+            message: { role: "assistant", content: "ok" },
+            finish_reason: "stop",
+          },
         ],
       }),
     );
@@ -107,7 +107,14 @@ describe("toOpenAiMessages —— 进模型前转换", () => {
     const messages: AgentMessage[] = [
       createUserMessage("帮我查文件"),
       createAssistantMessage(
-        [{ type: "toolCall", id: "call_1", name: "read_file", arguments: { path: "a.txt" } }],
+        [
+          {
+            type: "toolCall",
+            id: "call_1",
+            name: "read_file",
+            arguments: { path: "a.txt" },
+          },
+        ],
         "toolUse",
       ),
       {
@@ -129,9 +136,9 @@ describe("toOpenAiMessages —— 进模型前转换", () => {
     const toolMsg = sent.find((m) => m.role === "tool");
     expect(assistantMsg).toBeDefined();
     expect(toolMsg).toBeDefined();
-    expect(
-      (assistantMsg!.tool_calls as Array<{ id: string }>)[0].id,
-    ).toBe("call_1");
+    expect((assistantMsg!.tool_calls as Array<{ id: string }>)[0].id).toBe(
+      "call_1",
+    );
     expect(toolMsg!.tool_call_id).toBe("call_1");
     // 工具结果的文本也带上了
     expect(toolMsg!.content).toBe("hello");
@@ -141,7 +148,10 @@ describe("toOpenAiMessages —— 进模型前转换", () => {
     const capture = stubFetch(() =>
       jsonResponse({
         choices: [
-          { message: { role: "assistant", content: "ok" }, finish_reason: "stop" },
+          {
+            message: { role: "assistant", content: "ok" },
+            finish_reason: "stop",
+          },
         ],
       }),
     );
@@ -164,7 +174,10 @@ describe("toOpenAiMessages —— 进模型前转换", () => {
     const capture = stubFetch(() =>
       jsonResponse({
         choices: [
-          { message: { role: "assistant", content: "ok" }, finish_reason: "stop" },
+          {
+            message: { role: "assistant", content: "ok" },
+            finish_reason: "stop",
+          },
         ],
       }),
     );
@@ -226,7 +239,10 @@ describe("非流式响应 → AssistantMessage", () => {
     stubFetch(() =>
       jsonResponse({
         choices: [
-          { message: { role: "assistant", content: null }, finish_reason: "stop" },
+          {
+            message: { role: "assistant", content: null },
+            finish_reason: "stop",
+          },
         ],
       }),
     );
@@ -282,7 +298,7 @@ describe("流式 —— 逐 token 读取", () => {
     stubFetch(() =>
       sseResponse([
         'data: {"choices":[{"delta":{"content":"你"}}]}\n\n',
-        'data: {bad json\n\n', // 坏 JSON：整行 parse 失败 → 跳过
+        "data: {bad json\n\n", // 坏 JSON：整行 parse 失败 → 跳过
         'data: {"choices":[{"delta":{"content":"好"}}]}\n\n',
         "data: [DONE]\n\n",
       ]),
@@ -357,7 +373,13 @@ describe("流式 —— 逐 token 读取", () => {
 
 describe("错误策略 —— 不抛异常，转受控消息", () => {
   it("HTTP 500 → stopReason=error，errorMessage 含状态码", async () => {
-    stubFetch(() => new Response("boom", { status: 500, statusText: "Internal Server Error" }));
+    stubFetch(
+      () =>
+        new Response("boom", {
+          status: 500,
+          statusText: "Internal Server Error",
+        }),
+    );
 
     const msg = await makeModel().complete({
       systemPrompt: "sp",
@@ -406,7 +428,11 @@ describe("错误策略 —— 不抛异常，转受控消息", () => {
     const encoder = new TextEncoder();
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
-        controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"半截"}}]}\n\n'));
+        controller.enqueue(
+          encoder.encode(
+            'data: {"choices":[{"delta":{"content":"半截"}}]}\n\n',
+          ),
+        );
         controller.error(new Error("stream broken"));
       },
     });

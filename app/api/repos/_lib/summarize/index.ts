@@ -47,19 +47,19 @@ ONLY output the summary. Do NOT continue the conversation. Do NOT ask questions.
  * 关注点（repo.note）来自导航手册——告诉模型"这个项目对我们学什么
  * 最有价值"，让 ⭐ 标注结合本项目实际，而不是泛泛而谈。
  */
-function buildPrompt(
-  repoName: string,
-  note: string,
-  commits: string[],
-  totalCount: number,
-): string {
-  const commitLines = commits
-    .map((c) => `- ${c}`)
-    .join("\n");
+function buildPrompt(params: {
+  repoName: string;
+  note: string;
+  commits: string[];
+  totalCount: number;
+}): string {
+  const { repoName, note, commits, totalCount } = params;
+  const commitLines = commits.map((c) => `- ${c}`).join("\n");
 
-  const truncated = totalCount > MAX_COMMITS_IN_PROMPT
-    ? `\n\n(共 ${totalCount} 条，以下展示前 ${MAX_COMMITS_IN_PROMPT} 条)`
-    : "";
+  const truncated =
+    totalCount > MAX_COMMITS_IN_PROMPT
+      ? `\n\n(共 ${totalCount} 条，以下展示前 ${MAX_COMMITS_IN_PROMPT} 条)`
+      : "";
 
   return `以下是一个开源参考项目 "${repoName}" 最近的新增提交（git log --oneline）：
 
@@ -93,7 +93,7 @@ ${commitLines}${truncated}
    使用价值：<能否直接借鉴到我们项目，怎么用>
 
 不要用别的格式（不要用 - 列表，不要只写一句话）。没有值得学的
-就不要硬凑，宁可少。）；`
+就不要硬凑，宁可少。）；`;
 }
 
 // ------------------------------------------------------------
@@ -103,12 +103,13 @@ ${commitLines}${truncated}
 /**
  * 生成变更总结。失败/无 key/空输出 → degraded=true（页面显示跳过总结）。
  */
-export async function summarizeUpdate(
-  repoName: string,
-  note: string,
-  commits: string[],
-  signal?: AbortSignal,
-): Promise<UpdateSummary> {
+export async function summarizeUpdate(params: {
+  repoName: string;
+  note: string;
+  commits: string[];
+  signal?: AbortSignal;
+}): Promise<UpdateSummary> {
+  const { repoName, note, commits, signal } = params;
   // 没有可总结的内容：不算降级，但也没得写（调用方应避免传空）
   if (commits.length === 0) {
     return { text: "", degraded: false };
@@ -122,12 +123,12 @@ export async function summarizeUpdate(
     return { text: "", degraded: true };
   }
 
-  const prompt = buildPrompt(
+  const prompt = buildPrompt({
     repoName,
     note,
-    commits.slice(0, MAX_COMMITS_IN_PROMPT),
-    commits.length, // 原始总数（截断提示用）
-  );
+    commits: commits.slice(0, MAX_COMMITS_IN_PROMPT),
+    totalCount: commits.length, // 原始总数（截断提示用）
+  });
 
   const result = await model.complete({
     systemPrompt: SYSTEM_PROMPT,

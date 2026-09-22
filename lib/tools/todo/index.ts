@@ -101,7 +101,8 @@ export function validateTodos(raw: unknown): TodoItem[] {
     }
 
     const record = item as Record<string, unknown>;
-    const content = typeof record.content === "string" ? record.content.trim() : "";
+    const content =
+      typeof record.content === "string" ? record.content.trim() : "";
 
     if (!content) {
       throw new Error("todo 的 content 不能为空");
@@ -111,8 +112,14 @@ export function validateTodos(raw: unknown): TodoItem[] {
     }
 
     const status = record.status;
-    if (status !== "pending" && status !== "in_progress" && status !== "completed") {
-      throw new Error(`todo 的 status 必须是 pending/in_progress/completed（收到 ${String(status)}）`);
+    if (
+      status !== "pending" &&
+      status !== "in_progress" &&
+      status !== "completed"
+    ) {
+      throw new Error(
+        `todo 的 status 必须是 pending/in_progress/completed（收到 ${String(status)}）`,
+      );
     }
 
     seen.add(content);

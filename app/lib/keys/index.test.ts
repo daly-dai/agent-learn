@@ -11,14 +11,24 @@ import { isEditableTarget, isPlainKey } from ".";
 
 describe("isPlainKey —— 无修饰键的「干净」按键", () => {
   it("三键全 false 是干净按键", () => {
-    expect(isPlainKey({ ctrlKey: false, metaKey: false, altKey: false })).toBe(true);
+    expect(isPlainKey({ ctrlKey: false, metaKey: false, altKey: false })).toBe(
+      true,
+    );
   });
 
   it("任一修饰键按下都不是干净按键（组合键不该触发快捷键）", () => {
-    expect(isPlainKey({ ctrlKey: true, metaKey: false, altKey: false })).toBe(false);
-    expect(isPlainKey({ ctrlKey: false, metaKey: true, altKey: false })).toBe(false);
-    expect(isPlainKey({ ctrlKey: false, metaKey: false, altKey: true })).toBe(false);
-    expect(isPlainKey({ ctrlKey: true, metaKey: true, altKey: true })).toBe(false);
+    expect(isPlainKey({ ctrlKey: true, metaKey: false, altKey: false })).toBe(
+      false,
+    );
+    expect(isPlainKey({ ctrlKey: false, metaKey: true, altKey: false })).toBe(
+      false,
+    );
+    expect(isPlainKey({ ctrlKey: false, metaKey: false, altKey: true })).toBe(
+      false,
+    );
+    expect(isPlainKey({ ctrlKey: true, metaKey: true, altKey: true })).toBe(
+      false,
+    );
   });
 });
 

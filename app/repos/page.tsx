@@ -19,9 +19,17 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import styles from "./page.module.css";
-import { checkRepos, listRepos, readUpdateLog, updateRepo } from "@/app/services/repos";
+import {
+  checkRepos,
+  listRepos,
+  readUpdateLog,
+  updateRepo,
+} from "@/app/services/repos";
 import type { RepoStatus } from "@/app/services/repos/types";
-import type { UpdateLogWithContent, UpdateResult } from "@/app/services/repos/types";
+import type {
+  UpdateLogWithContent,
+  UpdateResult,
+} from "@/app/services/repos/types";
 import { Markdown } from "@/app/markdown";
 import { parseHighlights, parseSummary } from "@/app/lib/repos-summary";
 
@@ -87,6 +95,7 @@ export default function ReposPage() {
   useEffect(() => {
     const anyRunning = Object.values(states).some((s) => s.running);
     if (!anyRunning && Object.keys(states).length > 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 更新跑完后刷新列表：这个"外部事件 → 重拉数据"只能由 effect 观察 states 驱动 → 见池子 C46
       refresh();
     }
   }, [states, refresh]);
@@ -175,7 +184,9 @@ export default function ReposPage() {
                   {/* 状态点：有更新=琥珀，静默=灰 */}
                   <span
                     className={`${styles.repoDot}${
-                      repo.isGit && repo.hasUpdate === true ? ` ${styles.repoDotHot}` : ""
+                      repo.isGit && repo.hasUpdate === true
+                        ? ` ${styles.repoDotHot}`
+                        : ""
                     }`}
                     aria-hidden="true"
                   />
@@ -238,6 +249,7 @@ function RepoDetail({
   // 选中项目变化时加载它的全部历史日志
   useEffect(() => {
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 换项目就要立刻进 loading（由 prop 变化驱动的一次性同步）→ 见池子 C46
     setHistoryLoading(true);
     setHistory(null);
     readUpdateLog(repo.name)
@@ -307,13 +319,7 @@ function RepoDetail({
 }
 
 /** 本轮更新结果区：平铺 if/return（B17⑤），替代五层嵌套三元 */
-function UpdateBody({
-  repo,
-  state,
-}: {
-  repo: RepoStatus;
-  state: UpdateState;
-}) {
+function UpdateBody({ repo, state }: { repo: RepoStatus; state: UpdateState }) {
   if (!repo.isGit) {
     return <p className={styles.hint}>zip 快照（无 git 历史），不支持更新。</p>;
   }

@@ -104,7 +104,10 @@ describe("guardUrl —— URL 形状 + DNS 解析", () => {
   });
 
   it("⭐ localhost 解析到 127.0.0.1 → 拦（虽然域名本身无害）", async () => {
-    const result = await guardUrl("http://localhost:3000/", fakeLookup({ localhost: ["127.0.0.1"] }));
+    const result = await guardUrl(
+      "http://localhost:3000/",
+      fakeLookup({ localhost: ["127.0.0.1"] }),
+    );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toBe("loopback");
   });
@@ -132,9 +135,12 @@ describe("guardUrl —— URL 形状 + DNS 解析", () => {
   });
 
   it("字面量 IP 不查 DNS（内网 IP 直接拦，连解析都不做）", async () => {
-    const result = await guardUrl("http://169.254.169.254/latest/meta-data/", async () => {
-      throw new Error("不该走到 DNS");
-    });
+    const result = await guardUrl(
+      "http://169.254.169.254/latest/meta-data/",
+      async () => {
+        throw new Error("不该走到 DNS");
+      },
+    );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toBe("link-local");
   });

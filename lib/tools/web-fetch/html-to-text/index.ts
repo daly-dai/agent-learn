@@ -56,8 +56,20 @@ const DEFAULT_MAX_DEPTH = 512; // 见文件头"实测依据"
 
 /** HTML 里没有闭合标签、不占栈深的元素（省得把 <br> 当成一层） */
 const VOID_ELEMENTS = new Set([
-  "area", "base", "br", "col", "embed", "hr", "img", "input",
-  "link", "meta", "param", "source", "track", "wbr",
+  "area",
+  "base",
+  "br",
+  "col",
+  "embed",
+  "hr",
+  "img",
+  "input",
+  "link",
+  "meta",
+  "param",
+  "source",
+  "track",
+  "wbr",
 ]);
 
 /** 内容是**原始文本**、里面的 `<div>` 只是字符串的元素（不按标签扫） */
@@ -68,7 +80,13 @@ const RAW_TEXT_ELEMENTS = new Set(["script", "style", "textarea", "title"]);
  * `nodeName` 在 HTML 文档里是大写（domino 与浏览器一致），见 `isNonVisible`。
  */
 const NON_VISIBLE_ELEMENTS = new Set([
-  "SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE", "IFRAME", "OBJECT", "EMBED",
+  "SCRIPT",
+  "STYLE",
+  "NOSCRIPT",
+  "TEMPLATE",
+  "IFRAME",
+  "OBJECT",
+  "EMBED",
 ]);
 
 export type HtmlToTextDeps = {
@@ -148,7 +166,10 @@ function hasHiddenStyle(style: string | null): boolean {
       .replace(/\s*!important\s*$/, ""); // 去掉 !important 再比
 
     if (property === "display" && value === "none") return true;
-    if (property === "visibility" && (value === "hidden" || value === "collapse")) {
+    if (
+      property === "visibility" &&
+      (value === "hidden" || value === "collapse")
+    ) {
       return true;
     }
   }
@@ -207,6 +228,7 @@ export function htmlToText(
  * 这里手写一遍扫描，**只求"够用且在病态输入上不会更糟"**：
  * 真页面深度只有几十层，就算数歪一点也离 512 很远。
  */
+// eslint-disable-next-line complexity -- 查表型：每个分支对应扫描器的一种输入（注释 / 声明 / 引号内 / 收尾 `>` / 原始文本元素），顺序即扫描阶段，拆开更难看懂，见 doc/plan/c45-lint-format.md 4.1③
 export function measureTagDepth(html: string): number {
   const lower = html.toLowerCase();
   let depth = 0;
@@ -235,12 +257,14 @@ export function measureTagDepth(html: string): number {
     let quote: string | null = null;
     while (cursor < html.length) {
       const char = html[cursor];
-      if (quote) {
-        if (char === quote) quote = null;
-      } else if (char === '"' || char === "'") {
-        quote = char;
-      } else if (char === ">") {
-        break;
+      const insideQuote = quote !== null;
+
+      if (insideQuote && char === quote) {
+        quote = null; // 配对的引号：出引号
+      } else if (!insideQuote && (char === '"' || char === "'")) {
+        quote = char; // 进引号
+      } else if (!insideQuote && char === ">") {
+        break; // 只有在引号外，`>` 才是标签的收尾
       }
       cursor += 1;
     }
@@ -248,7 +272,10 @@ export function measureTagDepth(html: string): number {
 
     const raw = html.slice(open + 1, cursor);
     const isClosing = raw.startsWith("/");
-    const name = raw.replace(/^\//, "").split(/[\s/>]/, 1)[0].toLowerCase();
+    const name = raw
+      .replace(/^\//, "")
+      .split(/[\s/>]/, 1)[0]
+      .toLowerCase();
     const selfClosing = raw.endsWith("/");
 
     if (isClosing) {

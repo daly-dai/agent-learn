@@ -106,7 +106,9 @@ describe("buildSystemPrompt —— 提示词整体", () => {
     const prompt = buildSystemPrompt(FIXED, "", guidelines);
 
     for (const { name } of guidelines) {
-      expect(prompt, `工具 ${name} 的规矩没有进提示词`).toContain(`- ${name}：`);
+      expect(prompt, `工具 ${name} 的规矩没有进提示词`).toContain(
+        `- ${name}：`,
+      );
     }
     // 防"空转"：注册表一条投稿都没有的话，上面的循环什么都没验。
     // 断言的是"有工具带规矩"这个**性质**，不钉具体条数（条数会随工具增减变）。
@@ -237,7 +239,9 @@ describe("buildSystemPrompt —— 什么时候必须联网", () => {
   it("⭐ 把相对时间和「当前时间」挂钩（上一个 bug 的直接防线）", () => {
     // 只有「现在是 2026-09-14」还不够——必须同时说"别用训练数据里的年份"，
     // 否则模型会把两者当成互不相关的两段信息
-    expect(buildSystemPrompt(FIXED)).toMatch(/训练数据里的年份|不要用.*训练数据/);
+    expect(buildSystemPrompt(FIXED)).toMatch(
+      /训练数据里的年份|不要用.*训练数据/,
+    );
   });
 });
 
@@ -294,7 +298,8 @@ describe("buildSystemPrompt —— 不搬 codex 的产品机制", () => {
 
 describe("buildSystemPrompt —— 技能清单", () => {
   it("清单作为独立一节进提示词（模型据此知道有哪些技能）", () => {
-    const catalog = "以下技能可用。开始任务前先用 `skill` 工具加载。\n\n- `code-review`: 两轴评审";
+    const catalog =
+      "以下技能可用。开始任务前先用 `skill` 工具加载。\n\n- `code-review`: 两轴评审";
     const prompt = buildSystemPrompt(FIXED, catalog);
 
     expect(prompt).toContain("## 技能");
@@ -312,7 +317,8 @@ describe("buildSystemPrompt —— 技能清单", () => {
   it("清单原文逐字进提示词（不转义、不截断）", () => {
     // 清单是我们自己生成的 markdown；顺手"转义一下"会把反引号包着的技能名弄坏，
     // 而技能名正是模型要原样回传的东西（`skill({"name":"code-review"})`）。
-    const catalog = '以下技能可用。\n\n- `code-review`: a & b <c> "d" 的评审流程';
+    const catalog =
+      '以下技能可用。\n\n- `code-review`: a & b <c> "d" 的评审流程';
     expect(buildSystemPrompt(FIXED, catalog)).toContain(catalog);
   });
 

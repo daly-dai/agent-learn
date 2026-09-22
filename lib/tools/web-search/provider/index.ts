@@ -175,7 +175,9 @@ export function mapAnthropicResponse(
   maxResults: number,
 ): WebSearchResult {
   const blocks = payload.content ?? [];
-  const resultBlocks = blocks.filter((block) => block.type === "web_search_tool_result");
+  const resultBlocks = blocks.filter(
+    (block) => block.type === "web_search_tool_result",
+  );
   if (resultBlocks.length === 0) {
     throw new Error(
       "web_search 没有拿到 web_search_tool_result 块——这次请求没有真正触发服务端搜索。",
@@ -241,7 +243,12 @@ export function createDeepSeekSearchProvider(
         messages: [
           {
             role: "user",
-            content: [{ type: "text", text: `Perform a web search for the query: ${query}` }],
+            content: [
+              {
+                type: "text",
+                text: `Perform a web search for the query: ${query}`,
+              },
+            ],
           },
         ],
         tools: [

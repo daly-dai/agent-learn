@@ -10,11 +10,7 @@
 // 消费循环（谁发起 SSE、何时发）在 run-store.ts；本文件只管"状态怎么变"。
 // ============================================================
 
-import type {
-  AgentMessage,
-  SessionStats,
-  TodoItem,
-} from "@/lib/types";
+import type { AgentMessage, SessionStats, TodoItem } from "@/lib/types";
 import type { AskQuestion } from "@/lib/tools/ask-user";
 import type { ContextPressure } from "@/app/lib/context-occupancy";
 import type { ObservedEvent, StreamFrame } from "../sse";
@@ -205,7 +201,8 @@ export function foldRunFrame(
         ...state,
         toolOutputs: {
           ...state.toolOutputs,
-          [frame.toolCallId]: (state.toolOutputs[frame.toolCallId] ?? "") + frame.text,
+          [frame.toolCallId]:
+            (state.toolOutputs[frame.toolCallId] ?? "") + frame.text,
         },
       };
 
