@@ -174,7 +174,7 @@
 | B22 | **多会话并行 run（session-owner 架构）**：run 的 owner 从 UI 变会话 —— 切会话不取消在跑的 run | DSH useProjection / opencode run-coordinator | `doc/plan/b22-multi-session-run.md` | ✅ 浏览器人工验收场景 1-10 全过（09-04） | 已交付 |
 | A3 | **L3 Trace Viewer** | pi export-html / OpenHands 泳道（v2 见 C20） | `doc/plan/observability.md` | ✅ 8 条验收全过（2026-09-14） | 已交付 |
 | A5 | **web_search / web_fetch** | DSH tool-web / codex 决策边界 / opencode webfetch | `doc/plan/a5-web-search.md` | ✅ 真机验收通过（2026-09-14） | 已交付 |
-| C1 | MCP 接入 | Cline / smolagents mcp_client | — | — | 未开始 |
+| C1 | MCP 接入 | Cline / smolagents mcp_client（⚠️ **2026-09-21 侦察：Cline 不在本地参考系**，本地有五家带 MCP + 官方 spec 2026-07-28 —— 见 `doc/plan/c1-mcp.md` 2.1） | `doc/plan/c1-mcp.md`（材料已归位 · 未定案；**2026-09-22 补全链路 + 两处规范勘误**）⚠️ **只悬着一个问题：「要不要基于官方 npm 包做」**（用户 2026-09-22 提，**未拍**）—— 该文件头部「回来先读这一段」有**两个包的实测对照**（`sdk` 693 文件/16 依赖 vs `client` 85 文件/7 依赖） | — | 未开始 |
 | C8 | **Skills**：`skill` 工具 + `/` 面板技能条目 + 裸名手势 `/名字` | DSH tool-skill / pi core/skills.ts / opencode / codex | `doc/plan/c8-skills.md` | ✅ §5 十条验收全过（2026-09-17） | 已交付 |
 | C2 | 沙箱容器（**2026-09-14 扩范围：加"网络维度"**——原设计只有文件/进程，网络是空白） | **codex `network-proxy` + Windows MXC**（最新侦察）/ OpenHands / DSH sandbox | — | — | 未开始 |
 | C3 | 子智能体 / handoffs | DSH subagent（8 种实现）；⚠️ **动红线文件** `lib/agent/index.ts`（改动前须精读 pi → 对比 → 展示 → 用户拍板） | — | — | 未开始 |
@@ -244,6 +244,8 @@
 | C44 | **工具输出超限「留一份 + 给定位」**（C24 ②⑧ 的一手对照产物）：我们现在是**截断即永久丢弃**（`reader.cancel()`，模型再也拿不到那部分），而**两家都做了**：opencode 的 `Materialization.settle` 带托管 `outputPaths`、DSH 有**通用 spill 栈**（`dsh-spill-local` + `dsh-spill-policy`，工具零改动、模型侧只多一句通知） | 一手对照见 `doc/plan/c24-web-review.md` 的 ⑧ 表（含 file:line）；C24 复查已确认这是**能力差距**而非美化 | — | — | 未开始 |
 | C46 | **hook 里「同步 setState / 读 ref」的 5 处重构**：C45 带理由豁免了这 5 处 —— ①「外部数据消失→关面板」「换项目→进 loading」「跑完→重拉列表」都是 effect 驱动的同步 setState ② `useStickyScroll` 在渲染期读 `ref.current`。修法要动组件/hook 的状态模型（改成派生值、或换 `useSyncExternalStore` 之类），**可能改行为、需真机验收** | React 官方「You Might Not Need an Effect」+ `eslint-plugin-react-hooks` v7（随 `eslint-config-next` 进来的 React Compiler 时代护栏）；**触发条件：删掉那 5 处 `eslint-disable` 注释即可复现**（这就是它的检查方式） | — | — | 未开始 |
 | C45 | **ESLint + Prettier 接入**：现在提交前没有任何语法检查与代码格式化，全凭人眼看 —— 加静态检查 + 一键格式化，把 AGENTS.md 里那些"靠记性"的规矩（命名 / 分层 / 圈复杂度）变成"跑一下就报" | 同级项目 `E:\work-space\aI-admin-pro` 的实际配置（eslint flat config + 自定义硬规则 + prettier 三插件 + husky/lint-staged）+ Next 16 官方 ESLint 文档（`next lint` 在 16 已删除，改走 CLI + flat config + `eslint-config-next`）；触发：用户 2026-09-22 发现「我们项目没有语法检查和代码格式化」 | `doc/plan/c45-lint-format.md`（**已定案**：实测基线 3 张表 + 三条"为什么不能照抄" + 拍板记录 + 清理顺序 + 提交切分） | ① `pnpm lint` 0 error 0 warning ② `pnpm format:check` 退出码 0 ③ tsc 0 ④ 单测全绿（格式化不改语义）⑤ 21 处死代码真删掉、不是 disable ⑥ **红线文件零改动**（`git diff` 不含 `lib/agent/index.ts`）⑦ 4 处查表函数豁免带理由注释 ⑧ 钩子实测挡得住 ⑨ `pnpm dev` 页面不变（✅ ①–⑧ 全过：单测 **748/748**、钩子 A/B 两侧实测、`pnpm lint`/`format:check`/`type-check` 三脚本退出码 0；⑨ 只做了**冒烟** —— `/` `/repos` `/api/sessions` 全 200、dev 日志无报错，**人工交互没点**（用户 09-22 明确不做真机），见详案 8.2） | 已交付 |
+
+| C47 | **`bash` 子进程继承父进程全部环境变量** —— 模型一条 `echo $env:DEEPSEEK_API_KEY` 就能把你的 key 读走（**既有暴露，非 C1 引入**）：是否清洗、清洗到什么程度 | 2026-09-22 实读 `lib/tools/bash/bash-runner/index.ts:105-115`（`bashProcessEnv` 把 `...base` 原样展开，**一个都不删**，只加了 NO_COLOR / TERM / PAGER / GIT_PAGER）+ `lib/config/index.ts:119`（key 从 `process.env` 读）+ 本机实测 `.env.local` 含该键；对照 **DSH `scrubbedParentEnv`**（删掉名字含 KEY / PASSWORD / SECRET / TOKEN 的变量 —— `doc/plan/c1-mcp.md` 5.6 有 file:line） | — | — | 未开始 |
 
 #### 7.3.4 项目级事项（不属于任何功能/优化）
 
