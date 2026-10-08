@@ -15,6 +15,11 @@
    - **主动复盘**：带用户回顾"这个功能到底教了什么"，梳理核心概念、关键设计决策、踩过的坑。
    - **确认理解，不急着 commit**：不要机械地问"要不要提交"——commit 是教学收尾的一步，不是终点。先确认用户掌握了这个知识点，再谈提交。
    - **教学 > 代劳**：用户问"为什么/怎么做的"，要讲清机制和取舍（"抄谁、为什么抄、不抄会怎样"），而不是只给结论。做中学的价值在"想明白"，不在"代码跑通"——**但"想明白"的最终证据是作品：别人能跑通、且知道它什么时候会失败**。
+   - **⭐ 术语必须当场括注（2026-09-22 用户要求，硬规则，不设例外）**：输出里出现**任何**专业名词 / 缩写 / 行话，**必须紧跟一个括号说明**——**第一次出现时尤其**。判据只有一条：**读者不需要为了看懂这句话而中断去搜**。
+     - 反例（用户当场提的）：只写「TTL」，不写「TTL（Time-To-Live，"这结果能新鲜多久"的时间上限）」—— 读者得先搞懂 TTL 才能听懂你在说什么，**理解成本被转嫁给了他**。
+     - 正例：`stdio（标准输入输出；这里指"起一个子进程，用它的 stdin/stdout 一问一答"）` · `幂等（同一个请求做多次，结果和做一次一样）` · `SSRF（服务端请求伪造：骗你的服务器去访问它本不该访问的内网地址）`。
+     - **⚠️ 详案 / 计划 / 周报同样适用**：那些文档是给**未来的自己**看的，**那时的你也可能忘了这个词** —— 而且他没法追问。
+     - **为什么是硬规则**：这门课的收益全在"想明白"；读者卡在一个词上，**后面整段推导就全丢了** —— 而代价只是我多打一行括号。
    - **⚠️ agent-loop 是红线（2026-08-24 用户明确要求，2026-08-26 加固为文件级，2026-09-01 路径随目录化更新）**：**红线文件 = `lib/agent/index.ts`（引擎核心循环 + `RunAgentLoopOptions`/`runAgentLoop` 签名）。凡 git diff / 暂存列表出现该文件——哪怕只改一行注释——必须先精读 pi 的对应实现 → 对比 → 展示结论 → 由用户判断，不允许直接修改、不允许"顺手微调"。** 引擎是"内核"，内核的任何改动都比新功能更需要先对齐参考项目（pi）。三条执行纪律：
      - **触发不看"算不算"**：diff 里出现 `lib/agent/index.ts` 即触发，不做"这次改动是否涉及 loop"的主观判断——文件级红线没有模糊地带。
      - **禁止顺带**：红线文件的改动必须**独立成一个 commit**，禁止混在功能 commit 里"悄咪咪"带过；混入时整个 commit 停下来单独走流程。
@@ -119,7 +124,7 @@
 - ⭐ **`danger-full-access` 下这些全部消失**（2026-09-22 实测）：`node node_modules/vitest/vitest.mjs run --pool=threads` → **748/748 全绿、不需要任何 shim**；`pnpm dev` 能起且 `GET /` 200；`prettier .` 不再撞 `.tmp_pdf` 的 EPERM。
 - **要真跑起来，加 `danger-full-access`**；给了之后 `pnpm test` / husky / `prettier .` 都正常。
 - **`pnpm <script>` 会撞 store 版本**：DSH 自带的 pnpm 是 **11**，而本仓库 `node_modules` 是 **pnpm 10** 装的 ⇒ 报 `runDepsStatusCheck` 或 `ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY`（**不是脚本坏了**）。正解：`& 'C:\Users\25082\AppData\Local\pnpm\pnpm.CMD' <script>`。**别为此 `pnpm install` 整库重装**（会重建 node_modules 且把 lockfile 搅动）。
-- **沙箱起不了常驻 dev server**（`next dev` fork 报 EPERM）——约 30 秒短暂窗口可 curl 冒烟；**浏览器交互验证必须用户自己跑 `pnpm dev`**。
+- **沙箱起不了常驻 dev server**（`next dev` fork 报 EPERM）——约 30 秒短暂窗口可 curl 冒烟。⚠️ **2026-09-22 更正**：**起 server 仍要人**（用户手动 `pnpm dev`，或 AI 申请 `danger-full-access` 自己起），但**起好之后浏览器验证 AI 能自己做**——见下面「浏览器 MCP」。
 - `tsc --noEmit` 沙箱可跑（exit 0）。
 
 **真机验收（浏览器里让模型跑命令）** ⚠️ 2026-09-20 连栽两次，教训写在这里
@@ -127,10 +132,21 @@
 - ⭐ **期望值必须自己先跑出来**，不许写"我以为会怎样"（第一版清单里两条期望当场被用户打回）：① `[Math]::Min(1,2)` 只在**受限语言模式的机器**上才报错 —— 环境依赖，换台机器这条判据**永远过不了门槛** ② `Select-String` 无匹配在 **pwsh 里退出码是 0**（把 bash `grep` 的"无匹配 → 1"当成了 pwsh 行为，那条必然红）。
 - 顺带记两条 pwsh 事实（C36 实测）：**造"退出码 0 但有报错"的确定性写法 = `1..3 | ForEach-Object { Write-Error "boom" }`** —— 错误流经原生重定向时 PowerShell **总是**序列化成 CLIXML（`Write-Error` / `Get-Item 不存在路径` / `throw` / 受限模式报错，四种都产出），**任何 Windows 机器都能复现**；解那个信封要先解 `_xHHHH_` 转义再洗 ANSI（实现见 `lib/process-output/`）。
 
+**浏览器 MCP（AI 自己验收 UI）** —— 2026-09-22 装好并实测通过
+- **MCP**（Model Context Protocol，模型上下文协议：让 AI 调用外部工具 / 数据源的通用接口标准）本机挂了两条，都是 **DSH 宿主层的连接** ⇒ **接给 AI 的，不是你项目 agent 的**（你项目自己的 MCP 客户端是 `C1`，还没做）：`chrome-devtools` = Google 官方 `npx -y chrome-devtools-mcp@latest`（29 把工具）；`playwright` = Microsoft 官方 `npx @playwright/mcp@latest`（25 把）。
+- ⭐ **分工（实测出来的，别照直觉选）**：**要图 / 看视觉 → `chrome-devtools`**（`take_screenshot` 把图**作为附件直接送回 AI**）；**要操作 / 读结构 → `playwright`**（无障碍树（accessibility tree，浏览器给读屏软件生成的那份页面语义结构）紧凑、带 `ref=eN` 句柄，能 `click` / `type`）。
+- ⚠️ **坑 1：playwright 的截图不能传 `filename`**。传了 → 只存成 `.playwright-mcp\<名>.png` 且**只回一个路径**（AI 看不到图）；**不传 → 图作为附件回来**。要 AI 看的截图，一律省略 `filename`。
+- ⚠️ **坑 2：playwright 写的文件 AI 读不到**。快照 `.yml` / console `.log` / 截图 `.png` 全落进 `.playwright-mcp\`，而该目录**不在工作区里**（仓库 / DSH 目录 / 用户目录 / TEMP 都搜过，一个都没找到）⇒ 对 AI **只写不读**。**好消息**：它不污染仓库，`git status` 干净。
+- ⚠️ **坑 3：验收时必然撞上审批弹窗**，它有**四档** —— `Y 允许` / `A 本会话允许` / `P 一直允许` / `N 拒绝`，**别按"只有允许 / 拒绝两档"去找按钮**。审批模式默认「建议」时 `bash` 这类工具必弹。
+- **落地判据**：dev server 一起来，「改完 UI 对不对」就不再只能靠 `tsc` + 单测 + 用户口述 —— 可以自己点、自己看 console / 网络 / 视觉。
+
 **判退出码 / 判"干净"**
 - ⚠️ **`node … 2>&1 | Select-Object -Last N` 会让 `$LASTEXITCODE` 变成 1**（PowerShell 把原生 stderr 当错误记录）——**"全绿但退出码 1"就是这么来的假象**。要判真实退出码：重定向到文件，再单独读 `$LASTEXITCODE`。
 - ⚠️ **`tsc` 绿 ≠ 没有垃圾**：tsconfig **没开 `noUnusedLocals`**，删代码后留下的死导入（`readFileSync` / `writeFileSync` / `messageText`）它一个字都不报。**删完代码要另眼看一遍导入**，别把"类型自洽"当成"干净"。
 - **node 不能直接跑 TS**：临时脚本 = `tsc` 编译到临时目录 + node 跑产物；顶层 await 包进 `main()`。
+- ⚠️ **`Get-Content` 数行数会给出假数字（2026-09-22 实测，差点让我误报"文件被写坏了"）**：同一个 **881 行**的 md，`(Get-Content $p).Count` 报 **692**、`| Measure-Object -Line` 报 **584**、`Get-Content -Raw` 数 `` `n `` 报 **691** —— **三个方法三个错数，互不相同**；而 `read` 工具 / `grep`（ripgrep）/ `node -e "readFileSync().split('\n')"` **三家一致报 881**。
+  - **要核行数、或核"文件有没有丢内容"，只用后三家；`Get-Content` 的计数不可信。**
+  - **同族陷阱**（和上面那条"退明码 1"、以及沙箱那几条 EPERM 一样）：**它们都伪装成"文件坏了 / 代码坏了"** —— 先怀疑测量工具，再怀疑被测对象。
 
 **Git / PowerShell**
 - ⚠️ **`git add -A` 会把未跟踪文件一起吞进 commit**（实测：写在仓库根的提交信息文件被提交了，`create mode 100644`）。正解：① 用 `git add -u` + 显式列出新路径 ② **把提交信息文件放到仓库外**。事后只能 `--amend`——**只对"未推 + 尚未被任何文档引用 hash"的 commit 安全**。
