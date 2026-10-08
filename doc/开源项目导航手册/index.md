@@ -21,10 +21,13 @@
 | Survey（综述） | [survey.md](survey.md) | ETCLOVG 七层分类法，学术坐标系 |
 | langchainjs | [langchainjs.md](langchainjs.md) | LangChain JS：新一代 agent 框架 + middleware 生态 |
 | opencode | [opencode.md](opencode.md) | 终端 Agent 完整实现（TS，dev 分支） |
+| pi-web | [pi-web.md](pi-web.md) | **基于 pi 核心包的 Web 外壳**（Next.js）：agent 内核怎么套产品层 / 接缝在哪 |
 
 > **2026-09-14 更新**：codex 这半个月（617 commits）的重心是 **app-server（~1010 文件改动）/ 扩展体系 ext / 远程执行 exec-server / Guardian 评审 / Windows 沙箱 / 网络策略**——上表的 codex 行按这次侦察重排，入口详见 [codex.md](codex.md) 的「最新动向」一节。
 
 > **新增项目流程**：见 [sop-新增参考项目.md](sop-新增参考项目.md)（确认项目存在 → 架构解析 → 填导航卡 → 回填 → 验收）。
+
+> **附件**：[pi-接缝清单.md](pi-接缝清单.md) —— pi 的**三层接缝**（`pi-agent-core` 循环内核 / `harness` 会话内核 / `pi-coding-agent` 产品层）+ 真实 `file:line` + 「带去业务项目填」的对照作业单。**要梳理一个基于 pi 核心包开发的业务 agent 时，从这里入手**（先钉基准，再对号入座）。
 
 ---
 
@@ -52,6 +55,8 @@
 | **工具子系统的架构约束**（单执行入口 / 可见性≠授权 / 捕获上限与模型上限分离） | **opencode** | ⭐ 先读 `opencode/packages/core/src/tool/AGENTS.md` ⚠️ 工具**两套并存**，实现要 `core/src/tool/` + `opencode/src/tool/` 两处都看 |
 | **工具输出超限落盘 + 可回读**（`outputPaths` 回给模型） | **opencode** | `opencode/packages/core/src/tool-output-store.ts`（2000 行 / 50KB / 保留 7 天） |
 | **本地联网搜索**（本地起 HTTP，走 MCP 调 Exa / Parallel） | **opencode** | `opencode/packages/core/src/tool/websearch.ts` |
+| ⭐ **给已有 agent 内核套 Web 外壳**（进程内 SDK 宿主 / 命令+SSE 双通道 / 会话生命周期） | **pi-web**（新增，站 pi 产品层外） | 先读 [pi-web.md](pi-web.md) 的「主流程串线」，再进 `pi-web-main/lib/rpc-manager.ts` |
+| **基于 pi 核心包的"接缝对照作业单"**（业务 agent 在 pi 的哪些口子上挂了东西） | **pi-web**（或任何 pi 二开项目） | [pi-接缝清单.md](pi-接缝清单.md) + `pi-web-main/lib/rpc-manager.ts:2041/2108` |
 
 ---
 
