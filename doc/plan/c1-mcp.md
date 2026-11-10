@@ -4,6 +4,8 @@
 > **素材来源**：`PLAN.md` 需求池 C1 行（2026-09-21 定项）+ **2026-09-21 本地参考项目侦察**（五家一手，file:line 在下文）+ 我们自己的接缝实读。
 > ⚠️ **「详细设计」与「验收」都还是草稿 v0**（六 / 七，各自标着 ⛔）—— **没定案就不许开工。**
 
+> ⚠️ **2026-11-05 补记（读 §5.5 之前先看这条）**：主参考 **pi 已从 `0.99.0`（2026-09-29）起内置 MCP** —— **§5.5 的结论作废**。证据链、形态摘要、以及对 §5.5 三条理由的逐条复核，全在 **§十一**。决策表相应多了第 12 条（`6.9-11`）。
+
 ---
 
 ## ⭐ 回来先读这一段（冷启动入口 · 2026-09-22 写）
@@ -46,6 +48,10 @@
 ⭐ **所以"用官方包"有两个选项，而不是一个** —— 那个巨石 `sdk` 会把 express + hono 拖进来（我们**完全用不上**，我们不是 server）。
 
 **⚠️ 必须同时纠正一个可能的误解**：**"用 SDK ⇒ 功能就完善了"是错的。** SDK 省的是**协议管线**；`6.9` 那 11 条里**它只碰第 0 条本身** —— 剩下 10 条（命名 / 撞名 / 安装同意 / 审批重构 / 生命周期 / 读数 / `instructions` / 依据 / 配置 / 默认吵不吵）**SDK 一条都不管**，全是**产品决策**。详见 `6.9` 与 `9.3`。
+
+> ⭐ **2026-10-08 核实**：**"用官方包"里还有第三条路** —— 官方 `Client`（会话层）+ **我们自己的 transport**（自己 spawn、自己分帧）。**已核实成立**，官方明确支持自带 stdio 传输。三条路线的分界 + 接口原文见 **6.9-0a**；若选它，还附带一个子开关（`versionNegotiation.mode`）见 **6.9-0b**。
+> ⚠️ 同一次核实**纠正了两处低估**：① **官方包不替我们分帧**（`Transport.send` 收的是**已解析**的消息，不是字节）② `client` 那一层**不是薄壳** —— 它内建两代协议协商 / 响应缓存 / `listChanged` / elicitation / 内存直连对。**所以 6.9-0 的代价模型要按 6.9-0a 重算。**
+> 📄 **C47 的材料文件已建**：`doc/plan/c47-bash-env-scrub.md` —— 2026-10-08 从官方包捞到的**白名单**对照（`getDefaultEnvironment()`）已回填进去。**它仍然不属于 C1 的范围。**
 
 > ⚠️ **本段 2026-09-22 当天被 AI 写错过一次**：AI 一度把用户的"**正在权衡**"读成"**已拍板：节前不决定、不开工**"并写进了这里，当天修正。**记住这条**：**"用户正在想" ≠ "用户拍了"** —— 池子/详案里凡标 ⭐ 已拍的，都要能指回用户的原话。
 
@@ -521,7 +527,10 @@ maxTurns · beforeToolCall · onEvent · signal · onToolOutput
 | 错误 | `result.isError` → **抛 `ToolException`**（`tools.ts:837-839`）；兜底 `:1174` | ❌ 反例（对"给模型自纠"不友好）—— 但它服务的框架需要异常 |
 | 工程细节 | schema 为 LLM 简化：`dereferenceJsonSchema` → `simplifyJsonSchemaForLLM`（`:1244,1250`）；连接失败策略可配 `onConnectionError`（`throw` 默认 / `ignore` / 函数）（`types.ts:696`）；`throwOnLoadError` | ✅ **schema 简化**值得抄；失败策略"可配"比"写死"好 |
 
-### 5.5 pi（`E:\agents-read\pi`）—— ⚠️ **我们的主参考明确"不做 MCP"**
+### 5.5 pi（`E:\agents-read\pi`）—— ⚠️ **我们的主参考明确"不做 MCP"** · ⛔ **本节结论已作废（2026-11-05）**
+
+> ⛔ **结论作废，原文保留。** pi 从 **`0.99.0`（2026-09-29）** 起内置 MCP；本节下面引的两句原话（`README.md:501` "No MCP." / `usage.md:310` "It intentionally does not include built-in MCP"）在 **1.5.0 里已经 grep 不到**。
+> **为什么留着原文**（`AGENTS.md` 第 10 条）：补记不覆盖原文 —— 要看得见"2026-09 当时凭什么这么判"。**替代结论见 §十一。**
 
 **这条必须让用户看见**（它是"该不该做"的反方论证，不是遗漏）：
 
@@ -536,7 +545,7 @@ maxTurns · beforeToolCall · onEvent · signal · onToolOutput
 2. 它的扩展模型**不是更安全的边界**：`README.md:414` 原文 "Pi packages run with full system access." —— 比 MCP 的"外部进程 + 显式配置"面更大。
 3. 它明确**没有 permission popups**（`usage.md:310`），而我们**有**审批面 —— 它不需要 MCP 的审批问题，我们有。
 
-⇒ **结论**：C1 的理由**不是"pi 做了"**（它没做），而是：① 七层对照表把 **T 层唯一的洞**标在这里 ② 作品判据要求"**能力面不能有洞**"。**这是一个需要被拍板的取舍，不是既定事实。**
+⇒ **结论**：C1 的理由**不是"pi 做了"**（⚠️ 2026-11-05 更正：这句在 2026-09 成立，pi 现已内置 MCP，见 **§十一**），而是：① 七层对照表把 **T 层唯一的洞**标在这里 ② 作品判据要求"**能力面不能有洞**"。**这是一个需要被拍板的取舍，不是既定事实。**
 
 ### 5.6 DSH（`E:\agents-read\deepseek-harness`）—— **工程细节最硬的一家（三条别家没有）**
 
@@ -668,11 +677,14 @@ maxTurns · beforeToolCall · onEvent · signal · onToolOutput
 
 `resources` · `prompts` · **elicitation / MRTR** · OAuth（stdio 本就 SHOULD NOT 走它）· `listChanged` 订阅 · Legacy `initialize` 兼容 · 多模态附件 · 前缀可关 · resources/prompts 相关的三个内建工具。
 
-### 6.9 ⛔ 决策页（**唯一正本** · 拍完即定稿 · 共 11 条）
+### 6.9 ⛔ 决策页（**唯一正本** · 拍完即定稿 · 共 12 条）
 
 > ⚠️ **从 5 条变成 11 条**：4.1 收窄出 5 条，**写详案时又冒出 6 条**（标「新」的）—— 是"落到字面上才发现"，不是之前漏看。**别处不再重复列。**
 >
 > **拍法建议（2026-09-21）**：只有 **5 条**需要你主动拍（`0 / 2 / 3 / 4 / 5`，因为它们各自有真代价）；其余 **6 条**是"选个默认值就行"。你只要说一句「**按暂定走，第 X 条改成 Y**」就够了 —— ⚠️ **但沉默不算同意**，我不会自己把暂定当已拍。
+
+> ⚠️ **2026-11-05：多了第 12 条（`6.9-11` 工具暴露分级）** —— pi 1.5.0 内置 MCP 后暴露出来的新问题，来龙去脉见 **§十一**。它**属于"要你主动拍"**那一类 ⇒ 现在要主动拍的是 **6 条**。本文其余地方凡写「11 条」「5 条主动拍 / 其余 6 条」的，都是 **2026-09 的形态，保留不改**（时间线）。
+> ⚠️ **顺带一条悬空引用（本次未动）**：`2.3` 与 `2.4` 说「6.9 第 11 条（elicitation）」，但**本表没有任何一行是 elicitation**（`6.8` 明确第一版不做它）—— 属既有悬空引用，待核。
 
 | # | 题目 | 两条路的代价 | 暂定（我的建议） | 新? | 要你主动拍 |
 |---|---|---|---|---|---|
@@ -687,6 +699,58 @@ maxTurns · beforeToolCall · onEvent · signal · onToolOutput
 | 6.9-8 | 依据换不换（Cline 不在本地） | 划掉 = 少一次克隆；保留 = 按 §11.6 走完整流程（确认存在 → 架构解析 → 导航卡 → 回填） | **划掉 Cline**（第一依据 = 规范 + 本地五家） | — | — |
 | 6.9-9 | 配置住哪（`config.mcp` 段 vs 项目级文件） | `config` 段 = 快、与现有配置入口一致；项目级文件 = 与 `C32` 一致，代价是**两件事必须一起定** | **与 `C32` 一起看**（本项暂不动这块地） | — | — |
 | 6.9-10 | 审批默认吵不吵（"缺注解就问" = 每次弹框） | 先接受吵 = 安全、可能烦；立刻"按 server 记信任" = 安静，代价是放宽（且与规范 SHOULD 更远） | **先接受吵**，用实测数据再决定 | — | — |
+| **6.9-11** | ⭐ **要不要做"工具暴露分级"（exposure＝这把工具以什么身份存在：模型直接看见 / 按需加载 / 只能脚本里调 / 隐藏）** | **不做**（第一版一律 `direct` 平铺进 `definitions()`）= 零新机制，代价是**外部 server 的工具直接进模型清单**：14 把 + 一个 server 就可能越过 `tool_search` 的触发线（>20）；**做** = 与 pi 1.5 同形，但 `codemode` / `deferred` 两档**依赖我们还没有的两样东西**（脚本执行器 / `tool_search`）⇒ 等于把 C1 撑成三个功能 | **不做**：只做 `direct` + 前缀 + 审批 `ask`；把"越过 20 线"写成 C1 的**已知风险**，交付后立刻评估（依据：§5.7② 的规模行 · §6.8 第一版裁剪 · 我们仓库里既无 `tool_search` 也无脚本执行器） | 新 | ✅ |
+
+### 6.9-0a ⭐ 核实结果（2026-10-08 · 直读官方包类型定义）
+
+> **为什么有这一节**：原 `6.9-0` 只写了"自研 vs SDK"两条路，**没人核实过"能不能只用 SDK 的会话层、把传输握在自己手里"** —— 而那恰恰是我们想要的（进程策略必须在我们手上，见 5.7④ 与 6.4）。
+> **怎么读到的**：`node` 从 npm registry 取 tarball（**1,552,450 字节**）解到**仓库外**临时目录，读 `dist/*.d.mts` —— **只读公开类型定义，没读实现，没有装进本项目**。
+
+**① C 路线（官方 `Client` + 自带 transport）成立 —— 且官方为它设计过**
+
+| 事实 | 原文 / 位置 |
+|---|---|
+| `Client.connect` 收**任何** `Transport` 实现 | `connect(transport: Transport, options?: ConnectOptions): Promise<void>`（`dist/index.d.mts:2041`） |
+| `Transport` 是**公开接口**，共六样（三方法 + 三回调） | `start()` · `send(message: JSONRPCMessage, options?): Promise<void>` · `close()` · `onclose` · `onerror` · `onmessage(message: JSONRPCMessage)`（`dist/index-D4xIIEF6.d.mts:1693-1707`） |
+| ⭐ 官方**点名支持自带 stdio 传输** | 版本协商注释里两次出现 "…**in place for custom stdio-shaped transports**"（`dist/index.d.mts:1542,1577`） |
+
+⚠️ **一处必须纠正的直觉**：`Transport.send` 收的是**已解析的 `JSONRPCMessage`，不是字节** ⇒ **分帧（字节 ↔ 消息）仍归传输层**。所以 C 路线省下的**不是**分帧。
+
+**② 三条路线的真正分界（修正 9.3 的"缩成 4 块"）**
+
+| 路线 | 我们自己写 | 官方包给 | 基座块数 |
+|---|---|---|---|
+| **A** 全自研 | 全部六块 | — | 6 |
+| **C** 官方 `Client` + **自带 transport** | `naming` · **`framing`** · **`transport`** | **`client`（会话层）** | 5 |
+| **B** 官方 `Client` + 官方 stdio 传输 | `naming` · `tools` · `manager` | `framing` · `transport` · `client` | 3 |
+
+**③ 最该记住的一条：`client` 那一层**不是**薄壳（6.1 把它低估了）**
+
+`6.1` 的表述是"连接 + `tools/list` + `tools/call` + id 关联 + 每请求超时"。实测它的公开面还包括：
+
+| 官方包**内建**的东西 | 位置 / 意味着什么 |
+|---|---|
+| **两代协议 + 版本协商** | `VersionNegotiationMode = 'legacy' \| 'auto' \| { pin }`，**默认 `'legacy'`**；`'auto'` 要先发 `server/discover` 探测，还要处理规范强制的 **`-32022`「选一个共同版本继续」**修正步（`index.d.mts:1527-1599`） |
+| 探测用的**兄弟进程**机制 | 官方自家 stdio 传输会另起一个"随时可弃"的兄弟进程（理由写得很具体：**收到未 `initialize` 就退出的 server 必须判成 legacy**）；**自带传输则原地探测**（`:1570-1578`）⇒ 与 6.9-0b 那个子开关直接相关 |
+| 现代代次的**每请求 `_meta` 信封** | `:1958-1968` |
+| **响应缓存**（TTL / `cacheScope` / 逐方法失效） | `_cache` · `_defaultCacheTtlMs` · `_listMaxPages`（`:1896-1911`） |
+| **`listChanged`** 防抖 + 自动开订阅 | `_listChangedDebounceTimers` · `_autoOpenedSubscription`（`:1911,1930`） |
+| 输出 schema 校验（`./validators/*` 可插拔） | `_jsonSchemaValidator`（`:1895`） |
+| **`input_required` 驱动 = elicitation / MRTR** | `_inputRequiredDriverConfig`（`:1920`） |
+| 请求超时默认值 | `DEFAULT_REQUEST_TIMEOUT_MSEC` |
+| ⭐ **内存直连对**（单测用） | `InMemoryTransport.createLinkedPair()`（`index-D4xIIEF6.d.mts:2485`）—— **7.5 里打算"自己写十几行"的东西，包里现成** |
+
+⇒ **两条推论**：
+
+1. **`6.9-0` 的真实代价模型不是"省两百行分帧"**，而是"**省下整个两代协议协商 + 缓存 + 变更订阅 + elicitation 管道**"；代价是直接依赖 10 → 17（选 `client`），且**这些能力会在包里存在**。
+2. **走了官方包之后，"不做 elicitation / 不做缓存 / 不订阅 `listChanged`"从"不实现"变成"不暴露"** —— 这直接决定 `6.8` 那份能力声明怎么写，也决定「要么不做、要么做全」该怎么复核：**自己的实现里"没有"很干净；官方包里"有但没启用"必须写清楚。**
+
+### 6.9-0b ⛔ 若选 C，附带一个子开关：`versionNegotiation.mode`
+
+- **`'legacy'`（默认）** = 不做协商，直接走 2025 那套 `initialize` 握手 —— 官方原话是"**与不设此选项的客户端逐字节相同**"。
+- **`'auto'`** = 先探测 `server/discover`；⚠️ **自带传输时探测在我们的传输上"原地"跑**（官方原话），对我们的 `transport` 实现要求更高 —— 官方自家传输才用兄弟进程规避。
+- **`{ pin: '<版本>' }`** = 严格钉在现代代次，不符合就大声失败。
+⇒ **要拍的是**：我们要不要"现代代次"（2026-07-28+）？规范读的是 2026-07-28，但**包的默认是 `'legacy'`** —— 这一条决定了我们实际跑在哪一代协议上。
 
 ### 6.10 参考实现索引（动手时按需打开，别重读）
 
@@ -770,12 +834,13 @@ maxTurns · beforeToolCall · onEvent · signal · onToolOutput
 
 ## 八、⚠️ 缺什么才能定案
 
-- [x] 五家一手对照（每节带 `文件:行号`）：**smolagents 5.1 · opencode 5.2 · codex 5.3 · langchainjs 5.4 · pi 5.5（明确不做）· DSH 5.6** → 收口见 **5.7**（2026-09-21 全部到位）
+- [x] 五家一手对照（每节带 `文件:行号`）：**smolagents 5.1 · opencode 5.2 · codex 5.3 · langchainjs 5.4 · pi 5.5（明确不做）· DSH 5.6** → 收口见 **5.7**（2026-09-21 全部到位；⚠️ **2026-11-05 更正：pi 0.99.0 起已内置 MCP，5.5 作废 → §十一**）
 - [x] spec 2026-07-28：`server/tools` ✅（2.4）+ **传输 / 版本 / 安全**（2.5，7 个页面全 HTTP 200）—— ⚠️ 详案引用具体措辞时回 2.4/2.5 核锚点（网页无行号，按小标题定位）
 - [x] **详细设计草稿 v0**（六，含 6.10 参考实现索引 · 行号已自核）· **验收草稿 v0**（七：7.1 单测 8 条 / 7.2 真机 / 7.3 失败清单 F1–F9 / 7.4 出口 / **7.5 夹具来源**）—— ⛔ 未定稿
 - [ ] **6.9 的 11 个开关拍完** ⇒ 详案 + 验收定稿 ⇒ 状态改 `已纳入 I<n>` + 建 `doc/iteration/i<n>.md`（**这一步之前不许写产品代码**）
 - [ ] ⚠️ **"要么不做、要么做全"已定（2026-09-22）⇒ 6.9 里那些按「最小版」写的裁剪项要重过一遍**（第一版不做缓存 / 前缀可关 / 不做 elicitation / 不做 resources·prompts …）—— 见文件头部「回来先读这一段」第 5 条
-- [ ] ⚠️ **`ttlMs` / `cacheScope` 接不接**（2026-09-22 才补进 2.4）—— 它决定 `manager` 存不存缓存
+- [ ] ⚠️ **`ttlMs` / `cacheScope` 接不接**（2026-09-22 才补进 2.4）—— 它决定 `manager` 存不存缓存。⚠️ **2026-10-08 新证据**：走 **C / B** 时官方 `Client` **内建响应缓存**（`_defaultCacheTtlMs` / `cacheScope`）⇒ 问题从"我们自己存不存"变成"**启不启用它、信不信它的缓存**"。见 **6.9-0a ③**
+- [x] ⭐ **6.9-0 的"第三条路"已核实**（2026-10-08）：**C（官方 `Client` + 自带 transport）成立**，官方明确支持自带 stdio 传输 —— 接口原文与行号在 **6.9-0a**；顺带修正了 **9.3** 的映射，并提出子开关 **6.9-0b**
 - [ ] ⭐ **`Skills over MCP` 扩展与 `C37` 的关系**（2026-09-22 从规范的 Extensions 挖到）—— 是否影响 C37 的走向
 - [x] ~~**bash 子进程继承全部环境变量**~~ —— **不是本项的缺口**；2026-09-22 已单独入池 `PLAN.md` 的 **C47**
 - [x] ~~`mcpadapt` 内部行为~~ —— 影响面已被 codex / DSH / opencode 三家覆盖，**不再当阻塞项**（但仍是"没读到"的事实）
@@ -845,7 +910,7 @@ maxTurns · beforeToolCall · onEvent · signal · onToolOutput
 
 | 决定 | 落在哪 | 影响 |
 |---|---|---|
-| **6.9-0** 自研 vs SDK | ② framing + ④ client **由谁写** | 自研 = 图上 6 块；SDK = 这两块被库顶掉、基座缩成 4 块，代价是依赖数 10 → 27+ |
+| **6.9-0** 自研 vs SDK | ② framing + ④ client **由谁写** | ⚠️ **2026-10-08 修正（证据见 6.9-0a）**：官方包**不替我们分帧**（`Transport.send` 收的是已解析消息）⇒ 要分两种 —— **C**（官方 `Client` + 自带 transport）= 只有 ④ 被顶掉（6 块 → **5 块**）；**B**（连官方 stdio 传输一起用）= ②③④ 都被顶掉（→ **3 块**）。代价：直接依赖 `client` 10 → 17 / `sdk` 按原记 10 → 27+ |
 | 6.9-1 名字上限 64/128 | ① naming 的一个常量 | 只影响超长名怎么截断 |
 | **6.9-2** 撞内置工具 | ⑤ tools → 装配点 | 拒绝加载 = 该 server 一把都进不来；只跳过 = 其余能用、但清单少一把（读数里必须明说） |
 | 6.9-3 安装同意框 | **图外**（UI / `app/`） | 图里只管"记档/状态" |
@@ -856,8 +921,9 @@ maxTurns · beforeToolCall · onEvent · signal · onToolOutput
 | 6.9-8 Cline 当不当依据 | **不是代码**（文档） | 不影响任何一块 |
 | 6.9-9 配置住哪 | 图的**入口** | 与 `C32` 一起定 |
 | 6.9-10 审批默认吵不吵 | ⑤ tools 的**默认值**（放行逻辑在关口） | 决定第一次用远端工具弹不弹框 |
+| **6.9-11** 工具暴露分级 | ⑤ tools **进不进 `definitions()`**（装配方式） | 不做 = 外部工具全平铺进清单（逼近 20 线）；做 = 要连带 `tool_search` / 脚本执行器 |
 
-**统计**：改基座本体 6 条（0 / 1 / 2 / 5 / 9 / 10）· 改基座与外面的接口 1 条（4）· 图外 3 条（3 / 6 / 7）· 不是代码 1 条（8）。
+**统计**：改基座本体 7 条（0 / 1 / 2 / 5 / 9 / 10 / 11）· 改基座与外面的接口 1 条（4）· 图外 3 条（3 / 6 / 7）· 不是代码 1 条（8）。
 **真正决定"基座形状 + 工作量"的只有 2 条**：**6.9-5**（⑥ 存不存在）与 **6.9-4**（关口改不改、要不要动红线）。
 
 ### 9.4 基座不做的事
@@ -888,7 +954,7 @@ maxTurns · beforeToolCall · onEvent · signal · onToolOutput
 | **opencode** | **交互式 CLI 向导**（`@clack/prompts`）`opencode mcp` | `opencode.json` 的 `mcp` 段（用 `jsonc-parser` 改）；条目 `type: "local" \| "remote"`，remote 有 `oauth` | `packages/opencode/src/cli/cmd/mcp.ts:53-66`（`type === "remote"` + oauth 判定）；`mcp/auth.ts` · `mcp/oauth-provider.ts` · `mcp/oauth-callback.ts` · `mcp/browser.ts` |
 | **DSH** | UI 在**宿主层**（客户端不读配置文件） | 服务器清单**按会话由宿主传入**（ACP `newSession`） | `packages/acp/acp/src/mcp.ts:41-72`（`command` 必须**绝对路径** · 拒绝重名 · `url` 必须是 http(s)）· `acp/src/session.ts:135` 挂载 |
 | **smolagents / langchainjs** | **没有"添加"这回事** —— 它们是库 | 写在代码里 | 5.1 / 5.4 |
-| **pi** | **不做 MCP** | — | 5.5 |
+| **pi** | ⚠️ **2026-11-05 已反**：**内置 MCP**（`pi mcp add\|list\|login\|logout` + 会话内 `/mcp`）；"不做"是 `0.99.0` 之前的形态 | `~/.pi/agent/mcp.json`（用户级）+ `.pi/mcp.json`（**要先授予 project trust 才读**） | §十一 · `docs/mcp.md` |
 | **Claude Desktop** | 改配置文件 + 重启（本页官方教程的形态） | ⚠️ 本轮**只核到**：前置条件是**装 Node.js**（server 要运行时）、官方教程承诺"**every action 都要你显式许可**"；具体配置文件名/路径**未在本轮一手核到**（要用时补） | [Connect to local MCP servers](https://modelcontextprotocol.io/docs/2026-07-28/develop/connect-local-servers) |
 
 ### 10.3 三条观察（这才是给 6.9 用的）
@@ -902,3 +968,64 @@ maxTurns · beforeToolCall · onEvent · signal · onToolOutput
 1. **我们第一版只做 stdio ⇒ 我们拿到的就是"一行命令"，没有 URL。** 所以 6.9-3 那个同意框要显示的是**命令原文**（不截断），不是链接。
 2. **配置段就是真相**（`6.9-9`），UI 只是它的编辑器 —— 与 10.3① 一致；本项**不建市场、不接注册表**（那是另一件事，未入池）。
 3. **"首次启用要一次显式同意"不是我们的发明**，是规范的 MUST + 至少一家（VS Code）的现实做法 ⇒ 6.9-3 的暂定（前端一次弹框）有**两个独立依据**。
+
+---
+
+## 十一、补记：pi 1.5.0 已内置 MCP（2026-11-05）
+
+> **这是补记，不是新调研。** 起因：用户问「pi 现在（1.5）还不支持 mcp 吗」。
+> 下面每条事实都来自**本机检出实读**（`E:\agents-read\pi`，commit `d57c2d219`，2026-11-05；`git describe` = `v1.5.0-184-gd57c2d219`），不是转述，也不是印象。
+
+### 11.1 一句话
+
+**MCP 从 `0.99.0`（2026-09-29）起就是 pi 的内置功能**，1.5.0 只是继续往前推（OAuth 硬化、project overrides、CIMD…）。**§5.5 整节作废**，但原文保留 —— 那是 2026-09 的判断现场。
+
+### 11.2 证据链（每条都自己打开核过）
+
+| 事实 | 位置 |
+|---|---|
+| 版本 = `1.5.0` | `packages/coding-agent/package.json:3` |
+| 引入在 `0.99.0`（2026-09-29） | `packages/coding-agent/CHANGELOG.md:578`；`:582` New Features「**Codemode and MCP**」；`:590` Added「codemode, tool search, and **MCP support as built-in extensions**」（#10040） |
+| 有独立的客户端包 | `packages/mcp/` = `@earendil-works/pi-mcp`；`README.md:3` 原文："It does **not** depend on the official MCP SDK or other pi packages." |
+| 有真实现（不是只有文档） | `packages/mcp/src/`：`client.ts` · `transports/` · `oauth/` · `protocol/` · `naming.ts` · `input-schema.ts` · `output-limit.ts`；产品层 `src/core/mcp-servers.ts` + `src/extensions/mcp/`（10 个文件） |
+| 有文档 | `packages/coding-agent/docs/mcp.md`（274 行） |
+| ⭐ 有**官方一致性验收** | `packages/coding-agent/test/mcp-conformance/README.md:3,9` —— 跑 **官方 MCP conformance suite**（一致性测试套件：MCP 官方出的"你的客户端行为对不对"的公开测试集）并对比提交的 baseline，**CI 里有独立 job** |
+| 旧结论的两句原话已消失 | `README.md:501` / `docs/usage.md:310` 那两句在 1.5.0 里 **grep 不到** |
+
+### 11.3 它的形态（只写与 C1 直接相关的；术语当场括注）
+
+| 维度 | 它怎么做 | 出处 |
+|---|---|---|
+| 公开名 | `mcp__<server>__<tool>`；`[^A-Za-z0-9_]` → `_`（**连 `-` 也换**）；上限 **64**；超长或撞名 → `sha256(server\0tool)` 取 **8 位** 后缀 | `packages/mcp/src/naming.ts:10,23,25-26` |
+| 为什么连 `-` 也换掉 | 注释原文：`a-b` 与 `a_b` 会变成**同一个名字**，再靠 hash 后缀区分（对应真实事故 #10239） | `naming.ts:13-16` · `CHANGELOG.md:558` |
+| ⭐ **exposure 四档**（暴露级别：这把工具以什么身份存在） | `codemode`（**默认**——模型清单里根本没有它，脚本用 `searchTools()` 找）/ `deferred`（`tool_search` 加载后直接调）/ `direct`（像内置工具一样声明）/ `hidden`（注册但不可达） | `docs/mcp.md:191-206` |
+| 连带的自动启用 | 有 `codemode` / `deferred` 工具的 server 一连上，**自动激活 `codemode` / `tool_search`** | `src/extensions/mcp/index.ts:153` |
+| 清单规模怎么交代 | 这些 server **不进工具清单**，只进系统提示词的一个 `mcp_servers` 段（一行摘要） | `docs/mcp.md:204` |
+| resources（MCP 的另一类原语：可读的资源，不是"动作"） | 另造三个工具：`list_mcp_resources` / `list_mcp_resource_templates` / `read_mcp_resource`（与 Codex / OpenCode 同形） | `docs/mcp.md:240-246` |
+| 审批 | **不另造**：MCP 调用走既有的 `tool_call` / `tool_result` 门；server 自报的注解（`readOnlyHint` 这类"我只读"的自述）经 `pi.getAllTools()` **交给权限扩展**，**自己不下判断** | `docs/mcp.md:252-256` |
+| 配置 | `~/.pi/agent/mcp.json`（用户级）+ `.pi/mcp.json`（项目级，**要先授予 project trust 才读**） | `docs/mcp.md:32` |
+| 协议层 | **自研**，不用官方 SDK；协议版本 `2025-11-25`，兼容 `2025-06-18` / `2025-03-26` / `2024-11-05` | `packages/mcp/README.md:3,172` |
+| 关掉它的两个开关 | `--no-mcp`（单次运行）、`"extensions": ["-builtin:mcp"]`（长期） | `docs/mcp.md:230,268` |
+
+### 11.4 逐条复核 §5.5 的三条理由
+
+| # | 当时的话 | 现在 |
+|---|---|---|
+| ① | pi 的替代方案靠"工具带 CLI + README 载体"（用 Skills 封装 CLI） | **失效** —— 那是"它为什么**不需要** MCP"的解释；它现在自己接了 |
+| ② | 它的扩展模型不是更安全的边界（"Pi packages run with full system access."） | **仍成立**，与 MCP 无关 |
+| ③ | 它明确**没有 permission popups**，而我们有 | ⚠️ **未核** —— 原句（`usage.md:310`）已改；现在 MCP 调用走扩展的 `tool_call`/`tool_result` 门（`docs/mcp.md:254`），但"内置到底有没有弹框"**我没读**。**别当依据用。** |
+
+> ⚠️ 这一栏最值得记的不是结论，是**方法**：`pi.md` 导航卡上的"锚点"是 0.86.1，而检出已经 1.5.0 —— **参考项目会动，`file:line` 会烂**。这就是 §3.6 那条复核纪律的又一次实证。
+
+### 11.5 对 C1 的四条影响
+
+1. **反方论证消失**：C1 的第一依据里**再也不能引"pi 不做 MCP"**。理由回到原来那两条：七层对照表把 **T 层唯一的洞**标在这里 + 作品判据要求"**能力面不能有洞**"。
+2. **结论没变，代价模型要改**：pi 在 `0.99.0` 里是**三件事一起**加的（codemode + tool_search + MCP）。这是"**接 MCP 不便宜**"最硬的证据，正好印证 §5.7② 的规模行 —— 也直接催生了 `6.9-11`。
+3. **可抄项 +4**：`-`→`_` 归一（连 hash 后缀的理由一起）· **exposure 四档** · `.pi/mcp.json` + project trust 门禁 · **官方 conformance suite 当验收标准**。
+4. **一个反向印证**：我们 `6.9-0` 倾向"自研"，pi 也自研，而且它还能跑官方一致性测试 ⇒ "**自研 ⇒ 不合规**"不成立。但这**不改** 6.9-0 的代价模型（分帧 / 超时 / 版本协商仍要自己写对）。
+
+### 11.6 这次**没**做的（诚实边界，别当已核）
+
+- 只读了 `docs/mcp.md` **全篇** + `CHANGELOG` 的相关条目 + `naming.ts` / `extensions/mcp/{tools,config,index}.ts` 的**片段**（grep 命中行）。
+- **没通读** `packages/mcp/src/client.ts`（协议实现）与 `src/extensions/mcp/runtime.ts`（生命周期）⇒ **"连接是常驻还是按需"这条没核**，而它正是 `6.9-5` 的关键。下次要看就从 `runtime.ts` 进。
+- `apps/p2/` 下那套 MCP（`plugins/mcp`、`docs/mcp-durable.md`）是**另一个应用（Durable 版 p2）**的活，**不是 pi 产品线的形态**，别拿来当依据。

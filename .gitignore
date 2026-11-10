@@ -60,3 +60,4 @@ next-env.d.ts
 
 # 本地冒烟测试日志（E2 步骤3 起 dev server 时产生）
 dev-server.log
+.scratch
