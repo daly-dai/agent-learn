@@ -150,7 +150,7 @@ export function projectKey(cwd: string): string
 export function projectDir(root: string, cwd: string | undefined): string
 export function sessionDir(root: string, cwd: string | undefined, id: string): string
 export function sessionLogPath(root: string, cwd: string | undefined, id: string): string   // <sessionDir>/session.jsonl
-export function tracePath(root: string, cwd: string | undefined, id: string, runId: string): string // <sessionDir>/trace.<runId>.jsonl
+export function tracePath(sessionDirPath: string, runId: string): string        // <sessionDir>/trace.<runId>.jsonl
 export function encodeSegment(id: string): string   // 单射
 export function isValidSessionId(id: string): boolean
 ```
@@ -431,7 +431,7 @@ encodeSegment(id: string): string                  // 单射；非法码元 → 
 projectDir(root: string, cwd: string | undefined): string
 sessionDir(root: string, cwd: string | undefined, id: string): string
 sessionLogPath(root: string, cwd: string | undefined, id: string): string          // <dir>/session.jsonl
-tracePath(root: string, cwd: string | undefined, id: string, runId: string): string // <dir>/trace.<runId>.jsonl
+tracePath(sessionDirPath: string, runId: string): string // <dir>/trace.<runId>.jsonl
 isValidSessionId(id: string): boolean              // 从 manager 迁入，语义不变
 ```
 
