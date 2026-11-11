@@ -15,6 +15,9 @@
 import type { ToolCallContent } from "@/lib/types";
 import type { ToolDecision } from "@/lib/agent";
 
+/** 用户在弹框里的选择：前三种都是"允许"，只是信任期限不同（类型住 lib，这里转出给路由用） */
+export type { ApprovalOutcome } from "@/lib/permission/approval-outcome";
+
 /**
  * decideToolCall 的返回类型：ToolDecision 三选一（allow/block/rewrite）+ request。
  * request = "需要人工确认"——副作用（推帧/日志）由调用方执行，

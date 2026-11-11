@@ -159,39 +159,3 @@ describe("rename 原子写 —— 先写临时文件再替换", () => {
     }
   });
 });
-
-// ============================================================
-// delete 连带清理侧车（C18 A 档 ③）
-// ============================================================
-// 夹具的真实场景（AGENTS 11.5 ②）：审批日志是 <id>.approval.jsonl 侧车，
-// 而 delete 原来只 rm 主文件——实测存量里**已经有 3 个孤儿**
-// （s_2026-08-26T11-01-34-056Z_77przz / s_2026-09-01T02-59-02-629Z_homnjj /
-// smoke_s4b：会话早删了、日志还躺在 .sessions/ 里）。
-describe("delete 连带清理侧车 —— 不留孤儿", () => {
-  it("⭐ 删会话时审批侧车一起删", async () => {
-    const { manager, dir, cleanup } = makeManager();
-    try {
-      const id = await manager.create("有审批的会话");
-      const sidecar = join(dir, `${id}.approval.jsonl`);
-      writeFileSync(sidecar, '{"phase":"asked"}\n', "utf8");
-
-      await manager.delete(id);
-
-      expect(existsSync(join(dir, `${id}.jsonl`))).toBe(false);
-      expect(existsSync(sidecar)).toBe(false);
-    } finally {
-      cleanup();
-    }
-  });
-
-  it("侧车不存在也不报错（多数会话从没触发过审批——这是常态不是异常）", async () => {
-    const { manager, cleanup } = makeManager();
-    try {
-      const id = await manager.create("没审批的会话");
-
-      await expect(manager.delete(id)).resolves.toBeUndefined();
-    } finally {
-      cleanup();
-    }
-  });
-});

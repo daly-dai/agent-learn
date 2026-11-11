@@ -30,7 +30,7 @@ import {
 } from "@/lib";
 import type { ToolCallContent, ToolDecision } from "@/lib";
 import type { StreamFrame } from "./_pipeline/frames";
-import { decideToolCall } from "./_pipeline/approval";
+import { decideToolCall, type ApprovalOutcome } from "./_pipeline/approval";
 import { selectModelSafe } from "./_pipeline/model";
 import {
   createRequestContext,
@@ -40,10 +40,6 @@ import {
 import { runPipeline } from "./_pipeline/index";
 import { computeContextPressure } from "./_pipeline/context";
 import { isReadOnlyBash } from "@/lib/permission/readonly";
-import {
-  appendApprovalReceipt,
-  type ApprovalOutcome,
-} from "@/lib/permission/approval-log";
 import {
   isPersistApproved,
   isSessionApproved,
@@ -271,26 +267,11 @@ async function handleToolApproval(
   });
   if (decision.action !== "request") return decision;
 
-  // ★ B1-③ 审批日志：弹框前记 asked（审计：问了什么）
-  await appendApprovalReceipt(sessionDir, sessionId, {
-    phase: "asked",
-    approvalId: call.id,
-    toolCallId: call.id,
-    toolName: call.name,
-    createdAt: new Date().toISOString(),
-  });
-
   const outcome = await askUserApproval(call, send);
 
-  // ★ B1-③ 审批日志：决定后记 decided（审计：怎么答的）
-  await appendApprovalReceipt(sessionDir, sessionId, {
-    phase: "decided",
-    approvalId: call.id,
-    toolCallId: call.id,
-    toolName: call.name,
-    outcome,
-    createdAt: new Date().toISOString(),
-  });
+  // 为什么不再写 approval.jsonl（C52，2026-11-11）：审批决策本来就进轨迹
+  // （引擎的 tool_permission 事件带 action/reason/改写前后参数），而侧车
+  // 只有人写、没人读。要查"这个会话批准过什么"→ 翻它的 trace.*.jsonl。
 
   // B1-④：单次/本会话/一直允许 都是"允许"（记忆在 approve 接口里写）
   if (

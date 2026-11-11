@@ -16,7 +16,7 @@
 // globalThis 在同一进程内全局可见（多进程仍不共享，本地开发单进程可接受）。
 // ============================================================
 
-import type { ApprovalOutcome } from "./permission/approval-log";
+import type { ApprovalOutcome } from "./permission/approval-outcome";
 
 export type PendingApproval = {
   /** 被确认的工具名（approve 接口写记忆时用） */

@@ -40,7 +40,7 @@
 | 1 | `lib/session/manager/index.ts:47`（正主） |
 | 2 | `app/api/chat/export/route.ts:26` |
 | 3 | `app/api/chat/_pipeline/context.ts:65`（`createSessionStore`） |
-| 4 | `lib/permission/approval-log/index.ts:41`（侧车；**C52 会把这个模块整个删掉**） |
+| 4 | ~~`lib/permission/approval-log/index.ts:41`（侧车）~~ —— **C52 已删除该模块**（2026-11-11），这一处随之消失 |
 | 5 | `lib/trace/index.ts:117`（轨迹文件名） |
 
 漏改不会报错，只会**静默少东西**（导出 404 / 审批写丢 / 轨迹散落）。

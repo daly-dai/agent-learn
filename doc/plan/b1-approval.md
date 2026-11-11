@@ -145,3 +145,15 @@
 | Reasonix | yolo / auto 等 | 模式命令 |
 
 → 信任档位是参考项目普遍设计，运行时切换入口也是标配——都做了。
+
+---
+
+## 补记（2026-11-11）：审批侧车 `approval.jsonl` 已删除（C52）
+
+**删了什么**：`lib/permission/approval-log/`（模块 + 20 条测试）· `app/api/chat/route.ts` 里的两处 `appendApprovalReceipt` · `SessionManager.delete` 里的侧车删除。
+
+**为什么**：审计价值被轨迹覆盖 —— 审批决策本来就作为 `tool_permission` 事件进轨迹（`lib/agent/index.ts:271`，带 `action` / `reason` / 改写前后参数）；而侧车**只有人写、没人读**（`loadApprovalReceipts` / `replayApprovalReceipts` 的调用者只有它自己的测试）。保留它 = 多一个文件、一条路径、141 行模块陪跑。
+
+**后果（写进已知限制）**：不再有"独立成表"的审批史。要查「这个会话批准过什么」，去翻它目录下的 `trace.*.jsonl`，按 `tool_permission` 事件筛。
+
+**顺带**：`ApprovalOutcome` 类型从被删模块搬到 `lib/permission/approval-outcome.ts` —— 因为 `lib/toolApproval.ts` 还在用它，而 lib 不许依赖 app。

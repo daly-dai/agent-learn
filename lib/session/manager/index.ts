@@ -23,9 +23,6 @@ import { join } from "node:path";
 import type { SessionEntry } from "../../types";
 import { messageText } from "../../message";
 import { JsonlSessionStore } from "../store";
-// 审批侧车（<id>.approval.jsonl）的路径定义在权限层——delete 要连它一起删，
-// 所以这里复用那份定义，不自己再拼一次文件名（拼法只有一处，改也只会改一处）。
-import { approvalLogPath } from "../../permission/approval-log";
 
 export type SessionSummary = {
   id: string;
@@ -116,9 +113,9 @@ export class SessionManager {
     await renameFile(tmpPath, filePath);
   }
 
-  /** 删除整个会话：主文件 + 审批侧车。
-   *  为什么连侧车一起删：删会话的语义是"这个会话不存在了"，而原来只 rm 主文件——
-   *  审批日志会留成孤儿（实测存量里已有 3 个：会话早删了、日志还躺在 .sessions/）。
+  /** 删除整个会话。
+   *  审批侧车（<id>.approval.jsonl）已随 C52 一起删除（2026-11-11）：审批决策
+   *  本来就进轨迹，侧车只有人写、没人读。所以这里只剩主文件。
    *  轨迹文件**不在这里删**：轨迹是独立的一层（TRACE_DIR 可配、且是调试黑匣子），
    *  会话层不该知道它的布局。 */
   async delete(id: string): Promise<void> {
@@ -128,8 +125,6 @@ export class SessionManager {
     } catch {
       throw new Error(`会话不存在：${id}`);
     }
-    // force: 侧车不存在时静默返回——多数会话从没触发过审批，这是常态不是异常
-    await rm(approvalLogPath(this.sessionDir, id), { force: true });
   }
 }
 
