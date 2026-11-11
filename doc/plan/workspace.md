@@ -566,9 +566,8 @@ export async function bootstrapWorkspaces(home: string, sessionCwds: string[]): 
 |---|---|---|
 | `lib/session/paths` | 8 | `projectKey`：反斜杠/盘符/中文/emoji/超长截断/空串抛错/前导 `-` 去重；`encodeSegment` **单射**（不同 id 不出同段）；`..` 与绝对路径不出目录 |
 | `app/lib/session-groups` | 12 | 归属（cwd 匹配 / 未登记 / 空串）；组序（工作空间 `updatedAt` 倒序，未登记最后）；组内序；**空工作空间仍出现**；原对象不被改写；`foldGroup` 前 5 条与展开 |
-| `app/lib/tool-escape` | 6 | 7 个工具 × 内/外；`bash` 返回 `inside`（显式已知限制） |
-| `_pipeline/approval` 扩展 | 6 | 越界 × 三种模式；secret 优先于越界；非越界不受影响 |
-| `EscapePermits` | 2 | 一次性消费；未 grant 时围栏照常抛错 |
+| `app/lib/tool-escape` | 27 | 7 个路径工具 × 内/外（含 `../`、别的盘符、缺省 `.`）；`write_note` 与 `bash` **不参与**；前缀陷阱 `E:\ws2` 不在 `E:\ws` 里；bash 粗筛 5 正 4 反；**通行证一次性**（用一次作废、路径规范化） |
+| `_pipeline/approval` 扩展 | 6 | 越界 × 三种模式；secret 优先于越界；非越界不受影响（**下一步接线时才做**） |
 | `lib/resources` + `loadSkills` 多根 | 6 | 四层顺序；同 key 覆盖不合并；根不存在静默跳过；`root` 出处正确 |
 | 目录浏览栅栏 | 6 | `C:\x` 通过；`\foo`/`/foo`/相对路径拒绝；单段名校验；排序确定性；截断标记 |
 | `lib/workspace` 注册表 | 20 | canonical 去重（同一个文件夹登记两次 → 409）；`title` 默认取末段；重命名只改 `title`；删记录返回未登记会话数；json 坏文件 → 报错而不是当空；**并发 5 个新增一条不丢**（写队列）；bootstrap 幂等 |
