@@ -1,0 +1,287 @@
+/* ============================================================
+   directory-browser.module.css —— 选文件夹对话框（C6）
+   归属组件：app/components/directory-browser/index.tsx
+   token 全部来自 app/globals.css；不新增色相（唯一暖色仍是运行信号点）。
+   形态继承原型第二屏：680×500、三行栅格、面包屑 + 路径框 + 列表 + 页脚。
+   ============================================================ */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(17, 19, 21, 0.24);
+}
+
+.dialog {
+  position: relative;
+  width: min(680px, 100%);
+  height: min(500px, calc(100dvh - 32px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background: var(--plate);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  box-shadow: 0 24px 60px -20px rgba(17, 19, 21, 0.45);
+  overflow: hidden;
+}
+
+.head {
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.title {
+  margin: 0 0 10px;
+  font-family: var(--font-sans);
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--ink);
+}
+
+/* 面包屑：窄了会挤，允许横向滚动而不是换行（换行后"当前层"会被折到第二行） */
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  overflow-x: auto;
+  margin-bottom: 9px;
+  scrollbar-width: thin;
+}
+
+.crumbItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.crumb {
+  max-width: 160px;
+  padding: 2px 5px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-mid);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.crumb:hover {
+  background: var(--feed-hover);
+  color: var(--ink);
+}
+
+.crumbLast {
+  color: var(--ink);
+}
+
+.crumbSep {
+  flex: none;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+.pathRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--plate);
+}
+
+.pathRow:focus-within {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px rgba(17, 19, 21, 0.06);
+}
+
+.pathRow svg {
+  flex: none;
+  color: var(--ink-faint);
+}
+
+.pathInput {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.drives {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.drive {
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--plate);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-mid);
+  cursor: pointer;
+}
+
+.drive:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+  background: var(--feed-hover);
+}
+
+.list {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px 8px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: var(--hit);
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--r);
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.row:hover {
+  background: var(--feed-hover);
+}
+
+.folderIcon {
+  flex: none;
+  color: var(--ink-mid);
+}
+
+.name {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chevron {
+  flex: none;
+  margin-left: auto;
+  color: var(--line-strong);
+}
+
+.row:hover .chevron {
+  color: var(--ink-mid);
+}
+
+.note {
+  margin: 8px 10px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border-top: 1px solid var(--line-soft);
+  background: var(--plate);
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-sans);
+  font-size: 11.5px;
+  color: var(--ink-mid);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* 页脚那行"将加为工作空间：…"——它是这个对话框里最重要的一句话：
+   用户点确认之前必须知道自己在加哪个目录 */
+.target {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-mid);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ghost,
+.primary {
+  flex: none;
+  height: 30px;
+  padding: 0 13px;
+  border-radius: var(--r);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.ghost {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-mid);
+}
+
+.ghost:hover {
+  background: var(--feed-hover);
+  color: var(--ink);
+}
+
+.primary {
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--plate);
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--ink-hover);
+}
+
+.primary:disabled {
+  border-color: var(--line);
+  background: var(--line-soft);
+  color: var(--ink-faint);
+  cursor: not-allowed;
+}
+
+/* 错误行：拒绝的理由必须看得见（409 的文案是给人看的，不能吞掉） */
+.error {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 52px;
+  margin: 0;
+  padding: 6px 16px;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--pen-error);
+  background: var(--plate);
+  border-top: 1px solid var(--line-soft);
+}

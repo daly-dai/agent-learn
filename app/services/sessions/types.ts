@@ -12,13 +12,21 @@ export type SessionSummary = {
   /** 文件最后修改时间（毫秒） */
   updatedAt: number;
   preview?: string;
+  /** 会话所属工作空间的 canonical 路径（会话头的 cwd）—— 侧栏分组就靠它。
+   *  2026-11-11 新增：分组从"全局单工作区"改成"按工作空间分组"之后，它必须随列表返回。 */
+  cwd: string;
 };
 
-/** GET /api/sessions → { sessions: [...] } */
-export type SessionListResult = { sessions: SessionSummary[] };
+/** GET /api/sessions → { sessions, sessionsRoot } */
+export type SessionListResult = {
+  sessions: SessionSummary[];
+  /** 会话根（数据根下 sessions/），页脚展示用 */
+  sessionsRoot: string;
+};
 
-/** POST /api/sessions 参数：title 可选，不传则显示回退用 id */
-export type CreateSessionParams = { title?: string };
+/** POST /api/sessions 参数：**workspaceId 必填**（没有工作空间就没有落盘位置），
+ *  title 可选，不传则显示回退用 id */
+export type CreateSessionParams = { workspaceId: string; title?: string };
 
 /** POST /api/sessions → 新建的会话 id */
 export type CreateSessionResult = { id: string };

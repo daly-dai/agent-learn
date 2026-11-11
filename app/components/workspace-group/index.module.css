@@ -1,0 +1,225 @@
+/* ============================================================
+   workspace-group.module.css —— 侧栏里的「一个工作空间」
+   归属组件：app/components/workspace-group/index.tsx
+   形态继承已批准原型 workspace/prototype-workspace.html：
+   组头 = [⌄] 名字 计数 [＋] [⋯]，动作平时隐藏、hover / 键盘聚焦才出现。
+   ⚠️ 不新增色相：分组靠底色差（--recorder）+ 一条 --line-soft 收边。
+   ============================================================ */
+
+.group {
+  margin: 2px 0 6px;
+  min-width: 0;
+}
+
+.group + .group {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 4px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 2px 6px;
+  border-radius: var(--r);
+}
+
+.head:hover {
+  background: var(--feed-hover);
+}
+
+.chevron {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+
+.chevron:hover {
+  color: var(--ink);
+}
+
+.name {
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.count {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--ink-faint);
+}
+
+/* 组头动作：平时不可见也不可点（避免每行挂两把按钮），
+   hover 或键盘聚焦到组内才现身 */
+.actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.head:hover .actions,
+.head:focus-within .actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.iconButton {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink-mid);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.iconButton:hover {
+  background: var(--feed-active);
+  color: var(--ink);
+}
+
+/* ⋯ 菜单的锚点：menu.module.css 里 .wrap 是 relative，这里只需收尺寸 */
+.menuWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 2px 0 2px 12px; /* 缩进：会话行挂在组名下 */
+}
+
+/* 「展开其余 N 个」是一行文字，不是按钮面 —— 与组头的 ⌄ 形态区分开，
+   避免两个"展开"看起来是同一件事 */
+.showMore {
+  margin: 2px 0 4px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink-mid);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.showMore:hover {
+  background: var(--feed-hover);
+  color: var(--ink);
+}
+
+/* ---- 就地改名（组头换成输入框，不弹 prompt）---- */
+.renameInput {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--ink);
+  background: var(--plate);
+  border: 1px solid var(--pen-model);
+  border-radius: var(--r);
+  outline: none;
+}
+
+.renameAction {
+  flex: none;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--ink-mid);
+  cursor: pointer;
+}
+
+.renameAction:hover {
+  background: var(--feed-hover);
+  color: var(--ink);
+}
+
+/* ---- 删除确认（破坏性：连会话一起删，必须报数）---- */
+.confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 2px 6px 6px 24px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  background: var(--plate);
+}
+
+.confirmText {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--pen-error);
+}
+
+.confirmActions {
+  display: flex;
+  gap: 8px;
+}
+
+.confirmCancel,
+.confirmDanger {
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: var(--r);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.confirmCancel {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.confirmCancel:hover {
+  border-color: var(--ink-mid);
+}
+
+.confirmDanger {
+  border: 1px solid var(--pen-error);
+  background: var(--pen-error);
+  color: var(--plate);
+}
+
+.confirmDanger:hover {
+  filter: brightness(1.08);
+}

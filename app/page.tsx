@@ -61,6 +61,9 @@ import { useAgentRun } from "./lib/use-agent-run";
 import { useRunStore } from "./lib/run-store";
 import { useCommandMenu } from "./lib/use-command-menu";
 import { useSessions } from "./lib/use-sessions";
+import { useWorkspaces } from "./lib/use-workspaces";
+import { groupSessions } from "./lib/session-groups";
+import { DirectoryBrowser } from "./components/directory-browser";
 import { useStickyScroll } from "./lib/use-sticky-scroll";
 import { useTraces } from "./lib/use-traces";
 import { formatTokens } from "./lib/format";
@@ -72,8 +75,38 @@ export default function Home() {
   // 会话栏（Phase 2）：列表 + 当前会话 id。currentId 传给 useAgentRun，
   // 切换会话 = 换 currentId，聊天区随之清空并加载对应历史。
   // refresh 额外用于"run 结束后列表保鲜"（见下方 loading 跳变 effect）
-  const { sessions, currentId, select, create, rename, remove, refresh } =
-    useSessions();
+  const {
+    sessions,
+    sessionsRoot,
+    currentId,
+    select,
+    create,
+    rename,
+    remove,
+    refresh,
+  } = useSessions();
+
+  // 工作空间（C51）：侧栏的分组依据。它就是"会话属于哪个文件夹"的唯一来源 ——
+  // 会话头里的 cwd 与这里的 path 相等，所以两边必须来自同一个规范化路径。
+  const {
+    workspaces,
+    error: workspaceError,
+    setError: setWorkspaceError,
+    create: createWorkspace,
+    rename: renameWorkspace,
+    remove: removeWorkspace,
+    open: openWorkspace,
+  } = useWorkspaces();
+
+  // 分组是纯函数算的（app/lib/session-groups，node 可测），页面不做逻辑
+  const groups = useMemo(
+    () => groupSessions(sessions, workspaces),
+    [sessions, workspaces],
+  );
+
+  // 「选文件夹」对话框：打开时清掉上一次的错误（否则旧的红字会挂在新对话框里）
+  const [browserOpen, setBrowserOpen] = useState(false);
+  const [browserBusy, setBrowserBusy] = useState(false);
 
   // hook：一次 run 的观测状态和行为。页面从这里拿数据，不再自己发 fetch。
   //   messages  转录稿消息（当前会话历史 + 本次 run 新增）
@@ -235,13 +268,16 @@ export default function Home() {
       <Nameplate runId={runId} model={model} phase={phase} turn={turn} />
 
       <div className="deck">
-        {/* 左侧会话栏（Phase 2）：点击切换 / ＋新建 / ⋯ 重命名·删除 */}
+        {/* 左侧工作空间栏（C49/C51）：分组 / 组头新建会话 / 组头菜单三件事 */}
         <SessionList
-          sessions={sessions}
+          groups={groups}
+          totalSessions={sessions.length}
+          sessionsRoot={sessionsRoot}
+          workspaces={workspaces}
           currentId={currentId}
           onSelect={select}
-          onCreate={() => {
-            create();
+          onCreateSession={(workspaceId) => {
+            create(workspaceId);
           }}
           onRename={(id, title) => {
             rename(id, title);
@@ -250,6 +286,24 @@ export default function Home() {
             // B22：删会话 = 服务端删除 + 本地清桶（abort 在跑流，帧不再写）
             useRunStore.getState().deleteRun(id);
             remove(id);
+          }}
+          onCreateWorkspace={() => {
+            setWorkspaceError(null);
+            setBrowserOpen(true);
+          }}
+          onRenameWorkspace={(workspace, title) => {
+            renameWorkspace(workspace.id, title);
+          }}
+          onOpenWorkspaceFolder={(workspace) => {
+            openWorkspace(workspace.id);
+          }}
+          onDeleteWorkspace={(workspace) => {
+            // 删工作空间 = 记录 + 它名下的会话一起删（用户 2026-11-11 定的"粗暴"语义），
+            // 所以删完必须重拉会话列表，否则侧栏还挂着已经不存在的行
+            removeWorkspace(workspace.id).then((deleted) => {
+              if (deleted === null) return;
+              refresh();
+            });
           }}
         />
 
@@ -482,6 +536,23 @@ export default function Home() {
           </div>
         </main>
       </div>
+
+      {/* 「新增工作空间」：选一个文件夹 → 登记成记录。只读对话框，见组件头注释。
+          关闭即卸载（条件渲染）：每次打开都是干净实例，不需要"打开时复位"的 effect。 */}
+      {browserOpen ? (
+        <DirectoryBrowser
+          busy={browserBusy}
+          error={workspaceError}
+          onClose={() => setBrowserOpen(false)}
+          onPick={async (path) => {
+            setBrowserBusy(true);
+            const workspace = await createWorkspace(path);
+            setBrowserBusy(false);
+            // 成功才关：失败（409 已登记 / 400 路径不对）留在对话框里显示原因
+            if (workspace) setBrowserOpen(false);
+          }}
+        />
+      ) : null}
     </div>
   );
 }

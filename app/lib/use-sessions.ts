@@ -33,6 +33,8 @@ import type { SessionSummary } from "@/app/services/sessions/types";
 
 export function useSessions() {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  // 会话根（页脚展示）：由服务端给，前端不自己拼（STATVE_HOME 可覆盖）
+  const [sessionsRoot, setSessionsRoot] = useState("");
   const [currentId, setCurrentId] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -43,6 +45,7 @@ export function useSessions() {
         const data = await listSessions({ signal });
         const list = data.sessions ?? [];
         setSessions(list);
+        if (data.sessionsRoot) setSessionsRoot(data.sessionsRoot);
         return list;
       } catch (e) {
         if ((e as Error).name === "AbortError") return []; // 组件卸载导致的取消
@@ -76,9 +79,11 @@ export function useSessions() {
   }, []);
 
   const create = useCallback(
-    async (title?: string) => {
+    async (workspaceId: string, title?: string) => {
       try {
-        const data = await createSession(title ? { title } : {});
+        const data = await createSession(
+          title ? { workspaceId, title } : { workspaceId },
+        );
         setCurrentId(data.id); // 新建即切换
         await refresh();
         return data.id;
@@ -125,6 +130,7 @@ export function useSessions() {
 
   return {
     sessions,
+    sessionsRoot,
     currentId,
     loading,
     refresh,
