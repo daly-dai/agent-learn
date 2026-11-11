@@ -40,7 +40,8 @@ const TOOLS_NEEDING_CONFIRM = [
 /** decideToolCall 的外部依赖（注入，测试传 stub） */
 export type ApprovalContext = {
   sessionId: string;
-  sessionDir: string;
+  /** 「一直允许」的持久化落在哪（数据根，不是会话目录 —— 它是跨会话的） */
+  approvalDir: string;
   getApprovalMode: () => "suggest" | "bypass" | "never";
   isReadOnlyBash: (command: string) => boolean;
   isPersistApproved: (dir: string, toolName: string) => Promise<boolean>;
@@ -128,7 +129,7 @@ async function confirmOrRequest(
   }
 
   // 记忆放行：一直允许（磁盘规则）→ 本会话允许（内存记忆）。
-  if (await ctx.isPersistApproved(ctx.sessionDir, call.name)) {
+  if (await ctx.isPersistApproved(ctx.approvalDir, call.name)) {
     return { action: "allow" };
   }
   if (ctx.isSessionApproved(ctx.sessionId, call.name)) {

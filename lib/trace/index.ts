@@ -14,13 +14,12 @@
 //   ts    墙钟时间
 //   turn  当前第几轮（由 turn_start 事件自动跟踪）
 //
-// ── 落盘：一个 run 一个文件，路径 = dir/<sessionId>.<runId>.jsonl ──
-//   **会话归属写在文件名里，不写进字段**（2026-09-14 定，A3 详案 §3.1 ①）。
-//   文件名是唯一真相："列某个会话的轨迹" = readdir + 前缀过滤 = 零内容读取。
-//   再加一个 sessionId 字段就是第二个真相，两者会漂移——本项目已经栽过两次
-//   （header.version 从不被读、TraceSnapshot 无人传），教训是"结构不会忘，
-//   字段会忘"。runId 仍在首行：文件名管归属、首行管身份，各一份、不重复。
-//   一个 run 一个文件 ⇒ 单文件不会无界增长（上限就是单次 run 的量级）。
+// ── 落盘：一个 run 一个文件，路径 = <会话目录>/trace.<runId>.jsonl ──
+//   归属由**目录**保证（会话目录就是边界），文件名只承载 runId。删会话 =
+//   删目录，轨迹跟着走，不需要会话层知道轨迹布局。
+//   （2026-11-11 从 `.traces/<sessionId>.<runId>.jsonl` 改成现在这样：那时
+//   "会话归属写在文件名里"是为了一处 .traces 根下能按前缀筛；改成"每会话
+//   一个目录"之后，文件名里再带 sessionId 就是第二个真相。）
 //
 // ── 文件结构 ──
 //   首行 trace_start（元信息）→ 中间 TraceEntry → 末行 trace_end。
@@ -30,8 +29,13 @@
 
 import { appendFile, mkdir, open, readFile } from "node:fs/promises";
 import type { FileHandle } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import type { AgentEvent } from "../types";
+import { tracePath } from "../session/paths";
+
+/** 轨迹文件名前缀：列某个会话的轨迹 = readdir + 这个前缀过滤（零内容读取） */
+export const TRACE_FILE_PREFIX = "trace.";
+export const TRACE_FILE_SUFFIX = ".jsonl";
 
 export type TraceEntry = {
   seq: number;
@@ -106,7 +110,11 @@ export class TraceRecorder {
     this.filePath = params.filePath;
   }
 
-  static create(dir: string, model: string, sessionId: string): TraceRecorder {
+  static create(
+    sessionDirPath: string,
+    model: string,
+    sessionId: string,
+  ): TraceRecorder {
     const runId = generateRunId();
     // 五个字段四个是字符串：用具名对象传参，调用点读起来就知道谁是谁
     return new TraceRecorder({
@@ -114,7 +122,7 @@ export class TraceRecorder {
       model,
       sessionId,
       startedAt: Date.now(),
-      filePath: join(dir, traceFileName(sessionId, runId)),
+      filePath: tracePath(sessionDirPath, runId),
     });
   }
 
@@ -169,34 +177,12 @@ export class TraceRecorder {
 }
 
 // ------------------------------------------------------------
-// 文件名：`.traces/<sessionId>.<runId>.jsonl`
+// 文件名：`<会话目录>/trace.<runId>.jsonl`（拼法在 lib/session/paths）
 // ------------------------------------------------------------
-// 沿用项目既有约定：同一会话的兄弟文件用**文件名**表达，不是目录
-// （先例 `.sessions/<sessionId>.approval.jsonl`）。
-// isValidSessionId 保证 sessionId 不含 `.`，所以"首个点之前"就是会话 id，
-// 解析无歧义。
+// 这里**不再**提供「从文件名反解 sessionId」的函数：归属已经由目录表达，
+// 反解出来的只会是第二个真相。要拿 runId，读首行的 `trace_start`（列表本来
+// 就要读那 1KB，见 readTraceMeta）。
 // ------------------------------------------------------------
-
-export function traceFileName(sessionId: string, runId: string): string {
-  return `${sessionId}.${runId}.jsonl`;
-}
-
-/** 解析失败返回 undefined（老轨迹文件名里没有会话前缀 → 归不到任何会话） */
-export function parseTraceFileName(
-  fileName: string,
-): { sessionId: string; runId: string } | undefined {
-  if (!fileName.endsWith(".jsonl")) return undefined;
-
-  const body = fileName.slice(0, -".jsonl".length);
-  const dot = body.indexOf(".");
-  if (dot <= 0) return undefined;
-
-  const sessionId = body.slice(0, dot);
-  const runId = body.slice(dot + 1);
-  if (!sessionId || !runId) return undefined;
-
-  return { sessionId, runId };
-}
 
 function generateRunId(): string {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");

@@ -22,6 +22,7 @@ import { NextResponse } from "next/server";
 import {
   createUserMessage,
   isValidSessionId,
+  sessionManager,
   getApprovalMode,
   toolApprovals,
   clearRun,
@@ -49,13 +50,10 @@ import {
 // 后面 Phase 4 还要用 node:child_process 跑终端。
 export const runtime = "nodejs";
 
-// 路径与行为配置：全部来自 lib/config.ts（唯一入口，环境变量可覆盖）。
-// 工作区根目录 / 轨迹目录 / 会话目录 / 压缩阈值 / 审批超时都收编在这里。
-const {
-  workspace: workspaceRoot,
-  traces: traceDir,
-  sessions: sessionDir,
-} = config.paths;
+// 路径与行为配置：全部来自 lib/config（唯一入口，环境变量可覆盖）。
+// ⚠️ 2026-11-11 起这里**不再**取 workspaceRoot / traceDir / sessionDir：
+// 会话目录由 `SessionManager.locate(id)` 给出（lib/session/paths 是唯一拼法），
+// 轨迹住在会话目录里。这一步删掉了「4 处各自拼路径」里的两处。
 // 工具注册表【不在这里建单例】（贴 pi create-harness）：
 // 它在每次 POST 请求内组装，业务 hooks 闭包捕获当次的 store/send。
 //
@@ -106,12 +104,17 @@ export async function POST(req: NextRequest) {
   // 创建用户消息
   const userMessage = createUserMessage(text.trim());
 
-  // 创建会话存储和记录器
+  // 创建会话存储和记录器（先定位：找不到会话 = 404，不再"顺手建一个"）
+  const location = await sessionManager.locate(sessionId);
+  if (!location) {
+    return NextResponse.json(
+      { error: `会话不存在：${sessionId}` },
+      { status: 404 },
+    );
+  }
   const { store, recorder } = await createRequestContext({
     sessionId,
-    sessionDir,
-    workspaceRoot,
-    traceDir,
+    location,
     modelLabel,
   });
 
@@ -213,7 +216,13 @@ export async function GET(req: NextRequest) {
   if (!isValidSessionId(sessionId)) {
     return NextResponse.json({ error: "非法 sessionId" }, { status: 400 });
   }
-  const store = createSessionStore(sessionId);
+  const store = await createSessionStore(sessionId).catch(() => undefined);
+  if (!store) {
+    return NextResponse.json(
+      { error: `会话不存在：${sessionId}` },
+      { status: 404 },
+    );
+  }
   return NextResponse.json({
     sessionId,
     messages: store.buildContext(),
@@ -232,7 +241,13 @@ export async function DELETE(req: NextRequest) {
   if (!isValidSessionId(sessionId)) {
     return NextResponse.json({ error: "非法 sessionId" }, { status: 400 });
   }
-  const store = createSessionStore(sessionId);
+  const store = await createSessionStore(sessionId).catch(() => undefined);
+  if (!store) {
+    return NextResponse.json(
+      { error: `会话不存在：${sessionId}` },
+      { status: 404 },
+    );
+  }
   await store.reset();
   return NextResponse.json({ ok: true, sessionId });
 }
@@ -259,7 +274,8 @@ async function handleToolApproval(
   //   - request → 需要人工确认：这里执行副作用（日志 + 挂起弹框）
   const decision = await decideToolCall(call, {
     sessionId,
-    sessionDir,
+    // 「一直允许」是跨会话的：落数据根，不落会话目录
+    approvalDir: config.paths.home,
     getApprovalMode,
     isReadOnlyBash,
     isPersistApproved,

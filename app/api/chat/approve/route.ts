@@ -55,7 +55,8 @@ export async function POST(req: NextRequest) {
 
   // B1-④ 记忆：按用户选的档位写记忆，再 resolve 对应 outcome
   if (persist) {
-    await rememberPersist(config.paths.sessions, pending.toolName);
+    // 「一直允许」是跨会话的 ⇒ 落数据根，不落会话目录（会话目录现在是每个会话一个）
+    await rememberPersist(config.paths.home, pending.toolName);
     pending.resolve("approved-persist");
   } else if (sessionOpt) {
     rememberSession(sessionId, pending.toolName);

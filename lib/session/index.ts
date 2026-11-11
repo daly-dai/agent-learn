@@ -11,5 +11,10 @@
 
 export { JsonlSessionStore, summarizeEntries, estimateTokens } from "./store";
 export type { CompactionEntry, CompactionPreparation } from "./store";
-export { SessionManager, generateSessionId, isValidSessionId } from "./manager";
-export type { SessionSummary } from "./manager";
+export {
+  SessionManager,
+  generateSessionId,
+  isValidSessionId,
+  sessionManager,
+} from "./manager";
+export type { SessionLocation, SessionSummary } from "./manager";

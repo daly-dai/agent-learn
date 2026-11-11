@@ -122,7 +122,17 @@ export function sessionLogPath(
   cwd: string | undefined,
   id: string,
 ): string {
-  return join(sessionDir(root, cwd, id), "session.jsonl");
+  return sessionLogPathIn(sessionDir(root, cwd, id));
+}
+
+/**
+ * 已经拿到会话目录时的日志路径。
+ * 为什么还要一个：按 id 找会话时目录是**扫出来的**（`encodeSegment` 单射但
+ * 不可逆，没法从目录名反推 id），此时只有目录、没有 cwd，`sessionLogPath`
+ * 用不上。两个入口共用一个常量，日志名仍然只有一处。
+ */
+export function sessionLogPathIn(sessionDirPath: string): string {
+  return join(sessionDirPath, "session.jsonl");
 }
 
 /** 一次 run 的轨迹。归属由**目录**保证（传会话目录进来），文件名只承载 runId */

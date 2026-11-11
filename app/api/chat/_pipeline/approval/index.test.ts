@@ -18,7 +18,7 @@ function call(name: string, args: Record<string, unknown> = {}) {
 function ctx(overrides: Partial<ApprovalContext> = {}): ApprovalContext {
   return {
     sessionId: "s_test",
-    sessionDir: "/tmp/sessions",
+    approvalDir: "/tmp/statve",
     getApprovalMode: () => "suggest",
     isReadOnlyBash: () => false,
     isPersistApproved: vi.fn(async () => false),

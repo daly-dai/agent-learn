@@ -48,9 +48,10 @@ export {
   JsonlSessionStore,
   SessionManager,
   isValidSessionId,
+  sessionManager,
   summarizeEntries,
 } from "./session";
-export type { SessionSummary } from "./session";
+export type { SessionLocation, SessionSummary } from "./session";
 
 // 工具系统（子模块门面：lib/tools/index.ts）
 export { ToolRegistry, createToolRegistry } from "./tools";
@@ -66,7 +67,6 @@ export { runControllers } from "./runControl";
 export { TraceRecorder, readTrace, readTraceMeta } from "./trace";
 export type { TraceEntry, TraceMeta } from "./trace";
 export { listTraceFiles } from "./trace-files";
-export type { TraceFile } from "./trace-files";
 export { getApprovalMode, setApprovalMode } from "./approvalMode";
 export { toolApprovals } from "./toolApproval";
 export { userAnswers, makeAskKey, clearRun } from "./userAnswers";

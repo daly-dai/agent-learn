@@ -1,8 +1,10 @@
 // ============================================================
 // lib/trace —— 单个轨迹文件的格式与读写（A3）
 // ============================================================
-// 测 seam：traceFileName / parseTraceFileName（文件名即会话归属）、
-// TraceRecorder 落盘、readTrace（取中间 entries）、readTraceMeta（只读首末两行）。
+// 测 seam：TraceRecorder 落盘（`<会话目录>/trace.<runId>.jsonl`）、
+// readTrace（取中间 entries）、readTraceMeta（只读首末两行）。
+// ⚠️ 2026-11-11：文件名不再承载会话 id（归属由目录表达），所以原先测
+// `traceFileName` / `parseTraceFileName` 的那组用例随函数一起删了。
 //
 // 一个"只能这么测"的点：readTraceMeta 的核心要求是**不解析中间行**，
 // 这点从外部只能这样证明——在中间塞一条坏 JSON，若实现是 readFile + 全量
@@ -14,13 +16,12 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { readdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  TraceRecorder,
-  parseTraceFileName,
-  readTrace,
-  readTraceMeta,
-  traceFileName,
-} from "./index";
+import { TraceRecorder, readTrace, readTraceMeta } from "./index";
+
+/** 轨迹文件名：与 `lib/session/paths` 的 tracePath 同一个约定 */
+function traceName(runId: string): string {
+  return `trace.${runId}.jsonl`;
+}
 
 // ---- 临时目录（对齐 lib/session/store.test.ts 的做法） ----
 
@@ -77,37 +78,8 @@ async function writeTraceFile(
 
 // ============================================================
 
-describe("文件名即会话归属", () => {
-  it("traceFileName / parseTraceFileName 往返一致", () => {
-    const name = traceFileName(
-      "s_2026-09-14T07-00-05-195Z_abc123",
-      "run_2026-09-14T07-00-05-195Z_xyz789",
-    );
-    expect(name).toBe(
-      "s_2026-09-14T07-00-05-195Z_abc123.run_2026-09-14T07-00-05-195Z_xyz789.jsonl",
-    );
-    expect(parseTraceFileName(name)).toEqual({
-      sessionId: "s_2026-09-14T07-00-05-195Z_abc123",
-      runId: "run_2026-09-14T07-00-05-195Z_xyz789",
-    });
-  });
-
-  it("老轨迹文件名（<runId>.jsonl，没有会话前缀）解析不出来 → 归不到会话", () => {
-    expect(
-      parseTraceFileName("run_2026-08-19T07-00-05-195Z_i88i3v.jsonl"),
-    ).toBeUndefined();
-  });
-
-  it("非法/无关文件名返回 undefined（不抛）", () => {
-    expect(parseTraceFileName("smoke_a.jsonl")).toBeUndefined(); // 无点
-    expect(parseTraceFileName(".jsonl")).toBeUndefined(); // 空会话段
-    expect(parseTraceFileName("s_a..jsonl")).toBeUndefined(); // 空 runId 段
-    expect(parseTraceFileName("s_a.run_x.txt")).toBeUndefined(); // 后缀不对
-  });
-});
-
 describe("TraceRecorder 落盘", () => {
-  it("落到 <sessionId>.<runId>.jsonl，首行是带 sessionId 的 trace_start、末行是 trace_end", async () => {
+  it("落到 <会话目录>/trace.<runId>.jsonl，首行是带 sessionId 的 trace_start、末行是 trace_end", async () => {
     const dir = makeDir();
     const recorder = TraceRecorder.create(dir, "deepseek-chat", "s_demo");
     await recorder.init();
@@ -115,7 +87,7 @@ describe("TraceRecorder 落盘", () => {
     await recorder.end({ messages: 1 });
 
     const files = await readdir(dir);
-    expect(files).toEqual([traceFileName("s_demo", recorder.runId)]);
+    expect(files).toEqual([traceName(recorder.runId)]);
 
     const entries = await readTrace(join(dir, files[0]));
     expect(entries.map((entry) => entry.seq)).toEqual([1]);
@@ -149,7 +121,7 @@ describe("TraceRecorder 落盘", () => {
 describe("readTrace：取中间 entries", () => {
   it("跳过首末两行元信息，只返回 TraceEntry", async () => {
     const dir = makeDir();
-    const path = await writeTraceFile(dir, traceFileName("s_test", "run_x"), [
+    const path = await writeTraceFile(dir, traceName("run_x"), [
       startLine(),
       entryLine(1),
       entryLine(2),
@@ -165,7 +137,7 @@ describe("readTrace：取中间 entries", () => {
 describe("readTraceMeta：只读首末两行", () => {
   it("正常收尾 → completed + 摘要 + 字节数", async () => {
     const dir = makeDir();
-    const path = await writeTraceFile(dir, traceFileName("s_test", "run_x"), [
+    const path = await writeTraceFile(dir, traceName("run_x"), [
       startLine(),
       entryLine(1),
       endLine("run_x", { messages: 7 }),
@@ -184,7 +156,7 @@ describe("readTraceMeta：只读首末两行", () => {
 
   it("没有 trace_end（服务崩了）→ completed false，但头部信息仍可用（残轨迹也要列得出来）", async () => {
     const dir = makeDir();
-    const path = await writeTraceFile(dir, traceFileName("s_test", "run_x"), [
+    const path = await writeTraceFile(dir, traceName("run_x"), [
       startLine(),
       entryLine(1),
       entryLine(2), // 写到一半就断了
@@ -201,7 +173,7 @@ describe("readTraceMeta：只读首末两行", () => {
 
   it("末行是写了一半的 trace_end → 同样判为未完成（截断的 JSON 不算收尾）", async () => {
     const dir = makeDir();
-    const path = await writeTraceFile(dir, traceFileName("s_test", "run_x"), [
+    const path = await writeTraceFile(dir, traceName("run_x"), [
       startLine(),
       entryLine(1),
       '{"type":"trace_end","runId":"run_x","ts":2000,"seq":',
@@ -212,7 +184,7 @@ describe("readTraceMeta：只读首末两行", () => {
 
   it("⭐ 不解析中间行：中间塞坏 JSON 与假 trace_end 都不影响结果", async () => {
     const dir = makeDir();
-    const path = await writeTraceFile(dir, traceFileName("s_test", "run_x"), [
+    const path = await writeTraceFile(dir, traceName("run_x"), [
       startLine(),
       "{ 这一行不是合法 JSON —— 全量 parse 的实现会在这里抛",
       JSON.stringify({
@@ -248,7 +220,7 @@ describe("readTraceMeta：只读首末两行", () => {
 
   it("中途的 error 摘要能读出来（列表要显示这个 run 是否报错）", async () => {
     const dir = makeDir();
-    const path = await writeTraceFile(dir, traceFileName("s_test", "run_x"), [
+    const path = await writeTraceFile(dir, traceName("run_x"), [
       startLine(),
       endLine("run_x", { error: "model 超时" }),
     ]);

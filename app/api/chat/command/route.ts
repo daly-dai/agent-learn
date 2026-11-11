@@ -44,7 +44,14 @@ export async function POST(req: NextRequest) {
   }
 
   // 命令执行需要 store（/compact 落盘）+ model（生成摘要）——每请求组装。
-  const store = createSessionStore(sessionId);
+  // 会话必须已经存在：命令作用在某个会话上，"顺手建一个空的"没有意义。
+  const store = await createSessionStore(sessionId).catch(() => undefined);
+  if (!store) {
+    return NextResponse.json(
+      { error: `会话不存在：${sessionId}` },
+      { status: 404 },
+    );
+  }
 
   const selected = selectModelSafe();
   if (!selected.ok) {

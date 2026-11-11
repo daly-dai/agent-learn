@@ -22,7 +22,7 @@
 // 所有字段都是「字符串入、类型化出」，调用方拿到的永远是安全值。
 // ============================================================
 
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { homedir } from "node:os";
 
 /** 从 process.env 读字符串；没设（含空串）时用默认值 */
@@ -110,6 +110,12 @@ const PROVIDERS: Record<string, ProviderConfig> = {
 /** 当前 provider key：DEEPSEEK_PROVIDER 或 AI_PROVIDER；默认 deepseek */
 const providerKey = env("AI_PROVIDER", "deepseek");
 
+/**
+ * 数据根：会话 / 工作空间注册表 / 将来的 skill、MCP 都住这里。
+ * 先算成常量，因为 `sessions` 默认值要由它推出（对象字面量里引用不到自己）。
+ */
+const home = env("STATVE_HOME", resolve(homedir(), ".statve"));
+
 export const config = {
   /** 当前 provider（压缩阈值 / 模型 / 地址都随它走） */
   provider: (PROVIDERS[providerKey] ?? PROVIDERS.deepseek) as ProviderConfig,
@@ -121,16 +127,20 @@ export const config = {
     mockMode: env("MOCK_MODE", "") === "true",
   },
 
-  /** 路径（环境变量可覆盖；默认工作区/轨迹/会话目录） */
+  /** 路径（环境变量可覆盖） */
   paths: {
+    /**
+     * 数据根（2026-11-11 定）：会话、工作空间注册表、将来的 skill / MCP 都住这里。
+     * 为什么搬到用户目录：落盘位置不再取决于"进程从哪个目录启动" —— 以前默认是
+     * `resolve(process.cwd(), ".sessions")`，换个目录起 dev server 就换了一套会话。
+     */
+    home,
+    /** 会话根：下面一层是工作空间键、再一层是会话目录（见 lib/session/paths） */
+    sessions: env("SESSION_DIR", join(home, "sessions")),
     workspace: env("WORKSPACE_ROOT", resolve(process.cwd(), "workspace")),
-    traces: env("TRACE_DIR", resolve(process.cwd(), ".traces")),
-    sessions: env("SESSION_DIR", resolve(process.cwd(), ".sessions")),
     /**
      * 技能根（C8）：**只有这一个**，且是用户级（跨项目可用）。
      *
-     * 为什么单根：项目级 `.agents/skills` 要引入"项目 > 用户"的跨根优先级，
-     * 而这版明确不做分层（决策见 `doc/plan/c8-skills.md`）。
      * ⚠️ 它在**工作区之外** —— 这正是技能必须走专用 `skill` 工具、不能用
      * `read_file` 的原因（`read_file` 被 `resolveInsideWorkspace` 关在
      * 工作区内，读不到这里）。

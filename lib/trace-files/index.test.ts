@@ -1,102 +1,64 @@
 // ============================================================
-// trace-files —— 会话 → 轨迹文件定位（A3）
+// trace-files.test.ts —— 会话目录 → 轨迹文件（定位层）
 // ============================================================
-// 测 seam：listTraceFiles(traceDir, sessionId) → TraceFile[]（按时间升序）。
-// 这个模块的全部价值就是两条：① 只认自己那一会话的文件 ② 不动文件内容。
-// 所以用例围绕"混进别的会话/老文件/子目录时怎么办"展开。
+// 测 seam：listTraceFiles(会话目录) → 按文件名升序的路径数组。
+// 布局（2026-11-11）：<会话目录>/trace.<runId>.jsonl —— 归属由**目录**表达，
+// 文件名只承载 runId，所以这里只做「目录内过滤 + 排序」，不再解析文件名。
 // ============================================================
 
-import { afterEach, describe, expect, it } from "vitest";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
-import { writeFile } from "node:fs/promises";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { traceFileName } from "../trace";
 import { listTraceFiles } from "./index";
 
-const cleanups: Array<() => void> = [];
+const RUN_EARLY = "run_2026-08-19T06-00-00-000Z_aaaaaa";
+const RUN_LATE = "run_2026-08-19T07-00-00-000Z_bbbbbb";
 
-function makeDir(): string {
-  const dir = mkdtempSync(join(tmpdir(), "trace-files-test-"));
-  cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
-  return dir;
-}
+let dir: string;
 
-afterEach(() => {
-  while (cleanups.length) cleanups.pop()?.();
+beforeEach(() => {
+  dir = mkdtempSync(join(tmpdir(), "trace-files-test-"));
 });
 
-/** 只建文件，内容随便——列目录不该读内容 */
-async function touch(dir: string, name: string): Promise<void> {
-  await writeFile(join(dir, name), "内容不重要\n", "utf8");
+afterEach(() => {
+  rmSync(dir, { recursive: true, force: true });
+});
+
+function file(name: string): string {
+  const path = join(dir, name);
+  writeFileSync(path, "{}\n");
+  return path;
 }
 
-// runId 用真实形状（定宽 ISO 时间戳），这样排序断言才有意义
-const RUN_EARLY = "run_2026-09-14T07-00-05-195Z_aaaaaa";
-const RUN_LATE = "run_2026-09-14T09-30-00-000Z_bbbbbb";
-
 describe("listTraceFiles", () => {
-  it("只列本会话的文件，按时间升序（与写入顺序无关）", async () => {
-    const dir = makeDir();
-    await touch(dir, traceFileName("s_target", RUN_LATE));
-    await touch(dir, traceFileName("s_target", RUN_EARLY));
+  it("按文件名升序（runId 含定宽时间戳 ⇒ 字典序即时间序）", async () => {
+    // 故意先建晚的：证明排序不是"建文件顺序"
+    file(`trace.${RUN_LATE}.jsonl`);
+    file(`trace.${RUN_EARLY}.jsonl`);
 
-    const files = await listTraceFiles(dir, "s_target");
-    expect(files.map((file) => file.runId)).toEqual([RUN_EARLY, RUN_LATE]);
-    expect(files.map((file) => file.sessionId)).toEqual([
-      "s_target",
-      "s_target",
+    expect(await listTraceFiles(dir)).toEqual([
+      join(dir, `trace.${RUN_EARLY}.jsonl`),
+      join(dir, `trace.${RUN_LATE}.jsonl`),
     ]);
-    expect(files[0].path).toBe(join(dir, traceFileName("s_target", RUN_EARLY)));
   });
 
-  it("别的会话的文件不混进来", async () => {
-    const dir = makeDir();
-    await touch(dir, traceFileName("s_target", RUN_EARLY));
-    await touch(dir, traceFileName("s_other", RUN_EARLY));
+  it("只认 trace.*.jsonl：会话主日志与别的文件不算轨迹", async () => {
+    file("session.jsonl");
+    file("trace.notes.txt");
+    file("README.md");
+    const trace = file(`trace.${RUN_EARLY}.jsonl`);
 
-    const files = await listTraceFiles(dir, "s_target");
-    expect(files).toHaveLength(1);
-    expect(files[0].sessionId).toBe("s_target");
+    expect(await listTraceFiles(dir)).toEqual([trace]);
   });
 
-  it("会话 id 互为前缀时不误伤（s_a 不会把 s_ab 的文件算进来）", async () => {
-    const dir = makeDir();
-    await touch(dir, traceFileName("s_a", RUN_EARLY));
-    await touch(dir, traceFileName("s_ab", RUN_EARLY));
+  it("名字像轨迹的**目录**不算（isFile 判据）", async () => {
+    mkdirSync(join(dir, `trace.${RUN_EARLY}.jsonl`));
 
-    const files = await listTraceFiles(dir, "s_a");
-    expect(files.map((file) => file.sessionId)).toEqual(["s_a"]);
+    expect(await listTraceFiles(dir)).toEqual([]);
   });
 
-  it("老轨迹文件名（<runId>.jsonl，没有会话前缀）被忽略——它们归不到任何会话", async () => {
-    const dir = makeDir();
-    await touch(dir, `${RUN_EARLY}.jsonl`);
-    await touch(dir, traceFileName("s_target", RUN_EARLY));
-
-    const files = await listTraceFiles(dir, "s_target");
-    expect(files).toHaveLength(1);
-  });
-
-  it("忽略子目录（哪怕名字长得像轨迹文件）", async () => {
-    const dir = makeDir();
-    mkdirSync(join(dir, traceFileName("s_target", RUN_EARLY)));
-    await touch(dir, traceFileName("s_target", RUN_LATE));
-
-    const files = await listTraceFiles(dir, "s_target");
-    expect(files.map((file) => file.runId)).toEqual([RUN_LATE]);
-  });
-
-  it("目录不存在 → 空数组（不是抛错）", async () => {
-    const dir = makeDir();
-    expect(
-      await listTraceFiles(join(dir, "根本没有这个目录"), "s_target"),
-    ).toEqual([]);
-  });
-
-  it("没有轨迹的会话 → 空数组", async () => {
-    const dir = makeDir();
-    await touch(dir, traceFileName("s_other", RUN_EARLY));
-    expect(await listTraceFiles(dir, "s_target")).toEqual([]);
+  it("目录不存在 → 空数组（还没跑过 agent，不是错误）", async () => {
+    expect(await listTraceFiles(join(dir, "根本没有这个目录"))).toEqual([]);
   });
 });
