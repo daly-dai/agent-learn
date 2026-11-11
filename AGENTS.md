@@ -123,7 +123,7 @@
 
 - 分层、路线图、功能映射看 `PLAN.md`。
 - 系统提示词在 `app/api/chat/_pipeline/prompt/index.ts`（`buildSystemPrompt`），想调 agent 的说话方式就改那里。⚠️ **两类东西别往里面抄**：① 工具**清单**（"这把工具是什么"由随请求发来的 `tools` 定义承载）② 工具**专属的规矩**（住在**那个工具自己的文件**里 —— `RegisteredTool.guidelines`，由 `ToolRegistry.guidelines()` 收集、在 `_pipeline/index.ts` 的装配点渲染进提示词）。这里只留**不点名任何工具**的通用规矩。判据一句话：**文本住提示词文件 = 弱关联（谁都不欠它一次同步）；住工具文件 = 强关联（改工具就看得见、工具删了话跟着走）**。来龙去脉见 `doc/plan/c34-tool-guidelines.md`。
-- 轨迹（调试黑匣子）在 `.traces/`，一个 run 一个 jsonl 文件。
+- 轨迹（调试黑匣子）在**每个会话自己的目录里**（2026-11-11 搬的：`<数据根>/sessions/<工作空间键>/<会话目录>/trace.<runId>.jsonl`，数据根默认 `~/.statve`，`STATVE_HOME` 可覆盖）。不再有全局 `.traces/` —— 删会话 = 删整个目录，轨迹跟着走。
 
 ## 环境与验证（踩过的边界，别再踩）
 
@@ -138,7 +138,7 @@
 - `tsc --noEmit` 沙箱可跑（exit 0）。
 
 **真机验收（浏览器里让模型跑命令）** ⚠️ 2026-09-20 连栽两次，教训写在这里
-- ⭐ **应用的工作区根 ≠ 仓库根**：`lib/config/index.ts` 的默认值是 `resolve(process.cwd(), "workspace")`，即 **`<仓库>/workspace`**（`WORKSPACE_ROOT` 可覆盖，`.env.local` 里目前没设）。**文件工具的围栏、bash 的 `cwd` 全在它里面** ⇒ 验收命令里写 `PLAN.md` / `doc/plan/*.md` 就是**围栏外的路径**：模型读不到、相对路径也根本不存在。**能自包含的命令最稳（不读文件）**；要读就读工作区内的（如 `workspace/README.md`）。
+- ⭐ **应用的工作区根 = 那个会话自己的文件夹**（⚠️ 2026-11-11 改）：以前是全局配置 `resolve(process.cwd(), "workspace")`（即 `<仓库>/workspace`，`WORKSPACE_ROOT` 可覆盖）；现在**围栏根来自会话头的 `cwd`**——你在界面上选哪个文件夹当工作空间，模型的文件工具和 `bash` 的 `cwd` 就锁在哪个文件夹里（`lib/resources` + `app/api/chat/_pipeline/context` 的 `toolContextForWorkspace`）。⇒ **验收前先确认那个会话的工作空间是哪个文件夹**；要模型读文件，文件就得在**那个文件夹里**（仓库根、`PLAN.md`、`doc/**` 通常在它外面，模型读不到）。**能自包含的命令最稳（不读文件）**。
 - ⭐ **期望值必须自己先跑出来**，不许写"我以为会怎样"（第一版清单里两条期望当场被用户打回）：① `[Math]::Min(1,2)` 只在**受限语言模式的机器**上才报错 —— 环境依赖，换台机器这条判据**永远过不了门槛** ② `Select-String` 无匹配在 **pwsh 里退出码是 0**（把 bash `grep` 的"无匹配 → 1"当成了 pwsh 行为，那条必然红）。
 - 顺带记两条 pwsh 事实（C36 实测）：**造"退出码 0 但有报错"的确定性写法 = `1..3 | ForEach-Object { Write-Error "boom" }`** —— 错误流经原生重定向时 PowerShell **总是**序列化成 CLIXML（`Write-Error` / `Get-Item 不存在路径` / `throw` / 受限模式报错，四种都产出），**任何 Windows 机器都能复现**；解那个信封要先解 `_xHHHH_` 转义再洗 ANSI（实现见 `lib/process-output/`）。
 

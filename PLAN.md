@@ -252,6 +252,8 @@
 | C49 | **会话列表按工作空间分组显示**：组标题 = 工作空间**显示名**（同名靠重命名区分，不显示路径）；组头**始终显示**（它带 新建 / 重命名 / 打开 / 删除 四个动作）；每组先渲染 **5 条** + `展开其余 N 个` | 用户 2026-11-10 定「列表按照不同的工作空间分组」+「只显示文件夹名称」+「先加载前五个」；现状 `SessionSummary` 没有 `cwd`（`lib/session/manager/index.ts:30-37`），而 `cwd` 已写在会话头里 | 同上（设计 4.4，分组是纯函数 `app/lib/session-groups`，node 可测） | 见详案 5.1–5.2（I7） | 已纳入 I2 |
 | C50 | **全局数据根 `~/.statve`**：sessions（+未来 mcp）住这里；资源读取顺序 **项目·statve > 项目·agents > 用户·statve > 用户·agents**，同 key 覆盖不合并 | DSH 的家目录 `~/.dsh`（`DSH_HOME` 可覆盖，`docs/config-catalog.zh.md:400,848,3360,3397`）；触发：用户 2026-11-10 定「数据根指定到 C 盘用户目录的 .statve」+「全局 skill/mcp 读 .statve 和 .agents，statve 优先」。⚠️ 作废 `lib/config/index.ts:131-138` 那条「技能只做一个根」的决策 | `doc/plan/workspace.md`（设计 4.1、4.8） | 见详案 5.1（`lib/resources` 6 条） | 已纳入 I2 |
 | C52 | **删掉审批侧车 `approval.jsonl`**：审批决策已经逐条进轨迹（`tool_permission` 事件），侧车**只有人写、没人读** ⇒ 删模块 + 两处写入 + `delete()` 里的侧车分支 | 证据：`loadApprovalReceipts` / `replayApprovalReceipts` 的调用者只有测试；引擎在 `lib/agent/index.ts:271` 发 `tool_permission`；触发：用户 2026-11-10「我都有 trace 了，为啥还要 approval.jsonl」 | `doc/plan/workspace.md`（决策 16 + 4.12） | 见详案 5.1 / I5 | 已纳入 I2 |
+| C53 | **技能加载改成两阶段**：清单阶段只读 frontmatter（name + description），同名覆盖在清单层判；**选中之后**才读正文 + 递归列文件；`skill` 工具不再为 1 个技能全量扫 | 实测（2026-11-11，本机热缓存、每技能 17 文件）：30 技能 6.5ms / 300 技能 63ms / 1200 技能 ≈250ms，而**每条消息**都付一次；而清单只用到 name+desc。触发：用户「我一直以为咱们是只取 name+desc、选中再取详情」——现状是一次全读 | `doc/plan/c8-skills.md`（补记 12） | — | 未开始 |
+| C54 | **技能清单的规模上限与检索**：清单变大时不截断，改成「共有 N 个，用检索找」；面板的模糊匹配同时看 description（现在只看 name/aliases） | 实测：1200 技能清单 ≈77k 字符（每轮都付 token），而前端模糊匹配 1200 条只要 152µs ⇒ 瓶颈在 token 不在过滤；⚠️ 上限只能封「给模型看的那一份」，扫描层与面板快照必须全量，否则模糊匹配会搜不到被截掉的技能 | `doc/plan/c8-skills.md`（补记 12） | — | 未开始 |
 
 #### 7.3.4 项目级事项（不属于任何功能/优化）
 
