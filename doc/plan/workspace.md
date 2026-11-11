@@ -435,30 +435,28 @@ tracePath(sessionDirPath: string, runId: string): string // <dir>/trace.<runId>.
 isValidSessionId(id: string): boolean              // 从 manager 迁入，语义不变
 ```
 
-**`lib/workspace/`** —— 纯的与碰盘的分开
+**`lib/workspace/index.ts`** —— 一个模块三段（纯函数 / 序列化 / 碰盘），不拆成 `model.ts` + `store.ts`：它们是同一件事的三个面，拆开只会让人在文件间来回找（2026-11-11 实施时定的）
 
 ```ts
-// model.ts（纯）
+// 纯
 export type Workspace = { id: string; path: string; title: string; createdAt: string; updatedAt: string }
-export function defaultTitle(path: string): string        // 末段；盘符根（C:\）→ 盘符本身
-export function validateTitle(title: string): string      // trim；空 / >60 字 → 抛 WorkspaceError
-export function upsertOnBootstrap(records: Workspace[], sessions: { id: string; cwd: string }[]): Workspace[]
-// store.ts（碰盘；写入全部走模块内一条写队列，Promise 串行）
-export async function loadWorkspaces(home: string): Promise<Workspace[]>   // 文件不存在 → []
-export async function createWorkspace(home: string, path: string, title?: string): Promise<Workspace>
-export async function renameWorkspace(home: string, id: string, title: string): Promise<Workspace>
-export async function deleteWorkspace(home: string, id: string, sessionCwds: string[]): Promise<{ removed: Workspace; unregisteredSessions: number }>
+export type WorkspaceErrorCode = "corrupt" | "not-found" | "duplicate" | "invalid-title" | "invalid-path" | "not-a-directory"
+export class WorkspaceError extends Error { readonly code: WorkspaceErrorCode }
+export function isFullyQualifiedPath(path: string, platform?: NodeJS.Platform): boolean
+export function defaultTitle(path: string, platform?: NodeJS.Platform): string
+export function validateTitle(title: string): string
+export function parseRegistry(raw: string): Workspace[]
+export function serializeRegistry(workspaces: Workspace[]): string
+export function bootstrapRecords(records: Workspace[], sessionCwds: string[], now: string): Workspace[]
+// 碰盘（写入全部走模块内一条写队列，Promise 串行 + 临时文件 rename）
+export async function loadWorkspaces(home: string): Promise<Workspace[]>                     // 文件不存在 → []
+export async function createWorkspace(home: string, input: { path: string; title?: string }): Promise<Workspace>
+export async function renameWorkspace(home: string, input: { id: string; title: string }): Promise<Workspace>
+export async function deleteWorkspace(home: string, input: { id: string; sessionCwds: string[] }): Promise<{ removed: Workspace; unregisteredSessions: number }>
+export async function bootstrapWorkspaces(home: string, sessionCwds: string[]): Promise<Workspace[]>
 ```
 
-**错误类型：一种、带 `code`**
-
-```ts
-export class WorkspaceError extends Error {
-  code: "corrupt" | "not-found" | "duplicate" | "invalid-title" | "invalid-path" | "not-a-directory"
-}
-```
-
-> 不用一堆子类：调用方只需要**一个 switch** 把 code 翻成 HTTP 码；7 个子类会让路由里出现 7 个 `instanceof`。
+> 错误只有**一个类 + `code`**：调用方用一个 switch 就能把 code 翻成 HTTP 码；7 个子类会让路由里出现 7 个 `instanceof`。
 
 #### B. 错误码表（前端弹什么，全看这张）
 
@@ -573,7 +571,7 @@ export class WorkspaceError extends Error {
 | `EscapePermits` | 2 | 一次性消费；未 grant 时围栏照常抛错 |
 | `lib/resources` + `loadSkills` 多根 | 6 | 四层顺序；同 key 覆盖不合并；根不存在静默跳过；`root` 出处正确 |
 | 目录浏览栅栏 | 6 | `C:\x` 通过；`\foo`/`/foo`/相对路径拒绝；单段名校验；排序确定性；截断标记 |
-| `lib/workspace` 注册表 | 6 | canonical 去重（同一个文件夹登记两次 → 409）；`title` 默认取末段；重命名只改 `title`；删记录返回未登记会话数；json 坏文件 → 报错而不是当空；原子写不产生半截文件 |
+| `lib/workspace` 注册表 | 20 | canonical 去重（同一个文件夹登记两次 → 409）；`title` 默认取末段；重命名只改 `title`；删记录返回未登记会话数；json 坏文件 → 报错而不是当空；**并发 5 个新增一条不丢**（写队列）；bootstrap 幂等 |
 | `groupSessions` 与注册表联动 | 4 | 匹配 `cwd`；未登记组排最后；同名两组都出现；组头始终存在 |
 
 ### 5.2 集成与真机（dev server + 浏览器）
