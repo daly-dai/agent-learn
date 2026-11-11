@@ -565,7 +565,7 @@ export async function bootstrapWorkspaces(home: string, sessionCwds: string[]): 
 | 模块 | 用例数 | 判据 |
 |---|---|---|
 | `lib/session/paths` | 8 | `projectKey`：反斜杠/盘符/中文/emoji/超长截断/空串抛错/前导 `-` 去重；`encodeSegment` **单射**（不同 id 不出同段）；`..` 与绝对路径不出目录 |
-| `app/lib/session-groups` | 6 | 分组/组序/组内序/标题消歧/`_no-cwd`/单组标记 |
+| `app/lib/session-groups` | 12 | 归属（cwd 匹配 / 未登记 / 空串）；组序（工作空间 `updatedAt` 倒序，未登记最后）；组内序；**空工作空间仍出现**；原对象不被改写；`foldGroup` 前 5 条与展开 |
 | `app/lib/tool-escape` | 6 | 7 个工具 × 内/外；`bash` 返回 `inside`（显式已知限制） |
 | `_pipeline/approval` 扩展 | 6 | 越界 × 三种模式；secret 优先于越界；非越界不受影响 |
 | `EscapePermits` | 2 | 一次性消费；未 grant 时围栏照常抛错 |
