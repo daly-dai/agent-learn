@@ -80,7 +80,7 @@ Body.
     manyFiles,
   );
 
-  tool = createSkillTool(root);
+  tool = createSkillTool([root]);
 });
 
 afterAll(async () => {

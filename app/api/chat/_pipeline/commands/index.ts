@@ -62,9 +62,9 @@ export type CommandCatalog = {
  * ⚠️ 今天三个内置命令都没写别名，所以"别名那一半"暂时**没有用例守着**；留着它是因为
  * `SlashCommand.aliases` 是既有能力（codex ALIAS_COMMANDS），而漏了的后果是静默的。
  */
-export function commandCatalog(skillsRoot: string): CommandCatalog {
+export function commandCatalog(skillsRoots: string[]): CommandCatalog {
   const commands = commandDescriptors();
-  const { skills, diagnostics } = loadSkills(skillsRoot);
+  const { skills, diagnostics } = loadSkills(skillsRoots);
 
   const taken = new Set(
     commands.flatMap((command) => [command.name, ...(command.aliases ?? [])]),

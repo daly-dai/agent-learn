@@ -33,11 +33,7 @@ import type { ToolCallContent, ToolDecision } from "@/lib";
 import type { StreamFrame } from "./_pipeline/frames";
 import { decideToolCall, type ApprovalOutcome } from "./_pipeline/approval";
 import { selectModelSafe } from "./_pipeline/model";
-import {
-  createRequestContext,
-  createSessionStore,
-  toolContext,
-} from "./_pipeline/context";
+import { createRequestContext, createSessionStore } from "./_pipeline/context";
 import { runPipeline } from "./_pipeline/index";
 import { computeContextPressure } from "./_pipeline/context";
 import { isReadOnlyBash } from "@/lib/permission/readonly";
@@ -112,7 +108,7 @@ export async function POST(req: NextRequest) {
       { status: 404 },
     );
   }
-  const { store, recorder } = await createRequestContext({
+  const { store, recorder, toolContext } = await createRequestContext({
     sessionId,
     location,
     modelLabel,
@@ -171,7 +167,8 @@ export async function POST(req: NextRequest) {
           recorder,
           send,
           signal: abortController.signal,
-          // 这次请求的环境（模块顶部生产的那一个对象）
+          // 这次请求的环境：围栏根 = 本会话的工作空间，技能根由它派生（每请求一份，
+          // 不再是模块常量 —— 那是 F2「所有会话共用第一个工作空间」的来源）
           toolContext,
           beforeToolCall: (call) => handleToolApproval(call, send, sessionId),
         });

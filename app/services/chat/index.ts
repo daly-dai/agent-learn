@@ -96,9 +96,10 @@ export function sendMessage(
 
 // ---- C13 斜杠命令 ----
 
-/** GET /api/chat/commands —— 命令列表（前端命令面板数据源，slashCatalog 快照） */
-export function fetchCommands(): Promise<CommandsResult> {
-  return api("/api/chat/commands");
+/** GET /api/chat/commands?sessionId= —— 命令列表（前端命令面板数据源，slashCatalog 快照）。
+ *  必须带 sessionId：技能清单取决于「这个会话的工作空间」（项目级 / 用户级是不同的层）。 */
+export function fetchCommands(sessionId: string): Promise<CommandsResult> {
+  return api(`/api/chat/commands?sessionId=${encodeURIComponent(sessionId)}`);
 }
 
 /** POST /api/chat/command —— 执行一条斜杠命令（不走模型；未知命令 400） */

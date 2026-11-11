@@ -96,8 +96,11 @@ export class ToolRegistry {
 export type ToolContext = {
   /** 文件工具的围栏根：所有文件工具都关在它里面（`resolveInsideWorkspace`） */
   workspaceRoot: string;
-  /** 技能根：在**工作区之外**，只有 `skill` 工具读它（见 `lib/tools/skill/index.ts` 头部） */
-  skillsRoot: string;
+  /**
+   * 技能根**列表**，按优先级（见 `lib/resources` 的四层）：
+   * 在**工作区之外**，只有 `skill` 工具读它（见 `lib/tools/skill/index.ts` 头部）。
+   */
+  skillsRoots: string[];
 };
 
 /**
@@ -149,7 +152,7 @@ export function createToolRegistry(
   // 自动放行（不进 TOOLS_NEEDING_CONFIRM）：要防的是"动手"，不是"读"。
   // 认下的信任边界：技能正文是外部指令，会不经批准影响模型行为；兜底是
   // 正文若要模型动手，bash / 写文件**仍然弹框**。
-  registry.register(createSkillTool(context.skillsRoot));
+  registry.register(createSkillTool(context.skillsRoots));
 
   return registry;
 }

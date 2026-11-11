@@ -21,17 +21,24 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
-import { config } from "../config";
 import {
   buildSkillCatalog,
   findSkill,
   findSkillInvocations,
-  loadSkills,
+  loadSkills as loadSkillsFromRoots,
   renderSkillContent,
   type Skill,
 } from "./index";
+
+/**
+ * 单根包装：本文件绝大多数用例只关心"**一个**根里发生了什么"。
+ * 多根本身的行为（同名取第一个、去重）在文件末尾单独测。
+ */
+function loadSkills(root: string | string[]) {
+  return loadSkillsFromRoots(Array.isArray(root) ? root : [root]);
+}
 
 /** 往技能根里写一个技能目录（dirName 就是它的身份） */
 async function writeSkill(params: {
@@ -414,6 +421,7 @@ describe("buildSkillCatalog —— 只给模型看它调得动的（markdown 列
       description:
         "Create and present web-based slidedecks for developers using Slidev with Markdown, Vue components, code highlighting, animations, and interactive features. Use when building technical presentations, conference talks, code walkthroughs, teaching materials, or developer decks.",
       baseDir: join(root, "slidev"),
+      root,
       content: "# Slidev\n",
       files: [],
       modelInvocable: true,
@@ -422,6 +430,7 @@ describe("buildSkillCatalog —— 只给模型看它调得动的（markdown 列
       name: "teach",
       description: "Explain a topic interactively.",
       baseDir: join(root, "teach"),
+      root,
       content: "# Teach\n",
       files: [],
       modelInvocable: false,
@@ -442,6 +451,7 @@ describe("buildSkillCatalog —— 只给模型看它调得动的（markdown 列
       name: "x",
       description: "d",
       baseDir: root,
+      root,
       content: "c",
       files: [],
       modelInvocable: false,
@@ -562,6 +572,7 @@ describe("renderSkillContent —— 两条路（工具 / 手势）共用的同�
       name: "many-files",
       description: "d",
       baseDir: root,
+      root,
       content: "body",
       // 边界值构造：上限就是 10，真实技能今天最多十来个文件，
       // 超限那天必须有确定行为 —— 而这条行为只能在这里钉死。
@@ -583,6 +594,7 @@ describe("renderSkillContent —— 两条路（工具 / 手势）共用的同�
       name: 'a"b&c',
       description: "d",
       baseDir: root,
+      root,
       content: "body",
       files: [],
       modelInvocable: true,
@@ -719,7 +731,8 @@ describe("findSkillInvocations —— 裸名手势（谁被 /名字 点到了）
 // 当天就会变红，然后被人顺手改成新数字，从此失去意义。
 // ------------------------------------------------------------------
 describe("真实技能根（本机已装的技能）", () => {
-  const realRoot = config.paths.skillsRoot;
+  // 用户级共享技能根：`~/.agents/skills`（配置项 skillsRoot 已随多根删除）
+  const realRoot = join(homedir(), ".agents", "skills");
   const installed = existsSync(realRoot);
 
   it.skipIf(!installed)(
@@ -766,4 +779,95 @@ describe("真实技能根（本机已装的技能）", () => {
       }
     },
   );
+});
+
+// ------------------------------------------------------------------
+// 多根（C50）：技能根从"一个"变成"四层，按优先级"
+// ------------------------------------------------------------------
+// 夹具为什么是真的：四层里项目级两层（`.statve/skills`、`.agents/skills`）
+// 在真实机器上通常是**不存在**的，所以"根不存在就跳过"不是边界情况，
+// 而是每次请求的常态。
+describe("loadSkills 多根 —— 先命中的赢，不合并", () => {
+  it("同名技能取第一个根里的那份（后面的同名项被忽略）", async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), "skill-multi-project-"));
+    const userRoot = await mkdtemp(join(tmpdir(), "skill-multi-user-"));
+    try {
+      await writeSkill({
+        root: projectRoot,
+        dirName: "code-review",
+        skillMd:
+          "---\nname: code-review\ndescription: 项目版\n---\n\n项目正文\n",
+      });
+      await writeSkill({
+        root: userRoot,
+        dirName: "code-review",
+        skillMd:
+          "---\nname: code-review\ndescription: 用户版\n---\n\n用户正文\n",
+      });
+
+      const { skills } = loadSkills([projectRoot, userRoot]);
+
+      // 不合并：只有一条，且是项目级那份（"合并"会造出一个没人写过的技能）
+      expect(skills.map((s) => s.name)).toEqual(["code-review"]);
+      expect(skills[0].description).toBe("项目版");
+      expect(skills[0].root).toBe(projectRoot);
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true });
+      await rm(userRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("后面的根里**独有的**技能照样加载（只按名字去重，不整根舍弃）", async () => {
+    const projectRoot = await mkdtemp(join(tmpdir(), "skill-multi-project-"));
+    const userRoot = await mkdtemp(join(tmpdir(), "skill-multi-user-"));
+    try {
+      await writeSkill({
+        root: projectRoot,
+        dirName: "only-project",
+        skillMd:
+          "---\nname: only-project\ndescription: 项目独有\n---\n\n正文\n",
+      });
+      await writeSkill({
+        root: userRoot,
+        dirName: "only-user",
+        skillMd: "---\nname: only-user\ndescription: 用户独有\n---\n\n正文\n",
+      });
+
+      const { skills } = loadSkills([projectRoot, userRoot]);
+
+      expect(skills.map((s) => s.name)).toEqual(["only-project", "only-user"]);
+      expect(skills.map((s) => s.root)).toEqual([projectRoot, userRoot]);
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true });
+      await rm(userRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("不存在的根静默跳过、不产诊断（四层里有两层不存在是常态，不是错误）", async () => {
+    const realRoot = await mkdtemp(join(tmpdir(), "skill-multi-real-"));
+    try {
+      await writeSkill({
+        root: realRoot,
+        dirName: "tdd",
+        skillMd: "---\nname: tdd\ndescription: 测试驱动\n---\n\n正文\n",
+      });
+
+      const { skills, diagnostics } = loadSkills([
+        join(realRoot, "根本没有这一层"),
+        realRoot,
+      ]);
+
+      expect(skills.map((s) => s.name)).toEqual(["tdd"]);
+      expect(diagnostics).toEqual([]);
+    } finally {
+      await rm(realRoot, { recursive: true, force: true });
+    }
+  });
+
+  it("只给一层不存在的根 → 空结果、不抛（新机器 / 项目级什么都没装）", () => {
+    expect(loadSkills([join(tmpdir(), "statve-no-such-skill-root")])).toEqual({
+      skills: [],
+      diagnostics: [],
+    });
+  });
 });

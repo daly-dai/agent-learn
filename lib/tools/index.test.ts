@@ -19,7 +19,7 @@ import { createToolRegistry } from ".";
 function registry(): ToolRegistry {
   // 环境对象（C8 ToolContext）：这层只关心"工具清单"，两个根随便给一个目录
   return createToolRegistry(
-    { workspaceRoot: process.cwd(), skillsRoot: process.cwd() },
+    { workspaceRoot: process.cwd(), skillsRoots: [process.cwd()] },
     {},
   );
 }

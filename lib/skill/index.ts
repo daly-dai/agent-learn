@@ -32,6 +32,8 @@ export type Skill = {
   description: string;
   /** 技能目录绝对路径（模型读资源时相对它解析） */
   baseDir: string;
+  /** 这个技能是从**哪个根**加载的（诊断与界面能说"它从哪来"） */
+  root: string;
   /** SKILL.md 去掉 frontmatter 之后的正文 */
   content: string;
   /** 目录下的文件（相对路径、递归、字母序、不含 SKILL.md） */
@@ -60,11 +62,38 @@ const SKILL_FILE = "SKILL.md";
 export const MAX_LISTED_FILES = 10;
 
 /**
- * 扫一个技能根，返回**能用的技能**和**看不见就会出问题的诊断**。
+ * 扫多个技能根，返回**能用的技能**和**看不见就会出问题的诊断**。
  *
- * 根目录不存在 = 这台机器还没装过技能 → 空结果、不算错误。
+ * 根的顺序 = 优先级（C50，见 `lib/resources`）：**同名技能取第一个命中的**，
+ * 后面的同名技能直接忽略（不合并、不覆盖 —— 合并会产生一个"现实中不存在的
+ * 技能"，模型看到的东西没人写过）。
+ *
+ * 根目录不存在 = 这台机器/项目没往这一层放技能 → 跳过，不算错误。
+ * 为什么**不**为缺失的根记诊断：四层里通常有两层是不存在的（项目级多半没有），
+ * 记了就是每次请求两条噪音；"这技能从哪来"由 `Skill.root` 回答。
  */
-export function loadSkills(skillsRoot: string): LoadSkillsResult {
+export function loadSkills(roots: string[]): LoadSkillsResult {
+  const skills: Skill[] = [];
+  const diagnostics: SkillDiagnostic[] = [];
+  // 已经出现过的技能名：先到的根赢，后面的同名项不再进列表
+  const taken = new Set<string>();
+
+  for (const root of roots) {
+    const loaded = loadSkillsFromRoot(root);
+    diagnostics.push(...loaded.diagnostics);
+
+    for (const skill of loaded.skills) {
+      if (taken.has(skill.name)) continue;
+      taken.add(skill.name);
+      skills.push(skill);
+    }
+  }
+
+  return { skills, diagnostics };
+}
+
+/** 扫**一个**根（内部用；多根的顺序与去重由 `loadSkills` 负责） */
+function loadSkillsFromRoot(skillsRoot: string): LoadSkillsResult {
   const skills: Skill[] = [];
   const diagnostics: SkillDiagnostic[] = [];
 
@@ -74,7 +103,8 @@ export function loadSkills(skillsRoot: string): LoadSkillsResult {
       .filter((entry) => entry.isDirectory())
       .map((entry) => entry.name);
   } catch (error) {
-    // 根不存在不是错（新机器）；其它读不了要说话——静默失败是这个项目最恨的 bug 形态
+    // 根不存在不是错（新机器 / 这一层没放技能）；其它读不了要说话
+    // —— 静默失败是这个项目最恨的 bug 形态
     if ((error as NodeJS.ErrnoException).code === "ENOENT") {
       return { skills, diagnostics };
     }
@@ -91,7 +121,7 @@ export function loadSkills(skillsRoot: string): LoadSkillsResult {
   }
 
   for (const dirName of dirNames.sort(compareNames)) {
-    const loaded = loadOneSkill(dirName, join(skillsRoot, dirName));
+    const loaded = loadOneSkill(dirName, join(skillsRoot, dirName), skillsRoot);
 
     if (loaded.skill) skills.push(loaded.skill);
     diagnostics.push(...loaded.diagnostics);
@@ -109,6 +139,7 @@ export function loadSkills(skillsRoot: string): LoadSkillsResult {
 function loadOneSkill(
   dirName: string,
   baseDir: string,
+  root: string,
 ): { skill: Skill | null; diagnostics: SkillDiagnostic[] } {
   const skillFile = join(baseDir, SKILL_FILE);
   let raw: string;
@@ -164,6 +195,7 @@ function loadOneSkill(
       name: dirName,
       description,
       baseDir,
+      root,
       content: parsed.body,
       files: collectFiles(baseDir),
       modelInvocable: parsed.fields.get("disable-model-invocation") !== "true",

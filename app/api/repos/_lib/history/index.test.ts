@@ -25,7 +25,8 @@ const logsDir = join(tempDir, "更新日志");
 vi.mock("@/lib/config", () => ({
   config: {
     paths: {
-      workspace: tempDir,
+      // 2026-11-11：更新日志目录有了自己的配置项（原来的全局 workspace 已删除）
+      repoLogs: join(tempDir, "更新日志"),
     },
   },
 }));

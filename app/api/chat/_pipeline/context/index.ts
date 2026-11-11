@@ -1,11 +1,18 @@
 // ============================================================
-// _pipeline/context.ts —— 请求准备物（E2 步骤 3 从 route.ts 拆出）
+// _pipeline/context —— 请求准备物（E2 步骤 3 从 route.ts 拆出）
 // ============================================================
-// 一次 POST 请求的"准备阶段"：定位会话 + 建会话存储 + 建轨迹记录器。
+// 一次 POST 请求的"准备阶段"：定位会话 + 建会话存储 + 建轨迹记录器 + 建工具环境。
+//
 // 2026-11-11 起「会话在哪个目录」只由 `SessionManager.locate(id)` 给：
 // 本文件不再自己 join 路径（那是 F1「4 处拼法漏改一处就静默少东西」的来源）。
+//
+// ⚠️ **工具环境（ToolContext）不再是模块常量**：以前它是个 `export const`，
+// 工作区根来自全局配置 ⇒ 所有会话共用第一个工作区（F2：不报错、静默串味）。
+// 现在它由**会话头的 cwd** 每请求构造一次。谁能 new 的纪律：只许下面两个工厂造，
+// 不许在模块作用域出现 `const ctx: ToolContext = ...`。
 // ============================================================
 
+import { homedir } from "node:os";
 import {
   JsonlSessionStore,
   estimateTokens,
@@ -13,28 +20,10 @@ import {
 } from "@/lib/session";
 import type { SessionLocation } from "@/lib/session";
 import { config } from "@/lib/config";
+import { resolveSkillRoots } from "@/lib/resources";
 import { TraceRecorder } from "@/lib/trace";
 import type { ToolContext } from "@/lib/tools";
 import type { ContextPressure } from "@/app/lib/context-occupancy";
-
-/**
- * 本次部署的「工具环境」（工作区根 + 技能根）—— **唯一的生产点**。
- *
- * 为什么放这里、不放各自的 route 里：`POST /api/chat` 要它（建工具注册表 + 扫技能根），
- * `GET /api/chat/commands` 也要它（把技能组进面板清单）。技能根只允许出现在**一处**
- * （`doc/plan/c8-skills.md` 的施工纪律 5）—— 将来多根落地时要改的是"一个函数 + 一处
- * 调用点"，不是散开的签名。
- *
- * ⚠️ **本常量在模块作用域，是有前提的**：两个值今天都来自 `config`（静态，不会变）。
- * 一旦工作区改成"**按会话 / 按工作区**不同"（C6 工作区选择 + C32 项目级配置：值从会话头
- * 的 `cwd` 来、技能根由它派生 —— 见 `doc/plan/c8-skills.md` 的**补记 4**），
- * **它必须挪进请求处理函数内部**。不挪 = **第一个请求的工作区被所有会话共用**：
- * 不报错、只是静默串味 —— 和当年那个"模块级单例注册表"是同一个病的另一面。
- */
-export const toolContext: ToolContext = {
-  workspaceRoot: config.paths.workspace,
-  skillsRoot: config.paths.skillsRoot,
-};
 
 export type RequestContext = {
   /** 会话存储：每次请求新建实例并从磁盘读全量。
@@ -43,6 +32,8 @@ export type RequestContext = {
   store: JsonlSessionStore;
   /** 本次 run 的黑匣子：每次请求一个独立 runId，落在会话目录下的 `trace.<runId>.jsonl` */
   recorder: TraceRecorder;
+  /** 本次请求的工具环境：围栏根 = 这个会话的工作空间，技能根由它派生 */
+  toolContext: ToolContext;
 };
 
 /** 计算当前上下文占用（C13 ContextMeter 数据源）：
@@ -55,6 +46,36 @@ export function computeContextPressure(
     pressureTokens: estimateTokens(store.buildContext()),
     contextWindow: config.provider.contextWindow,
   };
+}
+
+/**
+ * 造一份工具环境（签名即契约，见 `doc/plan/workspace.md` 4.5）。
+ * 两个根都显式传入 —— 它不读全局配置，所以两个会话拿到的根可以不同。
+ */
+export function createToolContext(params: {
+  workspaceRoot: string;
+  skillsRoots: string[];
+}): ToolContext {
+  return {
+    workspaceRoot: params.workspaceRoot,
+    skillsRoots: params.skillsRoots,
+  };
+}
+
+/**
+ * 由「工作空间路径」推出工具环境 —— **生产环境唯一入口**。
+ * 技能根走四层解析（`lib/resources`）：项目级 .statve/.agents 优先，用户级在后。
+ * 用户家目录取 `os.homedir()`：`.agents` 是跨工具约定的用户级目录，与数据根无关。
+ */
+export function toolContextForWorkspace(cwd: string): ToolContext {
+  return createToolContext({
+    workspaceRoot: cwd,
+    skillsRoots: resolveSkillRoots({
+      cwd,
+      dataRoot: config.paths.home,
+      userHome: homedir(),
+    }),
+  });
 }
 
 /**
@@ -93,5 +114,9 @@ export async function createRequestContext(params: {
     params.sessionId,
   );
   await recorder.init();
-  return { store, recorder };
+  return {
+    store,
+    recorder,
+    toolContext: toolContextForWorkspace(params.location.cwd),
+  };
 }

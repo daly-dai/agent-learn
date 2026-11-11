@@ -23,9 +23,9 @@ export type UpdateLogEntry = {
   fileName: string;
 };
 
-/** 更新日志目录 */
+/** 更新日志目录（原本是 `workspace/更新日志`，2026-11-11 起有独立配置项） */
 function logsDir(): string {
-  return join(config.paths.workspace, "更新日志");
+  return config.paths.repoLogs;
 }
 
 /** 解析文件名 "<日期>-<项目>.md" → entry；不符合约定的返回 null */

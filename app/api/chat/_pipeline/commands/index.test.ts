@@ -98,7 +98,7 @@ describe("commandCatalog —— 面板清单（内置命令 + 技能）", () => 
 
   it('技能以 source:"skill" 进清单，且 supportsInlineArgs=true（选中是插文本、不是执行）', () => {
     const byName = new Map(
-      commandCatalog(skillsRoot).commands.map((c) => [c.name, c]),
+      commandCatalog([skillsRoot]).commands.map((c) => [c.name, c]),
     );
 
     expect(byName.get("code-review")).toMatchObject({
@@ -109,13 +109,13 @@ describe("commandCatalog —— 面板清单（内置命令 + 技能）", () => 
     expect(byName.get("前端设计")?.source).toBe("skill");
 
     // 前端安全：descriptor 不许泄漏执行函数（同内置命令那条断言）
-    for (const command of commandCatalog(skillsRoot).commands) {
+    for (const command of commandCatalog([skillsRoot]).commands) {
       expect("handler" in command).toBe(false);
     }
   });
 
   it("命令在前、技能在后（面板上半 / 下半的物理依据；各自按名排序）", () => {
-    expect(commandCatalog(skillsRoot).commands.map((c) => c.name)).toEqual([
+    expect(commandCatalog([skillsRoot]).commands.map((c) => c.name)).toEqual([
       "clear",
       "compact",
       "export",
@@ -125,7 +125,7 @@ describe("commandCatalog —— 面板清单（内置命令 + 技能）", () => 
   });
 
   it("⭐ 撞名：内置优先 —— 技能被顶掉，但**有一条诊断**（R3-1：不能静默丢）", () => {
-    const { commands, diagnostics } = commandCatalog(skillsRoot);
+    const { commands, diagnostics } = commandCatalog([skillsRoot]);
 
     const compacts = commands.filter((c) => c.name === "compact");
     expect(compacts).toHaveLength(1);
@@ -146,7 +146,7 @@ describe("commandCatalog —— 面板清单（内置命令 + 技能）", () => 
       "utf8",
     );
 
-    const { commands, diagnostics } = commandCatalog(broken);
+    const { commands, diagnostics } = commandCatalog([broken]);
     expect(commands.map((c) => c.name)).toEqual(["clear", "compact", "export"]);
     expect(diagnostics.map((d) => d.name)).toEqual(["no-desc"]);
 
@@ -154,7 +154,9 @@ describe("commandCatalog —— 面板清单（内置命令 + 技能）", () => 
   });
 
   it("技能根不存在 → 只有命令、没有诊断（新机器还没装过技能，不是错误）", () => {
-    const { commands, diagnostics } = commandCatalog(join(skillsRoot, "nope"));
+    const { commands, diagnostics } = commandCatalog([
+      join(skillsRoot, "nope"),
+    ]);
     expect(commands.map((c) => c.name)).toEqual(["clear", "compact", "export"]);
     expect(diagnostics).toEqual([]);
   });

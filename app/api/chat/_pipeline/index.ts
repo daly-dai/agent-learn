@@ -76,7 +76,7 @@ export async function runPipeline(params: RunPipelineParams) {
   // 1b) 技能根**每请求只扫这一遍**（C8）：手势注入与系统提示词清单共用这份结果。
   //     ⚠️ 必须在 `buildContext()` **之前** —— 上下文一旦读出来，再往 store 里追加就
   //     赶不上这一轮的请求体了；而"模型零工具调用"靠的正是正文已经在这一轮的上下文里。
-  const { skills, diagnostics } = loadSkills(toolContext.skillsRoot);
+  const { skills, diagnostics } = loadSkills(toolContext.skillsRoots);
   for (const diagnostic of diagnostics) {
     // 坏技能**不阻塞**（跳过，其余照常加载），但**诊断必须看得见** —— 三处一起兜（详案 §17）：
     //   ① 服务端日志（就是下面这一行）

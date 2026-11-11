@@ -99,7 +99,7 @@ describe("buildSystemPrompt —— 提示词整体", () => {
     // 提示词里只该出现后者。所以换成端到端这条 —— 它守的是**渲染那一步别漏**：
     // 工具声明了 guidelines、注册表也收集了，但没渲染进提示词 ⇒ 静默少几条规矩，没人报错。
     const registry = createToolRegistry(
-      { workspaceRoot: process.cwd(), skillsRoot: process.cwd() },
+      { workspaceRoot: process.cwd(), skillsRoots: [process.cwd()] },
       {},
     );
     const guidelines = registry.guidelines();
@@ -192,7 +192,7 @@ describe("buildSystemPrompt —— 工具使用原则（只写规矩，不列清
     // 不是"手写规矩"（理由写在 `lib/skill` 那句旁边）。传空清单把它排除在外。
     const prompt = buildSystemPrompt(FIXED, "");
     const toolNames = createToolRegistry(
-      { workspaceRoot: process.cwd(), skillsRoot: process.cwd() },
+      { workspaceRoot: process.cwd(), skillsRoots: [process.cwd()] },
       {},
     )
       .definitions()

@@ -45,10 +45,10 @@ const DESCRIPTION = [
 ].join("\n");
 
 /**
- * @param skillsRoot 技能根（**由调用方传进来**，工具自己不读配置）：
- *   将来技能根变成多根时，要改的是"谁把它传进来"，不是这个工具的职责。
+ * @param skillsRoots 技能根**列表**（按优先级，先命中的赢）：由调用方传进来，
+ *   工具自己不读配置 —— 根有哪些、谁优先，是 `lib/resources` 的事（C50）。
  */
-export function createSkillTool(skillsRoot: string): RegisteredTool {
+export function createSkillTool(skillsRoots: string[]): RegisteredTool {
   return {
     name: "skill",
     description: DESCRIPTION,
@@ -71,7 +71,7 @@ export function createSkillTool(skillsRoot: string): RegisteredTool {
 
       // 每次执行现扫：技能是用户随时会改的文件，缓存换不来可感知的收益
       // （实测热态 3.9ms），却要处理失效。
-      const { skills } = loadSkills(skillsRoot);
+      const { skills } = loadSkills(skillsRoots);
       const skill = findSkill(skills, name);
       if (!skill) {
         throw new Error(

@@ -59,23 +59,37 @@ export function useCommandMenu({
   const [commands, setCommands] = useState<CommandDescriptor[]>([]);
   // 快照是否加载成功：失败/未完成时跳过前端命令校验、直接交后端判
   // （review 修复：快照不可用时不能拿空名单误杀合法 /compact）
-  const [commandsLoaded, setCommandsLoaded] = useState(false);
+  //
+  // ⚠️ 记的是"**哪个会话**的快照已经到位"，不是一个布尔值（2026-11-11）：
+  // 技能清单随工作空间变，换会话必须重取；用布尔值就得在 effect 顶部
+  // 同步 setState 去复位，而那是 React 明确不建议的写法（eslint 直接报
+  // react-hooks/set-state-in-effect）。
+  const [loadedSessionId, setLoadedSessionId] = useState<string | null>(null);
+  const commandsLoaded = loadedSessionId === sessionId;
   const [commandMenuOpen, setCommandMenuOpen] = useState(false);
   const [commandActiveIndex, setCommandActiveIndex] = useState(0);
   const commandMenuRef = useRef<HTMLDivElement>(null); // 失焦关闭判定用
   const inputRef = useRef<HTMLTextAreaElement>(null); // 聚焦/自适应高度用
 
+  // 快照跟着会话走：换会话 = 换工作空间 = 换技能清单，必须重取
   useEffect(() => {
-    fetchCommands()
+    // 会话可能在请求途中又被切走：用 cancelled 丢弃过期响应（否则慢响应会把
+    // 上一个会话的技能名单盖到新会话上）
+    let cancelled = false;
+    fetchCommands(sessionId)
       .then((r) => {
+        if (cancelled) return;
         setCommands(r.commands);
-        setCommandsLoaded(true);
+        setLoadedSessionId(sessionId);
       })
       .catch(() => {
         /* 命令面板不可用不阻塞聊天（命令快照是增强，不是依赖）；
            保持 commandsLoaded=false：提交时跳过前端校验交给后端判 */
       });
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId]);
 
   // 输入框随内容长高（上限由 CSS 的 max-height 兜住）
   useEffect(() => {

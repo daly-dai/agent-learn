@@ -171,7 +171,7 @@ export async function saveUpdateLog(
 ): Promise<boolean> {
   try {
     const date = datePrefix();
-    const dir = join(config.paths.workspace, "更新日志");
+    const dir = config.paths.repoLogs;
     await mkdir(dir, { recursive: true });
     const file = join(dir, `${date}-${repoName}.md`);
 
