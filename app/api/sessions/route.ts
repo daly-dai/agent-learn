@@ -7,7 +7,7 @@
 //   /api/chat      管「会话里的对话」—— 发消息 / 历史 / 清空当前会话消息
 //
 // 接口一览：
-//   GET    → 会话列表 [{ id, title?, updatedAt, preview?, cwd }]（全量、跨工作空间）
+//   GET    → { sessions: [...], sessionsRoot }（全量、跨工作空间；侧栏要给分组与"存在哪"）
 //   POST   → 新建空会话（body: { workspaceId, title? }）→ { id }
 //   PATCH  → 重命名（body: { id, title }）→ { ok }
 //   DELETE → 删除会话（?id=）→ { ok }
@@ -31,7 +31,9 @@ export const runtime = "nodejs";
 // --- GET /api/sessions：会话列表（扫全部工作空间分组） ---
 export async function GET() {
   const sessions = await sessionManager.list();
-  return NextResponse.json({ sessions });
+  // sessionsRoot 一起回去：侧栏页脚要如实交代"会话存在哪"（数据根可被
+  // STATVE_HOME 覆盖，前端不能自己拼这个路径）
+  return NextResponse.json({ sessions, sessionsRoot: config.paths.sessions });
 }
 
 // --- POST /api/sessions：在指定工作空间里新建空会话 ---

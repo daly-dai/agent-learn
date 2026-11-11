@@ -14,7 +14,7 @@
 //      目录两次请求顺序可能不同，界面会"跳"。
 // ============================================================
 
-import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, parse, resolve } from "node:path";
 import { homedir } from "node:os";
 import { WorkspaceError, isFullyQualifiedPath } from "@/lib/workspace";
@@ -88,40 +88,6 @@ export function listDirectory(params: {
 }
 
 /**
- * 在 `path` 下新建一个**单层**目录，返回新目录的绝对路径。
- * 不递归：多层的需求是"你输错了"，悄悄帮你建一串目录只会让人更困惑。
- */
-export function createDirectory(params: {
-  path: string;
-  name: string;
-}): string {
-  const parent = requireDirectory(params.path);
-  const name = params.name.trim();
-  if (!isSingleSegmentName(name)) {
-    throw new WorkspaceError(
-      "invalid-path",
-      "名字只能是一层，不能含分隔符，也不能是 . 或 ..",
-    );
-  }
-
-  const target = join(parent, name);
-  if (existsSync(target)) {
-    throw new WorkspaceError("duplicate", `同名文件夹已经存在：${target}`);
-  }
-
-  try {
-    // 不传 recursive：父目录必须已存在（已由 requireDirectory 保证）
-    mkdirSync(target);
-  } catch (error) {
-    throw new WorkspaceError(
-      "not-a-directory",
-      `新建文件夹失败：${(error as Error).message}`,
-    );
-  }
-  return target;
-}
-
-/**
  * 校验并**规范化**一个"要拿来当目录"的路径。
  * 三道门：完全限定 → 存在 → 是目录。分别报不同的错（界面文案不同）。
  */
@@ -144,17 +110,6 @@ export function requireDirectory(path: string): string {
     throw new WorkspaceError("not-a-directory", `这不是文件夹：${path}`);
   }
   return normalized;
-}
-
-/** 名字必须是**一层**：不能含分隔符，不能是 `.` / `..`，不能为空 */
-export function isSingleSegmentName(name: string): boolean {
-  return (
-    name !== "" &&
-    name !== "." &&
-    name !== ".." &&
-    !name.includes("/") &&
-    !name.includes("\\")
-  );
 }
 
 /**

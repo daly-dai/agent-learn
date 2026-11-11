@@ -15,8 +15,6 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
   buildCrumbs,
-  createDirectory,
-  isSingleSegmentName,
   listDirectory,
   parentOf,
   requireDirectory,
@@ -130,28 +128,5 @@ describe("面包屑与上一层", () => {
   it("普通目录的上一层是父目录", () => {
     const root = makeTree();
     expect(parentOf(join(root, "alpha"))).toBe(resolve(root));
-  });
-});
-
-describe("createDirectory —— 只收一层名字、不递归、重名拒绝", () => {
-  it("正常新建：返回新目录绝对路径", () => {
-    const root = makeTree();
-    const created = createDirectory({ path: root, name: "new-proj" });
-    expect(created).toBe(join(resolve(root), "new-proj"));
-    expect(requireDirectory(created)).toBe(created);
-  });
-
-  it("名字必须是单层：`a\\b` / `/` / `.` / `..` 一律拒（那是输错了，不是要建两层）", () => {
-    for (const bad of ["a\\b", "a/b", ".", "..", ""]) {
-      expect(isSingleSegmentName(bad)).toBe(false);
-      expect(() => createDirectory({ path: makeTree(), name: bad })).toThrow();
-    }
-  });
-
-  it("同名已存在 → duplicate（409 的语义在模块里就定了）", () => {
-    const root = makeTree();
-    expect(() => createDirectory({ path: root, name: "alpha" })).toThrowError(
-      /已经存在/,
-    );
   });
 });

@@ -16,9 +16,6 @@ import type { Workspace } from "@/lib/workspace";
 /** 每组默认先渲染几条（详案 4.4 规则 7） */
 export const INITIAL_VISIBLE_SESSIONS = 5;
 
-/** 未登记组的标题（删过记录 / 手工放进来的旧会话） */
-export const UNREGISTERED_TITLE = "未登记的工作空间";
-
 /** 分组只依赖这三个字段：传进来的对象原样保留（title / preview 都跟着走） */
 export type GroupableSession = {
   id: string;
@@ -27,17 +24,17 @@ export type GroupableSession = {
 };
 
 export type SessionGroup<T extends GroupableSession> = {
-  /** 工作空间的 canonical 路径；未登记组为空串 */
+  /** 工作空间的 canonical 路径 */
   key: string;
   title: string;
-  /** 未登记组没有 id */
-  workspaceId?: string;
+  /** 每个组都对应一条真实记录（不再有"未登记"这种没有记录的分组） */
+  workspaceId: string;
   sessions: T[];
 };
 
 /**
  * 按工作空间分组。
- * 组顺序 = 工作空间记录的 `updatedAt` 倒序（最近动过的排前面），未登记组永远最后；
+ * 组顺序 = 工作空间记录的 `updatedAt` 倒序（最近动过的排前面）；
  * 组内按会话 `updatedAt` 倒序。
  */
 export function groupSessions<T extends GroupableSession>(
@@ -48,20 +45,17 @@ export function groupSessions<T extends GroupableSession>(
     workspaces.map((workspace) => [workspace.path, workspace]),
   );
   const buckets = new Map<string, T[]>();
-  const unregistered: T[] = [];
 
   for (const session of sessions) {
+    // 匹配不到记录的会话**丢弃**（见文件头：bootstrap 保证这种状态不该存在）
     const workspace = byPath.get(session.cwd);
-    if (workspace === undefined) {
-      unregistered.push(session);
-      continue;
-    }
+    if (workspace === undefined) continue;
     const bucket = buckets.get(workspace.path) ?? [];
     bucket.push(session);
     buckets.set(workspace.path, bucket);
   }
 
-  const registered = [...workspaces]
+  return [...workspaces]
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
     .map((workspace) => ({
       key: workspace.path,
@@ -69,17 +63,6 @@ export function groupSessions<T extends GroupableSession>(
       workspaceId: workspace.id,
       sessions: sortByUpdatedDesc(buckets.get(workspace.path) ?? []),
     }));
-
-  if (unregistered.length === 0) return registered;
-
-  return [
-    ...registered,
-    {
-      key: "",
-      title: UNREGISTERED_TITLE,
-      sessions: sortByUpdatedDesc(unregistered),
-    },
-  ];
 }
 
 /**

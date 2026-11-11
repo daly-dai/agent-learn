@@ -5,10 +5,13 @@
 //   GET    → { workspaces }（按 updatedAt 倒序）
 //   POST   → { path, title? } → { workspace }（409 = 这个文件夹已登记）
 //   PATCH  → { id, title }   → { workspace }（**只改显示名**）
-//   DELETE → ?id=            → { ok: true, unregisteredSessions: n }
+//   DELETE → ?id=            → { ok: true, deletedSessions: n }
 //
-// 关键语义（决策 13）：**删记录 ≠ 删会话**。删掉的只是 workspaces.json 里那一条，
-// 会话目录一个字节都不动；下一次列表刷新，它们出现在「未登记的工作空间」组里。
+// 关键语义（2026-11-11 用户改的，取代了旧决策 13）：**"所有会话必须有对应的工作空间"**。
+// 所以删除工作空间 = **记录 + 它名下的会话一起删**（界面必须二次确认并说清会话数）。
+// 为什么粗暴地连带删：只删记录的话，下次 bootstrap 扫到"盘上还有会话、表里没记录"，
+// 会把记录原样补回来 —— 删了等于没删；而留一个"未登记"组等于允许无主会话存在，
+// 那正是这一版要消灭的状态。
 //
 // ⚠️ 顺带做 bootstrap（"启动时补登记"的落地方式）：每次 GET 先扫一遍会话头，
 // 把磁盘上有会话、表里没有的 cwd 补成记录。为什么放在 GET 而不是进程启动钩子：
@@ -23,6 +26,7 @@ import {
   bootstrapWorkspaces,
   createWorkspace,
   deleteWorkspace,
+  loadWorkspaces,
   renameWorkspace,
 } from "@/lib/workspace";
 import { config } from "@/lib/config";
@@ -96,11 +100,19 @@ export async function DELETE(req: NextRequest) {
   }
 
   try {
-    const { unregisteredSessions } = await deleteWorkspace(config.paths.home, {
-      id,
-      sessionCwds: await sessionCwds(),
-    });
-    return NextResponse.json({ ok: true, unregisteredSessions });
+    // 先找到记录（要它的 path 才知道删哪些会话）；找不到就是 404，不误删
+    const records = await loadWorkspaces(config.paths.home);
+    const record = records.find((item) => item.id === id);
+    if (!record) {
+      return NextResponse.json({ error: "工作空间不存在" }, { status: 404 });
+    }
+
+    // 顺序：先删会话，再删记录（反过来的话 bootstrap 会把记录补回来）
+    const deletedSessions = await sessionManager.deleteSessionsWithCwd(
+      record.path,
+    );
+    await deleteWorkspace(config.paths.home, { id });
+    return NextResponse.json({ ok: true, deletedSessions });
   } catch (error) {
     return workspaceErrorResponse(error);
   }

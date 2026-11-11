@@ -138,6 +138,28 @@ export class SessionManager {
   }
 
   /**
+   * 删除**某个工作空间下的全部会话**（删工作空间的连带动作）。
+   *
+   * 为什么要有它（2026-11-11 用户定："所有会话必须有对应的工作空间，粗暴一点"）：
+   * 删工作空间必须是"记录 + 它名下的会话一起走"—— 否则删完的记录会被下一次
+   * bootstrap 又补回来（盘上还有会话的 cwd），删了等于没删。
+   *
+   * 返回删掉的会话数（界面要用它说"共删除 N 个会话"）。
+   */
+  async deleteSessionsWithCwd(cwd: string): Promise<number> {
+    let deleted = 0;
+
+    for (const found of await scanSessions(this.root)) {
+      const location = await readLocation(found);
+      if (!location || location.cwd !== cwd) continue;
+      await rm(location.dir, { recursive: true, force: true });
+      deleted += 1;
+    }
+
+    return deleted;
+  }
+
+  /**
    * 按 id 找会话（扫所有项目目录，拿目录名与 `encodeSegment(id)` 比）。
    * 为什么用编码比而不是读头里的 id：编码是**单射**的，比一次字符串就知道
    * 是不是同一个会话；读头则要为每个候选都开文件。

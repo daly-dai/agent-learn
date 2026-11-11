@@ -2,7 +2,7 @@
 // 会话分组（C49）—— 纯函数用例
 // ============================================================
 // 这一层的"会错且不报错"的形状有三种，用例就盯这三件事：
-//   ① 归属判错（会话落到错的工作空间，或该进未登记却没进）
+//   ① 归属判错（会话落到错的工作空间）
 //   ② 顺序错（组的顺序 / 组内顺序 —— 用户看到的"最近在哪"直接错）
 //   ③ 空组消失（刚建的空工作空间看不见，用户以为没建成）
 
@@ -10,7 +10,6 @@ import { describe, expect, it } from "vitest";
 import type { Workspace } from "@/lib/workspace";
 import {
   INITIAL_VISIBLE_SESSIONS,
-  UNREGISTERED_TITLE,
   foldGroup,
   groupSessions,
   type GroupableSession,
@@ -59,26 +58,21 @@ describe("groupSessions —— 归属", () => {
     expect(groups[0].workspaceId).toBe(projA.id);
   });
 
-  it("匹配不到的 cwd（含空串）→ 未登记组，且排最后", () => {
+  it("匹配不到的 cwd（含空串）→ **不进任何组**（所有会话必须有工作空间）", () => {
+    // 这条守的是用户 2026-11-11 定的规则：不再有"未登记的工作空间"这种分组。
+    // 服务端每次列工作空间都会 bootstrap 补登记，所以这种输入正常不会出现；
+    // 真出现（注册表被手改坏）也不该显示成一个"看起来设计如此"的组。
     const groups = groupSessions(
       [session("E:\\proj-a", 100), session("E:\\gone", 900), session("", 800)],
       [projA],
     );
 
-    expect(groups).toHaveLength(2);
-    expect(groups[1].key).toBe("");
-    expect(groups[1].title).toBe(UNREGISTERED_TITLE);
-    expect(groups[1].workspaceId).toBeUndefined();
-    expect(groups[1].sessions.map((item) => item.cwd)).toEqual([
-      "E:\\gone",
-      "",
-    ]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].sessions.map((item) => item.cwd)).toEqual(["E:\\proj-a"]);
   });
 
-  it("没有工作空间、只有会话 → 一个未登记组", () => {
-    const groups = groupSessions([session("E:\\x", 1)], []);
-    expect(groups).toHaveLength(1);
-    expect(groups[0].title).toBe(UNREGISTERED_TITLE);
+  it("没有工作空间、只有会话 → 一个组都没有（不造无主组）", () => {
+    expect(groupSessions([session("E:\\x", 1)], [])).toEqual([]);
   });
 
   it("什么都没有 → 空列表（不造一个空组出来）", () => {
@@ -87,12 +81,12 @@ describe("groupSessions —— 归属", () => {
 });
 
 describe("groupSessions —— 顺序与空组", () => {
-  it("组按工作空间 updatedAt 倒序（未登记组压最后）", () => {
+  it("组按工作空间 updatedAt 倒序", () => {
     const groups = groupSessions(
       [
         session("E:\\proj-a", 100),
         session("D:\\proj-b", 100),
-        session("E:\\gone", 999),
+        session("E:\\gone", 999), // 无主会话：不进任何组，也不影响组顺序
       ],
       [projA, projB, emptyWs],
     );
@@ -101,7 +95,6 @@ describe("groupSessions —— 顺序与空组", () => {
       "empty",
       "proj-b",
       "proj-a",
-      UNREGISTERED_TITLE,
     ]);
   });
 

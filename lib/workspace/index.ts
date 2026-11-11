@@ -204,13 +204,20 @@ export async function renameWorkspace(
 }
 
 /**
- * 删除：**只删记录**，会话目录一个字节都不动。
- * 返回的 `unregisteredSessions` 让界面能说"还有 n 个会话归到了未登记组"。
+ * 删除记录本身。
+ *
+ * ⚠️ 2026-11-11（用户定："所有会话必须有对应的工作空间"）：这个函数**只删记录**，
+ * 它名下的会话由**调用方**一并删掉（`SessionManager.deleteSessionsWithCwd`）。
+ * 为什么不让本模块去删会话：注册表不该知道会话存在哪（那是 `lib/session/paths`
+ * 的事），两个模块各管各的落盘结构。
+ *
+ * ⚠️ 顺序也很重要：**先删会话、再删记录**。反过来的话，下一次 bootstrap 会发现
+ * "盘上还有会话、表里没有记录"，把刚删掉的记录又补回来 —— 删了等于没删。
  */
 export async function deleteWorkspace(
   home: string,
-  input: { id: string; sessionCwds: string[] },
-): Promise<{ removed: Workspace; unregisteredSessions: number }> {
+  input: { id: string },
+): Promise<{ removed: Workspace }> {
   return serial(async () => {
     const records = await loadWorkspaces(home);
     const removed = records.find((record) => record.id === input.id);
@@ -219,10 +226,7 @@ export async function deleteWorkspace(
       home,
       records.filter((record) => record.id !== input.id),
     );
-    return {
-      removed,
-      unregisteredSessions: input.sessionCwds.filter((cwd) => cwd === removed.path).length,
-    };
+    return { removed };
   });
 }
 

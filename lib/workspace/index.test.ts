@@ -7,6 +7,7 @@
 //   ③ 失败语义：坏文件必须**大声报错**（静默重建 = 悄悄删光工作空间）
 
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -194,19 +195,17 @@ describe("碰盘：增 / 改名 / 删", () => {
     });
   });
 
-  it("删除只删记录，并报出会变成未登记的会话数", async () => {
+  it("删除只删记录本身（会话由调用方一并删 —— 见 deleteWorkspace 的注释）", async () => {
     const home = await makeHome();
     const folder = await makeFolder(home, "proj-a");
     const created = await createWorkspace(home, { path: folder });
 
-    const result = await deleteWorkspace(home, {
-      id: created.id,
-      sessionCwds: [folder, folder, join(home, "other")],
-    });
+    const result = await deleteWorkspace(home, { id: created.id });
 
     expect(result.removed.id).toBe(created.id);
-    expect(result.unregisteredSessions).toBe(2);
     await expect(loadWorkspaces(home)).resolves.toEqual([]);
+    // 目录还在：本模块不该碰任何会话/文件夹
+    expect(existsSync(folder)).toBe(true);
   });
 
   it("并发新增 5 个：一条都不丢（写队列的证明）", async () => {
